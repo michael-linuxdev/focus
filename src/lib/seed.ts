@@ -1,14 +1,19 @@
 import { addDays, isWeekday, parseISODate, startOfISOWeek, toISODate } from "@/lib/dates"
+import { demoDecisions, demoDecline, demoEnergy, demoHabitsForDay } from "@/lib/seed-modules"
 import { minutesBetween } from "@/lib/time"
 import {
   DEFAULT_SETTINGS,
   type AppState,
   type Category,
   type DailyHabit,
+  type DeclineLog,
+  type EnergyLog,
+  type ModuleHabit,
   type Reflection,
   type ReflectionScore,
   type TimeBlock,
   type WeeklyPriorities,
+  enabledHabits,
 } from "@/lib/types"
 
 type RawBlock = [start: string, end: string, category: Category, note: string]
@@ -408,6 +413,9 @@ export function createDemoState(today: Date): AppState {
   const dailyHabits: DailyHabit[] = []
   const weeklyPriorities: WeeklyPriorities[] = []
   const reflections: Reflection[] = []
+  const moduleHabits: ModuleHabit[] = []
+  const energyLogs: EnergyLog[] = []
+  const declines: DeclineLog[] = []
 
   for (const week of WEEKS) {
     const monday = addDays(currentMonday, week.offset * 7)
@@ -416,6 +424,12 @@ export function createDemoState(today: Date): AppState {
     week.days.forEach((plan, index) => {
       const date = toISODate(addDays(monday, index))
       pushDay(date, plan, timeBlocks, dailyHabits, reflections, todayIso)
+      if (date > todayIso) return
+      moduleHabits.push(...demoHabitsForDay(week.offset, index, date))
+      const energy = demoEnergy(week.offset, index, date)
+      if (energy) energyLogs.push(energy)
+      const decline = demoDecline(week.offset, index, date)
+      if (decline) declines.push(decline)
     })
     if (week.sunday) {
       pushDay(toISODate(addDays(monday, 6)), week.sunday, timeBlocks, dailyHabits, reflections, todayIso)
@@ -434,12 +448,32 @@ export function createDemoState(today: Date): AppState {
 
   timeBlocks.sort((a, b) => a.date.localeCompare(b.date) || (a.start ?? "").localeCompare(b.start ?? ""))
 
+  const decisionDemo = demoDecisions(today)
+  const habitKeys = new Set(moduleHabits.map((habit) => `${habit.kind}|${habit.date}`))
+  for (const habit of decisionDemo.habits) {
+    if (!habitKeys.has(`${habit.kind}|${habit.date}`)) moduleHabits.push(habit)
+  }
+
   return {
     version: 1,
     timeBlocks,
     dailyHabits,
     weeklyPriorities,
     reflections,
-    settings: { ...DEFAULT_SETTINGS },
+    decisions: decisionDemo.decisions,
+    moduleHabits,
+    energyLogs,
+    declines,
+    onboarding: {
+      status: "pending",
+      completed: false,
+      role: null,
+      pain: null,
+      time: null,
+    },
+    settings: {
+      ...DEFAULT_SETTINGS,
+      enabledHabits: enabledHabits(true),
+    },
   }
 }

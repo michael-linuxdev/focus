@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { toast } from "sonner"
 import { PageIntro } from "@/components/page-intro"
+import { useOnboardingWizard } from "@/components/onboarding/onboarding-context"
 import { useFocus } from "@/components/focus-provider"
 import { Button } from "@/components/ui/button"
 import {
@@ -16,11 +17,13 @@ import {
 import { Slider } from "@/components/ui/slider"
 import { formatMinutes } from "@/lib/format"
 import { STRATEGY_BLOCK_OPTIONS } from "@/lib/labels"
+import { MESSAGE_WINDOW_PRESETS } from "@/lib/modules"
 import { STORAGE_KEY } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 export function SettingsView() {
   const { state, hasDemo, updateSettings, clearDemo, loadDemo, clearAll } = useFocus()
+  const { openWizard } = useOnboardingWizard()
   const [confirmClear, setConfirmClear] = useState(false)
   const [confirmDemo, setConfirmDemo] = useState(false)
 
@@ -91,6 +94,66 @@ export function SettingsView() {
       </section>
 
       <section className="rounded-3xl bg-card p-5 ring-1 ring-foreground/10 sm:p-6">
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <h2 className="font-serif text-2xl tracking-tight">Entscheidungsbudget</h2>
+            <p className="mt-1 text-sm text-muted-foreground text-pretty">
+              So viele wichtige Entscheidungen an einem Tag. Kleine zählen nicht. Darüber hinaus verblasst das Budgettor im Palast.
+            </p>
+          </div>
+          <p className="font-serif text-5xl tabular-nums">{state.settings.decisionBudget}</p>
+        </div>
+        <Slider
+          className="mt-6"
+          aria-label="Entscheidungsbudget pro Tag"
+          min={1}
+          max={6}
+          step={1}
+          value={[state.settings.decisionBudget]}
+          onValueChange={(value) => {
+            const next = Array.isArray(value) ? value[0] : value
+            updateSettings({ decisionBudget: next })
+          }}
+        />
+      </section>
+
+      <section className="rounded-3xl bg-card p-5 ring-1 ring-foreground/10 sm:p-6">
+        <h2 className="font-serif text-2xl tracking-tight">Nachrichtenfenster</h2>
+        <p className="mt-1 text-sm text-muted-foreground text-pretty">
+          E-Mail und Slack nur in diesen Zeiten. Die Gewohnheit selbst hakst du auf der Seite Grenzen ab.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {MESSAGE_WINDOW_PRESETS.map((preset) => {
+            const selected = state.settings.messageWindows === preset
+            return (
+              <button
+                key={preset}
+                type="button"
+                aria-pressed={selected}
+                onClick={() => updateSettings({ messageWindows: preset })}
+                className={cn(
+                  "min-h-11 rounded-xl border px-4 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                  selected ? "border-strategic bg-[#e7f3ef] text-strategic" : "border-border bg-background",
+                )}
+              >
+                {preset}
+              </button>
+            )
+          })}
+        </div>
+      </section>
+
+      <section className="rounded-3xl bg-card p-5 ring-1 ring-foreground/10 sm:p-6">
+        <h2 className="font-serif text-2xl tracking-tight">Gewohnheiten</h2>
+        <p className="mt-1 text-sm text-muted-foreground text-pretty">
+          Die drei Fragen von vorn. Was du abwählst, verschwindet aus dem Tagesstreifen. Im Palast bleibt der Raum stehen.
+        </p>
+        <Button type="button" variant="outline" className="mt-4 h-10 bg-background px-4" onClick={openWizard}>
+          Einrichtung öffnen
+        </Button>
+      </section>
+
+      <section className="rounded-3xl bg-card p-5 ring-1 ring-foreground/10 sm:p-6">
         <h2 className="font-serif text-2xl tracking-tight">Was die Kategorien meinen</h2>
         <dl className="mt-4 space-y-3 text-sm">
           <div>
@@ -142,7 +205,7 @@ export function SettingsView() {
           <DialogHeader>
             <DialogTitle>Demodaten entfernen?</DialogTitle>
             <DialogDescription>
-              Beispielblöcke, Beispielgewohnheiten und Beispielreflexionen werden gelöscht. Eigene Einträge bleiben.
+              Beispielblöcke, Beispielgewohnheiten, Beispielentscheidungen und Beispielreflexionen werden gelöscht. Eigene Einträge bleiben.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -168,7 +231,7 @@ export function SettingsView() {
           <DialogHeader>
             <DialogTitle>Alle Daten löschen?</DialogTitle>
             <DialogDescription>
-              Zeitblöcke, Gewohnheiten, Reflexionen und Einstellungen in diesem Browser werden entfernt. Das lässt sich nicht rückgängig machen. Danach kannst du die Demodaten neu laden.
+              Zeitblöcke, Gewohnheiten, Entscheidungen, Energie und Einstellungen in diesem Browser werden entfernt. Das lässt sich nicht rückgängig machen. Danach kannst du die Demodaten neu laden.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

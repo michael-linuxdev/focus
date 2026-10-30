@@ -145,3 +145,59 @@
   background: oklch(0.86 0.04 165);
   color: oklch(0.25 0.02 170);
 }
+
+@keyframes palace-lamp {
+  0%,
+  100% {
+    opacity: 0.62;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes palace-dust {
+  0% {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  18% {
+    opacity: 0.75;
+  }
+  100% {
+    transform: translateY(-34px);
+    opacity: 0;
+  }
+}
+
+@keyframes palace-water {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(1.5px);
+  }
+}
+
+.palace-lamp {
+  animation: palace-lamp 5.6s ease-in-out infinite;
+}
+
+.palace-dust {
+  animation: palace-dust 7.5s ease-in infinite;
+}
+
+.palace-water {
+  animation: palace-water 4.8s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .palace-lamp,
+  .palace-dust,
+  .palace-water {
+    animation: none;
+  }
+}

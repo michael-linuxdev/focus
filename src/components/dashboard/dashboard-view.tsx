@@ -2,7 +2,10 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import { EveningRitual } from "@/components/dashboard/evening-ritual"
 import { HabitStrip } from "@/components/dashboard/habit-strip"
+import { TodayBoard } from "@/components/dashboard/today-board"
+import { PalaceHero } from "@/components/palace/palace-hero"
 import { Heatmap } from "@/components/dashboard/heatmap"
 import { HeroMetric } from "@/components/dashboard/hero-metric"
 import { ReflectionChart } from "@/components/dashboard/reflection-chart"
@@ -13,6 +16,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card"
 import { addDays, isoWeekNumber, parseISODate, toISODate, weekStartOffset } from "@/lib/dates"
 import { formatLongDate, formatMinutes, formatTimeRange, formatWeekRange } from "@/lib/format"
+import { pendingReviews } from "@/lib/modules"
 import { buildInsights, summarize, weekSeries } from "@/lib/stats"
 import { CategoryPill } from "@/components/category-pill"
 
@@ -38,9 +42,26 @@ export function DashboardView() {
   const current = offset === 0
   const unfinished = current && today < weekEnd
   const weekNumber = isoWeekNumber(parseISODate(weekStart))
+  const reviews = pendingReviews(state, today)
 
   return (
     <div className="space-y-6">
+      <PalaceHero />
+      <TodayBoard />
+      <EveningRitual />
+      {reviews.length > 0 ? (
+        <Link
+          href="/entscheidungen"
+          className="block rounded-3xl bg-[#fbf6ea] px-5 py-4 ring-1 ring-[#e4d3a1] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        >
+          <p className="text-sm font-medium">
+            {reviews.length === 1
+              ? `„${reviews[0].title}“ wartet auf einen Satz: Was habe ich gelernt?`
+              : `${reviews.length} Entscheidungen warten auf einen Satz: Was habe ich gelernt?`}
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">Nachlese öffnen</p>
+        </Link>
+      ) : null}
       <WeekSwitcher
         title={`KW ${weekNumber} · ${formatWeekRange(weekStart, weekEnd)}`}
         detail={current ? "Aktuelle Woche" : "Vergangene Woche"}

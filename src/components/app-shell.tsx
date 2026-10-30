@@ -1,18 +1,25 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Clock, LayoutDashboard, Settings, Target } from "lucide-react"
+import { Clock, LayoutDashboard, Scale, Settings, Shield, Target } from "lucide-react"
 import { DemoBanner } from "@/components/demo-banner"
 import { useFocus } from "@/components/focus-provider"
+import { OnboardingGate } from "@/components/onboarding/onboarding-gate"
+import { OnboardingWizardProvider } from "@/components/onboarding/onboarding-context"
 import { cn } from "@/lib/utils"
 
 const NAV = [
-  { href: "/", label: "Überblick", icon: LayoutDashboard },
-  { href: "/zeit", label: "Zeiterfassung", icon: Clock },
-  { href: "/fokus", label: "Fokus", icon: Target },
-  { href: "/einstellungen", label: "Einstellungen", icon: Settings },
+  { href: "/", label: "Überblick", short: "Überblick", icon: LayoutDashboard },
+  { href: "/zeit", label: "Zeiterfassung", short: "Zeit", icon: Clock },
+  { href: "/fokus", label: "Fokus", short: "Fokus", icon: Target },
+  { href: "/entscheidungen", label: "Entscheidungen", short: "Entscheide", icon: Scale },
+  { href: "/grenzen", label: "Grenzen & Energie", short: "Grenzen", icon: Shield },
+  { href: "/einstellungen", label: "Einstellungen", short: "Einstell.", icon: Settings },
 ] as const
+
+const MOBILE_NAV = NAV.filter((item) => item.href !== "/einstellungen")
 
 function Mark({ className }: { className?: string }) {
   return (
@@ -90,7 +97,21 @@ function LoadingState() {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const { ready, warning } = useFocus()
+  const { ready, warning, state, dismissOnboarding } = useFocus()
+  const [wizard, setWizard] = useState(false)
+  const phase = ready ? state.onboarding.status : "boot"
+  const [seenPhase, setSeenPhase] = useState<string | null>(null)
+  if (phase === "pending" && seenPhase !== "pending") {
+    setSeenPhase("pending")
+    setWizard(true)
+  } else if (phase !== "pending" && seenPhase === "pending") {
+    setSeenPhase(phase)
+  }
+
+  function dismiss() {
+    setWizard(false)
+    if (state.onboarding.status !== "done") dismissOnboarding()
+  }
 
   return (
     <div className="min-h-dvh bg-background">
@@ -120,6 +141,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Link href="/" className="rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
             <Wordmark />
           </Link>
+          <Link
+            href="/einstellungen"
+            aria-label="Einstellungen"
+            className="grid size-11 place-items-center rounded-xl text-foreground"
+          >
+            <Settings className="size-5" aria-hidden="true" />
+          </Link>
         </header>
         <main id="inhalt" className="mx-auto w-full max-w-6xl px-4 py-6 pb-28 sm:px-6 lg:px-8 lg:py-8 lg:pb-12">
           {warning ? (
@@ -127,8 +155,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               {warning}
             </p>
           ) : null}
-          {ready ? <DemoBanner /> : null}
-          {ready ? children : <LoadingState />}
+          {ready ? (
+            <OnboardingWizardProvider value={{ openWizard: () => setWizard(true) }}>
+              <div inert={wizard ? true : undefined}>
+                <DemoBanner />
+                <OnboardingGate
+                  open={wizard}
+                  onOpen={() => setWizard(true)}
+                  onClose={() => setWizard(false)}
+                  onDismiss={dismiss}
+                />
+                {children}
+              </div>
+            </OnboardingWizardProvider>
+          ) : (
+            <LoadingState />
+          )}
         </main>
       </div>
 
@@ -137,22 +179,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         aria-label="Hauptnavigation"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
-        <ul className="grid grid-cols-4">
-          {NAV.map((item) => {
+        <ul className="grid grid-cols-5">
+          {MOBILE_NAV.map((item) => {
             const active = pathname === item.href
             const Icon = item.icon
             return (
               <li key={item.href}>
                 <Link
                   href={item.href}
+                  aria-label={item.label}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "flex min-h-16 flex-col items-center justify-center gap-1 text-[11px] font-medium",
+                    "flex min-h-16 flex-col items-center justify-center gap-1 px-0.5 text-center text-[10px] leading-tight font-medium",
                     active ? "text-strategic" : "text-muted-foreground",
                   )}
                 >
                   <Icon className="size-5" aria-hidden="true" />
-                  {item.label}
+                  {item.short}
                 </Link>
               </li>
             )

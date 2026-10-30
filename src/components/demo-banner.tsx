@@ -24,8 +24,8 @@ export function DemoBanner() {
       className="mb-6 flex flex-col gap-3 rounded-2xl border border-[#e4d3a1] bg-[#fbf6ea] px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
     >
       <p className="text-sm text-pretty">
-        <span className="font-medium">Demodaten.</span> Sechs Wochen eines Geschäftsführers, klar als Beispiel
-        markiert — keine echten Termine. Eigene Einträge bleiben erhalten, wenn du die Demo entfernst.
+        <span className="font-medium">Demodaten.</span> Sechs Wochen eines Geschäftsführers: Zeit, Entscheidungen
+        und Grenzen, klar als Beispiel markiert. Eigene Einträge bleiben erhalten, wenn du die Demo entfernst.
       </p>
       <Button type="button" variant="outline" className="h-10 shrink-0 bg-card px-3" onClick={() => setOpen(true)}>
         Demodaten entfernen
@@ -35,8 +35,8 @@ export function DemoBanner() {
           <DialogHeader>
             <DialogTitle>Demodaten entfernen?</DialogTitle>
             <DialogDescription>
-              Beispielblöcke, Beispielgewohnheiten und Beispielreflexionen werden gelöscht. Was du selbst erfasst hast,
-              bleibt in diesem Browser.
+              Beispielblöcke, Beispielgewohnheiten, Beispielentscheidungen und Beispielreflexionen werden gelöscht. Was
+              du selbst erfasst hast, bleibt in diesem Browser.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
