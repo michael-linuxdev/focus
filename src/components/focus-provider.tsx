@@ -5,15 +5,24 @@ import { ThemeProvider } from "next-themes"
 import { Toaster } from "@/components/ui/sonner"
 import { parseISODate, todayISO } from "@/lib/dates"
 import { createId } from "@/lib/ids"
+import { importantCount, normalizeSettings } from "@/lib/modules"
 import { createPersistence, type FocusPersistence } from "@/lib/persistence"
 import { createDemoState } from "@/lib/seed"
 import {
   createEmptyState,
   type AppState,
   type DailyHabitKind,
+  type DecisionDraft,
+  type EnabledHabits,
+  type EnergyLevel,
+  type ModuleHabit,
+  type ModuleHabitKind,
+  type PainChoice,
   type ReflectionScore,
+  type RoleChoice,
   type Settings,
   type TimeBlockDraft,
+  type TimeChoice,
   type WeeklyPriorities,
 } from "@/lib/types"
 
@@ -102,6 +111,21 @@ interface FocusContextValue {
   ) => void
   saveReflection: (date: string, score: ReflectionScore, note: string) => void
   updateSettings: (patch: Partial<Settings>) => void
+  setModuleHabit: (kind: ModuleHabitKind, date: string, done: boolean) => void
+  toggleModuleHabit: (kind: ModuleHabitKind, date: string) => void
+  addDecision: (draft: DecisionDraft) => boolean
+  deleteDecision: (id: string) => void
+  saveLearning: (id: string, learning: string) => void
+  saveEnergy: (date: string, level: EnergyLevel) => void
+  incrementDeclines: (date: string) => void
+  decrementDeclines: (date: string) => void
+  completeOnboarding: (profile: {
+    role: RoleChoice
+    pain: PainChoice
+    time: TimeChoice
+    enabled: EnabledHabits
+  }) => void
+  dismissOnboarding: () => void
   clearDemo: () => void
   loadDemo: () => void
   clearAll: () => void
@@ -114,12 +138,33 @@ function demoPresent(state: AppState): boolean {
     state.timeBlocks.some((block) => block.demo) ||
     state.dailyHabits.some((habit) => habit.demo) ||
     state.weeklyPriorities.some((week) => week.demo) ||
-    state.reflections.some((reflection) => reflection.demo)
+    state.reflections.some((reflection) => reflection.demo) ||
+    state.decisions.some((decision) => decision.demo) ||
+    state.moduleHabits.some((habit) => habit.demo) ||
+    state.energyLogs.some((entry) => entry.demo) ||
+    state.declines.some((entry) => entry.demo)
   )
 }
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, Math.round(value)))
+function withModuleHabit(current: AppState, kind: ModuleHabitKind, date: string, done: boolean): AppState {
+  const now = new Date().toISOString()
+  const existing = current.moduleHabits.find((habit) => habit.kind === kind && habit.date === date)
+  const next: ModuleHabit = existing
+    ? { ...existing, done, demo: false, updatedAt: now }
+    : { id: createId(), kind, date, done, demo: false, updatedAt: now }
+  return {
+    ...current,
+    moduleHabits: existing
+      ? current.moduleHabits.map((habit) => (habit.id === existing.id ? next : habit))
+      : [...current.moduleHabits, next],
+  }
+}
+
+function syncBudget(current: AppState, date: string): AppState {
+  const count = importantCount(current, date)
+  if (count > current.settings.decisionBudget) return withModuleHabit(current, "decision-budget", date, false)
+  if (count > 0) return withModuleHabit(current, "decision-budget", date, true)
+  return current
 }
 
 export function FocusProvider({ children }: { children: ReactNode }) {
@@ -228,14 +273,140 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     updateSettings: (patch) => {
       store.update((current) => ({
         ...current,
-        settings: {
-          targetPercent: clamp(patch.targetPercent ?? current.settings.targetPercent, 10, 80),
-          strategyBlockMinutes: clamp(
-            patch.strategyBlockMinutes ?? current.settings.strategyBlockMinutes,
-            30,
-            240,
+        settings: normalizeSettings({ ...current.settings, ...patch }, false),
+      }))
+    },
+    setModuleHabit: (kind, date, done) => {
+      store.update((current) => {
+        if (kind === "decision-budget" && done && importantCount(current, date) > current.settings.decisionBudget) {
+          return current
+        }
+        return withModuleHabit(current, kind, date, done)
+      })
+    },
+    toggleModuleHabit: (kind, date) => {
+      store.update((current) => {
+        const done = !current.moduleHabits.some((habit) => habit.kind === kind && habit.date === date && habit.done)
+        if (kind === "decision-budget" && done && importantCount(current, date) > current.settings.decisionBudget) {
+          return withModuleHabit(current, kind, date, false)
+        }
+        return withModuleHabit(current, kind, date, done)
+      })
+    },
+    addDecision: (draft) => {
+      const title = draft.title.trim().slice(0, 140)
+      if (!title) return false
+      const now = new Date().toISOString()
+      const date = draft.date && /^\d{4}-\d{2}-\d{2}$/.test(draft.date) ? draft.date : snapshot.today
+      return store.update((current) => {
+        let next: AppState = {
+          ...current,
+          decisions: [
+            ...current.decisions,
+            {
+              id: createId(),
+              title,
+              importance: draft.importance,
+              date,
+              sleptOn: draft.sleptOn,
+              proContra: draft.proContra,
+              learning: "",
+              demo: false,
+              createdAt: now,
+              updatedAt: now,
+            },
+          ],
+        }
+        if (draft.sleptOn) next = withModuleHabit(next, "sleep-on-it", date, true)
+        if (draft.proContra) next = withModuleHabit(next, "pro-contra", date, true)
+        return syncBudget(next, date)
+      })
+    },
+    deleteDecision: (id) => {
+      store.update((current) => {
+        const existing = current.decisions.find((decision) => decision.id === id)
+        if (!existing) return current
+        return syncBudget({ ...current, decisions: current.decisions.filter((decision) => decision.id !== id) }, existing.date)
+      })
+    },
+    saveLearning: (id, learning) => {
+      const now = new Date().toISOString()
+      const trimmed = learning.trim().slice(0, 280)
+      store.update((current) => {
+        const existing = current.decisions.find((decision) => decision.id === id)
+        if (!existing) return current
+        let next: AppState = {
+          ...current,
+          decisions: current.decisions.map((decision) =>
+            decision.id === id ? { ...decision, learning: trimmed, demo: false, updatedAt: now } : decision,
           ),
+        }
+        if (trimmed) next = withModuleHabit(next, "decision-review", snapshot.today || existing.date, true)
+        return next
+      })
+    },
+    saveEnergy: (date, level) => {
+      const now = new Date().toISOString()
+      store.update((current) => {
+        const existing = current.energyLogs.find((entry) => entry.date === date)
+        if (!existing) {
+          return {
+            ...current,
+            energyLogs: [...current.energyLogs, { id: createId(), date, level, demo: false, updatedAt: now }],
+          }
+        }
+        return {
+          ...current,
+          energyLogs: current.energyLogs.map((entry) =>
+            entry.date === date ? { ...entry, level, demo: false, updatedAt: now } : entry,
+          ),
+        }
+      })
+    },
+    incrementDeclines: (date) => {
+      const now = new Date().toISOString()
+      store.update((current) => {
+        const existing = current.declines.find((entry) => entry.date === date)
+        if (!existing) {
+          return {
+            ...current,
+            declines: [...current.declines, { id: createId(), date, count: 1, demo: false, updatedAt: now }],
+          }
+        }
+        return {
+          ...current,
+          declines: current.declines.map((entry) =>
+            entry.date === date ? { ...entry, count: Math.min(99, entry.count + 1), demo: false, updatedAt: now } : entry,
+          ),
+        }
+      })
+    },
+    decrementDeclines: (date) => {
+      const now = new Date().toISOString()
+      store.update((current) => ({
+        ...current,
+        declines: current.declines.map((entry) =>
+          entry.date === date ? { ...entry, count: Math.max(0, entry.count - 1), demo: false, updatedAt: now } : entry,
+        ),
+      }))
+    },
+    completeOnboarding: (profile) => {
+      store.update((current) => ({
+        ...current,
+        onboarding: {
+          status: "done",
+          completed: true,
+          role: profile.role,
+          pain: profile.pain,
+          time: profile.time,
         },
+        settings: normalizeSettings({ ...current.settings, enabledHabits: profile.enabled }, false),
+      }))
+    },
+    dismissOnboarding: () => {
+      store.update((current) => ({
+        ...current,
+        onboarding: { ...current.onboarding, status: "done", completed: current.onboarding.completed },
       }))
     },
     clearDemo: () => {
@@ -245,6 +416,10 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         dailyHabits: current.dailyHabits.filter((habit) => !habit.demo),
         weeklyPriorities: current.weeklyPriorities.filter((week) => !week.demo),
         reflections: current.reflections.filter((reflection) => !reflection.demo),
+        decisions: current.decisions.filter((decision) => !decision.demo),
+        moduleHabits: current.moduleHabits.filter((habit) => !habit.demo),
+        energyLogs: current.energyLogs.filter((entry) => !entry.demo),
+        declines: current.declines.filter((entry) => !entry.demo),
       }))
     },
     loadDemo: () => {
@@ -257,18 +432,27 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         const weekKeys = new Set(weeks.map((week) => week.weekStart))
         const reflections = current.reflections.filter((reflection) => !reflection.demo)
         const reflectionKeys = new Set(reflections.map((reflection) => reflection.date))
+        const decisions = current.decisions.filter((decision) => !decision.demo)
+        const decisionIds = new Set(decisions.map((decision) => decision.id))
+        const moduleHabits = current.moduleHabits.filter((habit) => !habit.demo)
+        const moduleKeys = new Set(moduleHabits.map((habit) => `${habit.kind}|${habit.date}`))
+        const energy = current.energyLogs.filter((entry) => !entry.demo)
+        const energyDates = new Set(energy.map((entry) => entry.date))
+        const declines = current.declines.filter((entry) => !entry.demo)
+        const declineDates = new Set(declines.map((entry) => entry.date))
         return {
           ...current,
           timeBlocks: [...current.timeBlocks.filter((block) => !block.demo), ...demo.timeBlocks],
-          dailyHabits: [
-            ...habits,
-            ...demo.dailyHabits.filter((habit) => !habitKeys.has(`${habit.kind}|${habit.date}`)),
-          ],
+          dailyHabits: [...habits, ...demo.dailyHabits.filter((habit) => !habitKeys.has(`${habit.kind}|${habit.date}`))],
           weeklyPriorities: [...weeks, ...demo.weeklyPriorities.filter((week) => !weekKeys.has(week.weekStart))],
-          reflections: [
-            ...reflections,
-            ...demo.reflections.filter((reflection) => !reflectionKeys.has(reflection.date)),
+          reflections: [...reflections, ...demo.reflections.filter((reflection) => !reflectionKeys.has(reflection.date))],
+          decisions: [...decisions, ...demo.decisions.filter((decision) => !decisionIds.has(decision.id))],
+          moduleHabits: [
+            ...moduleHabits,
+            ...demo.moduleHabits.filter((habit) => !moduleKeys.has(`${habit.kind}|${habit.date}`)),
           ],
+          energyLogs: [...energy, ...demo.energyLogs.filter((entry) => !energyDates.has(entry.date))],
+          declines: [...declines, ...demo.declines.filter((entry) => !declineDates.has(entry.date))],
         }
       })
     },

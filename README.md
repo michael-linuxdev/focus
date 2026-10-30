@@ -1,23 +1,33 @@
 # Strategic Focus Tracker
 
-Ein ruhiges Werkzeug für Geschäftsführerinnen und Geschäftsführer, die sehen wollen, wie viel ihrer Zeit wirklich strategisch ist. Nicht noch eine Gewohnheits-App: Im Mittelpunkt steht der Anteil gestaltender gegenüber reagierender Zeit.
+Ein ruhiges Werkzeug für Geschäftsführerinnen und Geschäftsführer. Im Mittelpunkt bleibt der Anteil gestaltender gegenüber reagierender Zeit. Darum herum wächst ein Gedankenpalast: Fokus, Entscheidungen, Grenzen.
+
+## Gedankenpalast
+
+Auf dem Überblick steht ein gemeinsames Haus mit drei Flügeln.
+
+- **Fokus** — Strategieblock, Deep Work, Top 3, Tagesreflexion
+- **Entscheidungen** — Nacht darüber schlafen, Pro und Contra, Tagesbudget, Nachlese
+- **Grenzen & Energie** — Abendritual, Nachrichtenfenster, Erholung, Nein gesagt
+
+Räume, Stockwerke und Details erscheinen mit Serie und Beständigkeit. Lässt eine Gewohnheit nach, verblasst nur der betroffene Teil: weniger Deckkraft, weniger Farbe, etwas Staub. Nichts wird abgerissen. Sobald du wieder hältst, kehrt das Licht zurück.
 
 ## Funktionen
 
+- **Einrichtung.** Drei Fragen: Rolle, was gerade drückt (zu operativ, zu viele Entscheidungen, kaum Grenzen), wie viel Zeit am Tag. Danach sind passende Gewohnheiten schon angehakt. Du schaltest nur um, was nicht passt. Wer die App schon genutzt hat, bekommt die neuen Flügel einmal angeboten.
+- **Tagesnutzung.** Auf dem Überblick reicht ein Tipp pro Gewohnheit. Das Abendritual dauert etwa dreißig Sekunden: Energieschieber, „reagiert oder gestaltet?“, Laptop zu.
 - **Zeiterfassung.** Blöcke mit Datum, Zeitraum oder Dauer, Kategorie „strategisch“ (gestaltend) oder „operativ“ (reagierend) und optionaler Notiz. Einträge lassen sich bearbeiten und löschen.
-- **Fokus-Gewohnheiten mit Serien.**
-  - Strategie-Block in der Länge, die du festlegst
-  - Deep Work vor 10 Uhr
-  - Top 3 der Woche, mit Text und Abhaken
-  - Tagesreflexion: „Habe ich heute eher reagiert oder gestaltet?“
-- **Überblick.** Große Kennzahl („X % deiner Zeit war diese Woche strategisch“) gegen ein selbst gesetztes Ziel, Ring, Wochenverlauf, Kalender der strategischen Zeit, Reflexionsverlauf und aktuelle Serien.
-- **Einstellungen.** Zielanteil und Länge des Strategieblocks. Demodaten entfernen, neu laden oder alles löschen.
+- **Fokus.** Strategie-Block in der Länge, die du festlegst. Deep Work vor 10 Uhr. Top 3 der Woche. Tagesreflexion.
+- **Entscheidungen.** Eine Entscheidung notieren: Titel, Gewicht, ob eine Nacht vergangen ist, ob Pro und Contra stehen. Wichtige Entscheidungen zählen gegen ein Tagesbudget. Ältere ohne Nachlese fragen: „Was habe ich gelernt?“
+- **Grenzen & Energie.** Abendritual, feste Fenster für E-Mail und Slack, Erholung nach dünnen Tagen, ein Tipp für jedes Nein. Der Energieschieber liegt im Abendritual.
+- **Überblick.** Der Palast, der Tagesstreifen, das Abendritual, darunter der strategische Anteil der Woche, Verlauf, Kalender und Serien.
+- **Einstellungen.** Zielanteil, Länge des Strategieblocks, Entscheidungsbudget, Nachrichtenfenster, Einrichtung erneut öffnen. Demodaten entfernen, neu laden oder alles löschen.
 
 Wochenenden unterbrechen eine Tagesserie nicht. Ein noch nicht markierter heutiger Werktag bricht die Serie erst, wenn der Tag vorbei ist.
 
 ## Demodaten
 
-Beim ersten Öffnen liegen sechs Wochen eines beispielhaften Geschäftsführers im Browser: eine Krisenwoche mit sehr wenig Strategie, eine starke Woche über dem Ziel und die laufende Woche knapp darunter. Alles ist als Demo gekennzeichnet. Eigene Einträge bleiben erhalten, wenn du die Demo entfernst.
+Beim ersten Öffnen liegen sechs Wochen eines beispielhaften Geschäftsführers im Browser: eine Krisenwoche mit sehr wenig Strategie, eine starke Woche über dem Ziel und die laufende Woche knapp darunter. Entscheidungen, Energie und Grenzen sind mit dabei, damit der Palast beim ersten Blick schon bewohnt ist — der Grenzenflügel ist absichtlich etwas staubig. Alles ist als Demo gekennzeichnet. Eigene Einträge bleiben erhalten, wenn du die Demo entfernst.
 
 ## Lokal starten
 
@@ -54,6 +64,6 @@ Beim DNS-Anbieter zeigt ein CNAME-Eintrag von `focus.micana.de` auf `michael-lin
 
 ## Daten
 
-Alles bleibt in `localStorage` unter dem Schlüssel `strategic-focus-tracker.v1`. Es gibt kein Konto und keinen Server.
+Alles bleibt in `localStorage` unter dem Schlüssel `strategic-focus-tracker.v1`. Es gibt kein Konto und keinen Server. Der Schlüssel ist derselbe geblieben: ältere Stände ohne die neuen Felder werden gelesen, die Fokus-Gewohnheiten bleiben an, und die Einrichtung für Entscheidungen und Grenzen wird einmal angeboten.
 
-Die Oberfläche spricht nur mit der Schnittstelle `FocusPersistence` (`src/lib/persistence`). `LocalStoragePersistence` ist die aktuelle Umsetzung. Eine spätere API kann dieselbe Schnittstelle implementieren; Auswertungen in `src/lib/stats.ts` und die Seiten bleiben unverändert. Die Kennzahlen sind reine Funktionen der gespeicherten Blöcke.
+Die Oberfläche spricht nur mit der Schnittstelle `FocusPersistence` (`src/lib/persistence`). `LocalStoragePersistence` ist die aktuelle Umsetzung. Eine spätere API kann dieselbe Schnittstelle implementieren; Auswertungen in `src/lib/stats.ts`, der Palast in `src/lib/palace.ts` und die Seiten bleiben unverändert. Die Kennzahlen sind reine Funktionen der gespeicherten Einträge.

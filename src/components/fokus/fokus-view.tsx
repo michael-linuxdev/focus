@@ -170,7 +170,7 @@ export function FokusView() {
       <PageIntro
         eyebrow="Fokus"
         title="Vier Gewohnheiten, die Zeit schützen"
-        lede="Ein ungestörter Block, ein Vormittag vor den Terminen, drei Prioritäten in der Woche und eine ehrliche Frage am Abend."
+        lede="Ein ungestörter Block, ein Vormittag vor den Terminen, drei Prioritäten in der Woche und eine ehrliche Frage am Abend. Dieser Flügel des Gedankenpalasts wächst damit."
       />
 
       <WeekSwitcher

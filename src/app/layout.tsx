@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     template: "%s · Strategic Focus Tracker",
   },
   description:
-    "Strategische und operative Zeit im Blick — für Geschäftsführerinnen und Geschäftsführer, die Gestaltungszeit schützen wollen.",
+    "Gedankenpalast für Geschäftsführerinnen und Geschäftsführer: Fokus, Entscheidungs-Hygiene und Grenzen. Alles bleibt in diesem Browser.",
 }
 
 export const viewport: Viewport = {

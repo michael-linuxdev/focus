@@ -1,16 +1,29 @@
+import { normalizeSettings } from "@/lib/modules"
+import type { FocusPersistence, PersistenceRead, PersistenceWrite } from "@/lib/persistence/types"
 import {
-  DEFAULT_SETTINGS,
+  DEFAULT_ONBOARDING,
   STORAGE_KEY,
   type AppState,
   type Category,
   type DailyHabit,
   type DailyHabitKind,
+  type Decision,
+  type DecisionImportance,
+  type DeclineLog,
+  type EnergyLevel,
+  type EnergyLog,
+  type ModuleHabit,
+  type ModuleHabitKind,
+  type Onboarding,
+  type OnboardingStatus,
+  type PainChoice,
   type Reflection,
   type ReflectionScore,
+  type RoleChoice,
   type TimeBlock,
+  type TimeChoice,
   type WeeklyPriorities,
 } from "@/lib/types"
-import type { FocusPersistence, PersistenceRead, PersistenceWrite } from "@/lib/persistence/types"
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/
 const TIME = /^\d{2}:\d{2}$/
@@ -25,6 +38,42 @@ function isHabitKind(value: unknown): value is DailyHabitKind {
 
 function isScore(value: unknown): value is ReflectionScore {
   return value === 1 || value === 2 || value === 3 || value === 4 || value === 5
+}
+
+function isEnergy(value: unknown): value is EnergyLevel {
+  return value === 1 || value === 2 || value === 3 || value === 4 || value === 5
+}
+
+function isImportance(value: unknown): value is DecisionImportance {
+  return value === "klein" || value === "wichtig" || value === "gross"
+}
+
+function isModuleKind(value: unknown): value is ModuleHabitKind {
+  return (
+    value === "sleep-on-it" ||
+    value === "pro-contra" ||
+    value === "decision-budget" ||
+    value === "decision-review" ||
+    value === "shutdown" ||
+    value === "message-windows" ||
+    value === "recovery"
+  )
+}
+
+function isRole(value: unknown): value is RoleChoice {
+  return value === "geschaeftsfuehrung" || value === "vorstand" || value === "bereichsleitung" || value === "inhaber"
+}
+
+function isPain(value: unknown): value is PainChoice {
+  return value === "operational" || value === "decisions" || value === "boundaries"
+}
+
+function isTimeChoice(value: unknown): value is TimeChoice {
+  return value === "light" || value === "steady" || value === "deep"
+}
+
+function isOnboardingStatus(value: unknown): value is OnboardingStatus {
+  return value === "pending" || value === "offer" || value === "done"
 }
 
 function asString(value: unknown, max: number): string {
@@ -108,38 +157,107 @@ function sanitizeReflection(value: unknown): Reflection | null {
   }
 }
 
-function clamp(value: unknown, min: number, max: number, fallback: number): number {
-  if (typeof value !== "number" || Number.isNaN(value)) return fallback
-  return Math.min(max, Math.max(min, Math.round(value)))
+function list<T>(value: unknown, map: (item: unknown) => T | null): T[] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((item) => {
+    const next = map(item)
+    return next ? [next] : []
+  })
+}
+
+function sanitizeDecision(value: unknown): Decision | null {
+  if (!value || typeof value !== "object") return null
+  const decision = value as Partial<Decision>
+  if (typeof decision.id !== "string" || !decision.date || !DATE.test(decision.date)) return null
+  if (!isImportance(decision.importance)) return null
+  const title = asString(decision.title, 140).trim()
+  if (!title) return null
+  return {
+    id: decision.id,
+    title,
+    importance: decision.importance,
+    date: decision.date,
+    sleptOn: decision.sleptOn === true,
+    proContra: decision.proContra === true,
+    learning: asString(decision.learning, 280),
+    demo: decision.demo === true,
+    createdAt: asString(decision.createdAt, 40) || new Date(0).toISOString(),
+    updatedAt: asString(decision.updatedAt, 40) || new Date(0).toISOString(),
+  }
+}
+
+function sanitizeModuleHabit(value: unknown): ModuleHabit | null {
+  if (!value || typeof value !== "object") return null
+  const habit = value as Partial<ModuleHabit>
+  if (typeof habit.id !== "string" || !habit.date || !DATE.test(habit.date) || !isModuleKind(habit.kind)) return null
+  return {
+    id: habit.id,
+    kind: habit.kind,
+    date: habit.date,
+    done: habit.done === true,
+    demo: habit.demo === true,
+    updatedAt: asString(habit.updatedAt, 40) || new Date(0).toISOString(),
+  }
+}
+
+function sanitizeEnergy(value: unknown): EnergyLog | null {
+  if (!value || typeof value !== "object") return null
+  const entry = value as Partial<EnergyLog>
+  if (typeof entry.id !== "string" || !entry.date || !DATE.test(entry.date) || !isEnergy(entry.level)) return null
+  return {
+    id: entry.id,
+    date: entry.date,
+    level: entry.level,
+    demo: entry.demo === true,
+    updatedAt: asString(entry.updatedAt, 40) || new Date(0).toISOString(),
+  }
+}
+
+function sanitizeDecline(value: unknown): DeclineLog | null {
+  if (!value || typeof value !== "object") return null
+  const entry = value as Partial<DeclineLog>
+  if (typeof entry.id !== "string" || !entry.date || !DATE.test(entry.date)) return null
+  if (typeof entry.count !== "number" || entry.count < 0 || entry.count > 99) return null
+  return {
+    id: entry.id,
+    date: entry.date,
+    count: Math.round(entry.count),
+    demo: entry.demo === true,
+    updatedAt: asString(entry.updatedAt, 40) || new Date(0).toISOString(),
+  }
+}
+
+function sanitizeOnboarding(value: unknown, legacy: boolean): Onboarding {
+  if (!value || typeof value !== "object") {
+    return legacy ? { status: "offer", completed: false, role: null, pain: null, time: null } : { ...DEFAULT_ONBOARDING }
+  }
+  const raw = value as Partial<Onboarding>
+  return {
+    status: isOnboardingStatus(raw.status) ? raw.status : legacy ? "offer" : "pending",
+    completed: raw.completed === true,
+    role: isRole(raw.role) ? raw.role : null,
+    pain: isPain(raw.pain) ? raw.pain : null,
+    time: isTimeChoice(raw.time) ? raw.time : null,
+  }
 }
 
 export function sanitizeState(value: unknown): AppState | null {
   if (!value || typeof value !== "object") return null
   const raw = value as Partial<AppState>
   if (raw.version !== 1) return null
-  const settings = raw.settings
+  const legacy = raw.onboarding == null
   return {
     version: 1,
-    timeBlocks: Array.isArray(raw.timeBlocks) ? raw.timeBlocks.flatMap((item) => {
-      const block = sanitizeBlock(item)
-      return block ? [block] : []
-    }) : [],
-    dailyHabits: Array.isArray(raw.dailyHabits) ? raw.dailyHabits.flatMap((item) => {
-      const habit = sanitizeHabit(item)
-      return habit ? [habit] : []
-    }) : [],
-    weeklyPriorities: Array.isArray(raw.weeklyPriorities) ? raw.weeklyPriorities.flatMap((item) => {
-      const week = sanitizeWeek(item)
-      return week ? [week] : []
-    }) : [],
-    reflections: Array.isArray(raw.reflections) ? raw.reflections.flatMap((item) => {
-      const reflection = sanitizeReflection(item)
-      return reflection ? [reflection] : []
-    }) : [],
-    settings: {
-      targetPercent: clamp(settings?.targetPercent, 10, 80, DEFAULT_SETTINGS.targetPercent),
-      strategyBlockMinutes: clamp(settings?.strategyBlockMinutes, 30, 240, DEFAULT_SETTINGS.strategyBlockMinutes),
-    },
+    timeBlocks: list(raw.timeBlocks, sanitizeBlock),
+    dailyHabits: list(raw.dailyHabits, sanitizeHabit),
+    weeklyPriorities: list(raw.weeklyPriorities, sanitizeWeek),
+    reflections: list(raw.reflections, sanitizeReflection),
+    decisions: list(raw.decisions, sanitizeDecision),
+    moduleHabits: list(raw.moduleHabits, sanitizeModuleHabit),
+    energyLogs: list(raw.energyLogs, sanitizeEnergy),
+    declines: list(raw.declines, sanitizeDecline),
+    onboarding: sanitizeOnboarding(raw.onboarding, legacy),
+    settings: normalizeSettings(raw.settings, legacy),
   }
 }
 
