@@ -15,7 +15,7 @@ die der Spieler selbst baut. Dieselbe Mechanik trägt Einstieg, Stadtausbau und 
 | Typprüfung | `npm run typecheck` |
 | Logik-Tests | `npm test` |
 | Bauen (prüft Typen) | `npm run build` |
-| Browsertest in Handygröße (nach dem Bauen) | `npm run test:e2e` |
+| Browsertest in Handygröße (nach dem Bauen, Bildschirmfotos nach `test-results/`) | `npm run test:e2e` |
 | Gebauten Stand ansehen | `npm run preview` |
 
 Kein Commit mit fehlschlagenden Tests. Vor jeder Fertigmeldung: `npm test && npm run build && npm run test:e2e`.
@@ -51,7 +51,8 @@ Kein Commit mit fehlschlagenden Tests. Vor jeder Fertigmeldung: `npm test && npm
 Abgestimmte Auslegungen: Der Schild schützt vor Nachbarstädten, nicht vor Räubern; Räuberbeute
 unterliegt denselben Grenzen. Türme entstehen während einer Welle sofort, Bauzeiten gelten für
 Gebäude, Ausbau und Burgfried. Tutorial-Schritte hängen am Fortschritt, nicht an der Uhr.
-Nachtangriff: beim ersten Öffnen nach mindestens vier Stunden Abwesenheit (Wert in den Daten).
+Im ersten Schritt wartet die Welle am Haltepunkt, bis der erste Turm steht;
+Tutorial-Wellen sind `unlosable` (kein Burgfried-Schaden). Nachtangriff: beim ersten Öffnen nach mindestens vier Stunden Abwesenheit (Wert in den Daten).
 
 ## Ordner
 

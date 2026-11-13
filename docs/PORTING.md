@@ -1,6 +1,6 @@
 # Umzug nach Unity 6 / C# / Metaplay
 
-Stand: M0. Dieses Dokument wird mit jedem Meilenstein nachgezogen.
+Stand: M1. Dieses Dokument wird mit jedem Meilenstein nachgezogen.
 
 ## Was übernommen wird
 
@@ -41,34 +41,62 @@ Verboten in `src/sim/` (per Test erzwungen): Gleitkomma-Funktionen, `Math.random
 1. Eingaben dieses Ticks in Listenreihenfolge anwenden (ungültige werden übergangen)
 2. Fällige Einheiten in Planreihenfolge aufstellen
 3. Einheiten in Reihenfolge ihrer Kennung bewegen
-4. Angekommene Einheiten zählen und entfernen
-5. Ergebnis prüfen, Tick hochzählen
+4. Am Burgfried angekommene Einheiten entfernen, Burgfried-Schaden (nicht bei `unlosable`)
+5. Türme in Reihenfolge der Bauplätze der Straße: Abklingzeit herunterzählen oder schießen
+6. Ergebnis prüfen (`lost` vor `won`), Tick hochzählen
 
 Sortierungen müssen stabil sein (in C# `OrderBy`, nicht `List.Sort`).
+
+### Regeln der Verteidigung (Stand M1)
+
+- **Ziel eines Turms:** die am weitesten vorgerückte Einheit in Reichweite, bei Gleichstand die mit der kleinsten Kennung.
+  Reichweite über das Quadrat des Abstands zwischen Bauplatz und Ort der Einheit in Milli-Kacheln (bleibt unter 2^31).
+- **Schuss:** sofortiger Treffer, kein fliegendes Geschoss. Stirbt das Ziel, gibt es das Kopfgeld (`bounty`) sofort.
+  Türme schießen nacheinander; ein späterer Turm sieht die Treffer der früheren desselben Ticks.
+- **Haltepunkt (`holdMilliUntilTower`):** Solange kein Turm steht und der vorderste Angreifer die Wegstrecke erreicht hat,
+  entfallen Schritt 2 und 3, und alle geplanten Aufstellungen verschieben sich um einen Tick. Nur im ersten Tutorial-Schritt gesetzt.
+- **Unverlierbar (`unlosable`):** Angekommene Angreifer verschwinden ohne Burgfried-Schaden. Gilt für die Tutorial-Wellen.
+- **Zeit vor dem Auslösen:** Die Hülle rechnet vor `ReleaseWave` nur dann einen Tick, wenn eine Eingabe vorliegt.
+  Für die Logik ist das unsichtbar: eine Wiederholung enthält schlicht Eingaben bei Tick 0, 1, 2 …
+- **Sieggold (`victoryGold`)** vergibt nicht die Schlacht, sondern `ResolveDefense` im Spielzustand.
 
 ## Wiederholungsformat
 
 ```json
-{ "format": 1, "dataVersion": "1.1.1.1", "setup": { "roadId": "dorf_1", "waveId": "demo_1" },
-  "seed": 42, "inputs": [{ "tick": 20, "action": { "type": "ReleaseWave" } }],
-  "finalTick": 675, "finalHash": 2437633192 }
+{ "format": 1, "dataVersion": "1.2.2.1.2.1",
+  "setup": { "roadId": "dorf_1", "waveId": "dorf_w2", "towers": [{ "slot": "s1", "def": "bogenturm", "level": 1 }],
+             "gold": 50, "keepHp": 10, "unlosable": true, "autoRelease": false, "holdMilliUntilTower": 0 },
+  "seed": 42,
+  "inputs": [{ "tick": 0, "action": { "type": "BuildTower", "slot": "s2", "tower": "bogenturm" } },
+             { "tick": 1, "action": { "type": "ReleaseWave" } }],
+  "finalTick": 430, "finalHash": 123456789 }
 ```
 
-`dataVersion` verkettet die Versionen der Datendateien. Ändert sich eine Datei mit Einfluss auf Schlachten,
-steigt ihre Version, und alte Wiederholungen gelten nur gegen den alten Datenstand.
+`dataVersion` verkettet die Versionen der Datendateien (game, roads, units, towers, waves, tutorial). Ändert sich eine Datei
+mit Einfluss auf Schlachten, steigt ihre Version, und alte Wiederholungen gelten nur gegen den alten Datenstand.
+Die letzte Verteidigung liegt als Wiederholung im Spielzustand (`lastDefense`).
 
-## Aktionen (Stand M0)
+## Zustandsmodell (Stand M1)
+
+- `GameState`: `version`, `now`, `nextSeed`, `gold`, `towers[]` (Bauplatz, Turm, Stufe), `wavesWon`, `lastDefense`
+- `BattleState`: `tick`, `rng`, `setup`, `released`, `pending[]`, `units[]`, `towers[]`, `gold`, `keepHp`, `killed`, `leaked`, `result`
+- Der Tutorial-Schritt ist kein eigener Zustand, sondern folgt aus `wavesWon` und `data/tutorial.json`.
+  Welcher Hinweis gerade gilt, berechnet `currentHint` aus Schritt und Schlachtzustand.
+
+## Aktionen (Stand M1)
 
 | Aktion | Ebene | Prüfung |
 | --- | --- | --- |
 | `AdvanceTime { now }` | Spielzustand | Zeit läuft nicht rückwärts |
-| `FinishBattle { arrived }` | Spielzustand | Platzhalter bis M1; später aus der nachgerechneten Schlacht abgeleitet |
+| `ResolveDefense { inputs }` | Spielzustand | Rechnet die Verteidigung aus eigenem Startzustand, eigenem Startwert und den Eingaben nach; lehnt unfertige Schlachten ab. Gold, Türme und Fortschritt stammen aus dem nachgerechneten Ergebnis, nie vom Client. |
 | `ReleaseWave` | Schlacht | Schlacht läuft, Welle noch nicht ausgelöst |
+| `BuildTower { slot, tower }` | Schlacht | Bauplatz und Turm bekannt, Platz frei, Gold reicht |
+| `UpgradeTower { slot }` | Schlacht | Turm vorhanden, nächste Stufe vorhanden, Gold reicht |
 
 ## Annahmen des Prototyps, die auf einem Server nicht gelten
 
 - **Geräteuhr.** `AdvanceTime` bekommt die Uhr des Geräts. Wer sie verstellt, überspringt Bauzeiten. Auf dem Server kommt die Zeit vom Server.
-- **Startwerte.** Der Client würfelt den Startwert der Schlacht selbst. Auf dem Server vergibt ihn der Server.
+- **Startwerte.** Der erste Startwert kommt vom Gerät, jeder weitere wird daraus abgeleitet und ist für den Client vorhersehbar. Auf dem Server vergibt ihn der Server.
 - **Vertrauen.** Der Client wendet Aktionen selbst an und speichert das Ergebnis. Auf dem Server werden Aktionen geprüft und Schlachten aus der Wiederholung nachgerechnet.
 - **Speicherstand.** Liegt unverschlüsselt in `localStorage` und ist veränderbar. Migrationen (`src/app/save.ts`) werden durch die Schema-Migration des Backends ersetzt.
 - **Einzelspieler.** Es gibt keine gleichzeitigen Zugriffe auf einen Zustand, also keine Konfliktbehandlung.
