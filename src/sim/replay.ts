@@ -28,7 +28,7 @@ export function runBattle(
 ): BattleState {
   let state = createBattle(setup, seed, data);
   let next = 0;
-  while (!state.done && state.tick < untilTick) {
+  while (state.result === 'running' && state.tick < untilTick) {
     const actions = [];
     while (next < inputs.length && inputs[next]!.tick <= state.tick) {
       if (inputs[next]!.tick === state.tick) actions.push(inputs[next]!.action);

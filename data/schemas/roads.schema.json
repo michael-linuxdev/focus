@@ -1,16 +1,35 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Straßenverläufe (Kachelkoordinaten, nur achsenparallele Abschnitte)",
+  "title": "Straßenverläufe und Turm-Bauplätze (Kachelkoordinaten, nur achsenparallele Abschnitte)",
   "type": "object",
   "additionalProperties": false,
-  "required": ["version", "grid", "roads"],
+  "required": [
+    "version",
+    "grid",
+    "roads"
+  ],
   "properties": {
-    "version": { "type": "integer", "minimum": 1 },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
     "grid": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["cols", "rows"],
-      "properties": { "cols": { "type": "integer", "minimum": 1 }, "rows": { "type": "integer", "minimum": 1 } }
+      "required": [
+        "cols",
+        "rows"
+      ],
+      "properties": {
+        "cols": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "rows": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
     },
     "roads": {
       "type": "array",
@@ -18,13 +37,55 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "waypoints"],
+        "required": [
+          "id",
+          "waypoints",
+          "towerSlots"
+        ],
         "properties": {
-          "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
           "waypoints": {
             "type": "array",
             "minItems": 2,
-            "items": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "integer", "minimum": 0 } }
+            "items": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "towerSlots": {
+            "type": "array",
+            "minItems": 0,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "x",
+                "y"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*$"
+                },
+                "x": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "y": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
           }
         }
       }

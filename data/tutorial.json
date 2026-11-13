@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "preliminary": true,
+  "start": {
+    "gold": 50,
+    "roadId": "dorf_1",
+    "keepHp": 10
+  },
+  "defenseSteps": [
+    {
+      "id": "erster_turm",
+      "wave": "dorf_w1",
+      "autoRelease": true,
+      "holdMilliUntilTower": 2400,
+      "unlosable": true,
+      "victoryGold": 30,
+      "hints": [
+        {
+          "type": "buildTower",
+          "slot": "s1",
+          "tower": "bogenturm"
+        }
+      ]
+    },
+    {
+      "id": "zweiter_turm",
+      "wave": "dorf_w2",
+      "autoRelease": false,
+      "holdMilliUntilTower": 0,
+      "unlosable": true,
+      "victoryGold": 30,
+      "hints": [
+        {
+          "type": "buildTower",
+          "slot": "s2",
+          "tower": "bogenturm"
+        },
+        {
+          "type": "releaseWave"
+        }
+      ]
+    },
+    {
+      "id": "erster_ausbau",
+      "wave": "dorf_w3",
+      "autoRelease": false,
+      "holdMilliUntilTower": 0,
+      "unlosable": true,
+      "victoryGold": 40,
+      "hints": [
+        {
+          "type": "upgradeTower",
+          "slot": "s1"
+        },
+        {
+          "type": "releaseWave"
+        }
+      ]
+    }
+  ],
+  "afterTutorial": {
+    "id": "freies_spiel",
+    "wave": "dorf_loop",
+    "autoRelease": false,
+    "holdMilliUntilTower": 0,
+    "unlosable": false,
+    "victoryGold": 30,
+    "hints": []
+  }
+}

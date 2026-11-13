@@ -1,0 +1,241 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Geführter Ablauf: Startwerte, Verteidigungsschritte in Reihenfolge, danach freies Spiel",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "preliminary",
+    "start",
+    "defenseSteps",
+    "afterTutorial"
+  ],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "preliminary": {
+      "type": "boolean"
+    },
+    "start": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "gold",
+        "roadId",
+        "keepHp"
+      ],
+      "properties": {
+        "gold": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "roadId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "keepHp": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "defenseSteps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "wave",
+          "autoRelease",
+          "holdMilliUntilTower",
+          "unlosable",
+          "victoryGold",
+          "hints"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "wave": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "autoRelease": {
+            "type": "boolean"
+          },
+          "holdMilliUntilTower": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unlosable": {
+            "type": "boolean"
+          },
+          "victoryGold": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "hints": {
+            "type": "array",
+            "minItems": 0,
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "type",
+                    "slot",
+                    "tower"
+                  ],
+                  "properties": {
+                    "type": {
+                      "const": "buildTower"
+                    },
+                    "slot": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]*$"
+                    },
+                    "tower": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]*$"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "type",
+                    "slot"
+                  ],
+                  "properties": {
+                    "type": {
+                      "const": "upgradeTower"
+                    },
+                    "slot": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]*$"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "type"
+                  ],
+                  "properties": {
+                    "type": {
+                      "const": "releaseWave"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "afterTutorial": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "wave",
+        "autoRelease",
+        "holdMilliUntilTower",
+        "unlosable",
+        "victoryGold",
+        "hints"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "wave": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "autoRelease": {
+          "type": "boolean"
+        },
+        "holdMilliUntilTower": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unlosable": {
+          "type": "boolean"
+        },
+        "victoryGold": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "hints": {
+          "type": "array",
+          "minItems": 0,
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "type",
+                  "slot",
+                  "tower"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "buildTower"
+                  },
+                  "slot": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_]*$"
+                  },
+                  "tower": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_]*$"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "type",
+                  "slot"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "upgradeTower"
+                  },
+                  "slot": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_]*$"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "type"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "releaseWave"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "preliminary": true,
+  "towers": [
+    {
+      "id": "bogenturm",
+      "levels": [
+        {
+          "cost": 50,
+          "damage": 6,
+          "rangeMilli": 2500,
+          "cooldownTicks": 14
+        },
+        {
+          "cost": 80,
+          "damage": 9,
+          "rangeMilli": 2800,
+          "cooldownTicks": 12
+        }
+      ]
+    }
+  ]
+}
