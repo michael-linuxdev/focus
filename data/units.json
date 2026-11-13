@@ -1,5 +1,42 @@
 {
-  "version": 2,
+  "version": 3,
   "preliminary": true,
-  "units": [{ "id": "raeuber", "hp": 30, "speedMilliPerTick": 40, "bounty": 5, "keepDamage": 1 }]
+  "units": [
+    {
+      "id": "raeuber",
+      "hp": 30,
+      "speedMilliPerTick": 40,
+      "bounty": 5,
+      "keepDamage": 1,
+      "armor": 0,
+      "siege": 0
+    },
+    {
+      "id": "leicht",
+      "hp": 28,
+      "speedMilliPerTick": 70,
+      "bounty": 0,
+      "keepDamage": 1,
+      "armor": 0,
+      "siege": 1
+    },
+    {
+      "id": "gepanzert",
+      "hp": 110,
+      "speedMilliPerTick": 32,
+      "bounty": 0,
+      "keepDamage": 1,
+      "armor": 3,
+      "siege": 1
+    },
+    {
+      "id": "ramme",
+      "hp": 90,
+      "speedMilliPerTick": 26,
+      "bounty": 0,
+      "keepDamage": 1,
+      "armor": 1,
+      "siege": 10
+    }
+  ]
 }

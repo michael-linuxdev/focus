@@ -1,0 +1,134 @@
+{
+  "version": 1,
+  "preliminary": true,
+  "start": {
+    "resources": {
+      "gold": 50,
+      "wood": 0,
+      "stone": 0
+    },
+    "keepHp": 10
+  },
+  "sections": [
+    {
+      "id": "nord"
+    },
+    {
+      "id": "mitte"
+    },
+    {
+      "id": "sued"
+    }
+  ],
+  "towerSlots": [
+    {
+      "id": "s1",
+      "x": 2,
+      "y": 2,
+      "keepLevel": 1,
+      "section": "nord"
+    },
+    {
+      "id": "s2",
+      "x": 2,
+      "y": 5,
+      "keepLevel": 1,
+      "section": "nord"
+    },
+    {
+      "id": "s3",
+      "x": 4,
+      "y": 6,
+      "keepLevel": 1,
+      "section": "mitte"
+    },
+    {
+      "id": "s4",
+      "x": 5,
+      "y": 9,
+      "keepLevel": 1,
+      "section": "sued"
+    },
+    {
+      "id": "s5",
+      "x": 3,
+      "y": 12,
+      "keepLevel": 1,
+      "section": "sued"
+    },
+    {
+      "id": "s6",
+      "x": 6,
+      "y": 5,
+      "keepLevel": 2,
+      "section": "mitte"
+    },
+    {
+      "id": "s7",
+      "x": 3,
+      "y": 9,
+      "keepLevel": 2,
+      "section": "sued"
+    }
+  ],
+  "plots": [
+    {
+      "id": "p1",
+      "x": 8,
+      "y": 2
+    },
+    {
+      "id": "p2",
+      "x": 8,
+      "y": 5
+    },
+    {
+      "id": "p3",
+      "x": 8,
+      "y": 9
+    },
+    {
+      "id": "p4",
+      "x": 7,
+      "y": 12
+    },
+    {
+      "id": "p5",
+      "x": 0,
+      "y": 12
+    },
+    {
+      "id": "p6",
+      "x": 0,
+      "y": 9
+    }
+  ],
+  "keepLevels": [
+    {
+      "level": 1,
+      "cost": {
+        "gold": 0,
+        "wood": 0,
+        "stone": 0
+      },
+      "buildSeconds": 0,
+      "roads": [
+        "dorf_1"
+      ]
+    },
+    {
+      "level": 2,
+      "cost": {
+        "gold": 100,
+        "wood": 20,
+        "stone": 20
+      },
+      "buildSeconds": 20,
+      "roads": [
+        "ostbogen",
+        "westschleife",
+        "doppelkehre"
+      ]
+    }
+  ]
+}

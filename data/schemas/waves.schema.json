@@ -3,27 +3,69 @@
   "title": "Wellen (Zeiten in Ticks)",
   "type": "object",
   "additionalProperties": false,
-  "required": ["version", "preliminary", "waves"],
+  "required": [
+    "version",
+    "preliminary",
+    "waves"
+  ],
   "properties": {
-    "version": { "type": "integer", "minimum": 1 },
-    "preliminary": { "type": "boolean" },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "preliminary": {
+      "type": "boolean"
+    },
     "waves": {
       "type": "array",
       "minItems": 1,
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "groups"],
+        "required": [
+          "id",
+          "groups"
+        ],
         "properties": {
-          "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
           "groups": {
             "type": "array",
             "minItems": 1,
             "items": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["unit", "count", "startTick", "intervalTicks", "jitterTicks"],
-              "properties": { "unit": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" }, "count": { "type": "integer", "minimum": 1 }, "startTick": { "type": "integer", "minimum": 0 }, "intervalTicks": { "type": "integer", "minimum": 0 }, "jitterTicks": { "type": "integer", "minimum": 0 } }
+              "required": [
+                "unit",
+                "count",
+                "startTick",
+                "intervalTicks",
+                "jitterTicks"
+              ],
+              "properties": {
+                "unit": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*$"
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "startTick": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "intervalTicks": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "jitterTicks": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
             }
           }
         }

@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "preliminary": true,
+  "camps": [
+    {
+      "id": "raeuberlager_1",
+      "roadId": "dorf_1",
+      "keepLevel": 1,
+      "gateHp": 300,
+      "towers": [
+        {
+          "slot": "s1",
+          "def": "bogenturm",
+          "level": 1
+        },
+        {
+          "slot": "s3",
+          "def": "bogenturm",
+          "level": 1
+        },
+        {
+          "slot": "s4",
+          "def": "bogenturm",
+          "level": 1
+        }
+      ],
+      "stock": {
+        "gold": 600,
+        "wood": 300,
+        "stone": 300
+      },
+      "protected": {
+        "gold": 100,
+        "wood": 50,
+        "stone": 50
+      }
+    }
+  ]
+}

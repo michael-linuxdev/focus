@@ -1,46 +1,60 @@
-import { MILLI } from '../fixed.ts';
-import { findById, type GameData, type RoadDef, type TowerLevelDef } from '../data.ts';
+import { MILLI, PERMILLE, mulDiv } from '../fixed.ts';
+import { findById, type CityTowerRef, type GameData, type RoadDef, type TowerLevelDef, type UnitDef, type WaveGroupDef } from '../data.ts';
 import { roadLengthMilli, roadPointMilli } from '../road.ts';
 import { rngFromSeed, rngInt, type RngState } from '../rng.ts';
 
 /**
- * Schlacht-Simulation, Stand M1: Verteidigung. Angreifer laufen die Straße entlang,
- * Türme auf Bauplätzen schießen von selbst, der Spieler baut und baut aus.
+ * Schlacht-Simulation, Stand M3. Verteidigung und Angriff sind dieselbe Schlacht:
+ * Angreifer laufen die Straße vom Torhaus zum Burgfried, Türme auf Bauplätzen schießen von selbst.
+ * Nur die Seite des Spielers unterscheidet sich (`playerSide`) und damit, welche Eingaben er hat.
  *
  * Reihenfolge innerhalb eines Ticks (verbindlich, auch für die C#-Fassung):
  *   1. Eingaben dieses Ticks in Listenreihenfolge anwenden (ungültige werden übergangen)
  *   2. Fällige Einheiten in Planreihenfolge aufstellen
- *   3. Einheiten in Reihenfolge ihrer Kennung bewegen
+ *   3. Einheiten in Reihenfolge ihrer Kennung bewegen; vor einem stehenden Tor halten sie an und beschädigen es
  *      (Schritte 2 und 3 entfallen, solange die Welle am Haltepunkt steht; siehe `frozen`)
  *   4. Am Burgfried angekommene Einheiten entfernen, Burgfried-Schaden
- *   5. Türme in Reihenfolge der Bauplätze der Straße: Abklingzeit oder Schuss
- *   6. Ergebnis prüfen, Tick hochzählen
+ *   5. Türme in Reihenfolge der Bauplätze der Stadt: Abklingzeit oder Schuss
+ *   6. Durchbruchstiefe und Ergebnis prüfen, Tick hochzählen
  */
 
-export interface CityTower {
-  readonly slot: string;
-  readonly def: string;
-  /** Stufe, beginnend bei 1. */
-  readonly level: number;
+export type CityTower = CityTowerRef;
+
+export interface BattleWave {
+  readonly groups: readonly WaveGroupDef[];
 }
 
 /** Startzustand einer Schlacht. Zusammen mit Startwert und Eingaben ist sie vollständig bestimmt. */
 export interface BattleSetup {
+  /** Der Verteidiger baut Türme, der Angreifer löst Wellen aus und setzt Fähigkeiten ein. */
+  readonly playerSide: 'defender' | 'attacker';
   readonly roadId: string;
-  readonly waveId: string;
+  /** Burgfried-Stufe der verteidigten Stadt (bestimmt bebaubare Plätze und Turmtypen). */
+  readonly keepLevel: number;
   readonly towers: readonly CityTower[];
+  /** Gold des Verteidigers für Türme während der Schlacht. */
   readonly gold: number;
   readonly keepHp: number;
   readonly unlosable: boolean;
-  readonly autoRelease: boolean;
   /** Solange kein Turm steht, hält die Welle an, sobald der vorderste Angreifer diese Wegstrecke erreicht (0 = aus). */
   readonly holdMilliUntilTower: number;
+  /** Mauerabschnitt, den der Held des Verteidigers verstärkt. */
+  readonly heroSection: string | null;
+  readonly gateHp: number;
+  readonly waves: readonly BattleWave[];
+  /** Alle Wellen laufen bei Tick 0 los. */
+  readonly autoRelease: boolean;
+  /** Fähigkeiten des Angreifer-Helden. */
+  readonly abilities: readonly string[];
+  /** Nach so vielen Ticks endet die Schlacht zugunsten des Verteidigers (0 = keine Grenze). */
+  readonly maxTicks: number;
 }
 
 export type BattleAction =
   | { readonly type: 'ReleaseWave' }
   | { readonly type: 'BuildTower'; readonly slot: string; readonly tower: string }
-  | { readonly type: 'UpgradeTower'; readonly slot: string };
+  | { readonly type: 'UpgradeTower'; readonly slot: string }
+  | { readonly type: 'UseAbility'; readonly ability: string; readonly slot: string | null };
 
 export interface BattleInput {
   readonly tick: number;
@@ -62,20 +76,23 @@ export interface PendingSpawn {
 export interface BattleTower extends CityTower {
   /** Ticks bis zum nächsten Schuss. */
   readonly cooldown: number;
+  /** Bis zu diesem Tick außer Gefecht (Brandpfeile). */
+  readonly disabledUntil: number;
   /** Letzter Schuss, nur für die Darstellung (-1 = noch keiner). Ort in Milli-Kacheln. */
   readonly lastShotTick: number;
   readonly targetX: number;
   readonly targetY: number;
 }
 
-export type BattleResult = 'running' | 'won' | 'lost';
+/** `held`: der Verteidiger hat gehalten. `breached`: der Burgfried ist gefallen. */
+export type BattleResult = 'running' | 'held' | 'breached';
 
 export interface BattleState {
   readonly tick: number;
   readonly rng: RngState;
   readonly setup: BattleSetup;
   readonly roadLength: number;
-  readonly released: boolean;
+  readonly releasedWaves: number;
   /** Aufsteigend nach Tick, bei Gleichstand in Planreihenfolge. */
   readonly pending: readonly PendingSpawn[];
   readonly units: readonly Unit[];
@@ -83,35 +100,57 @@ export interface BattleState {
   readonly towers: readonly BattleTower[];
   readonly gold: number;
   readonly keepHp: number;
-  readonly killed: number;
+  readonly gateHp: number;
+  /** Durchbruchstiefe: 0 nichts, 1 Tor genommen, 2 Marktplatz erreicht, 3 Burgfried erreicht. */
+  readonly depth: number;
+  /** Bis zu diesem Tick nehmen Angreifer verringerten Schaden (Schildwall). */
+  readonly shieldUntil: number;
+  /** Je Fähigkeit aus `setup.abilities`: frühester Tick des nächsten Einsatzes. */
+  readonly abilityReadyAt: readonly number[];
+  /** Besiegte Angreifer in Reihenfolge ihres Falls (Einheitentyp). */
+  readonly fallen: readonly string[];
   readonly leaked: number;
   readonly result: BattleResult;
 }
 
 export type ActionError =
   | 'battle_done'
-  | 'wave_already_released'
+  | 'not_your_side'
+  | 'no_wave_left'
   | 'unknown_slot'
   | 'unknown_tower'
   | 'slot_occupied'
   | 'slot_empty'
+  | 'slot_locked'
+  | 'tower_locked'
   | 'max_level'
-  | 'not_enough_gold';
+  | 'not_enough_gold'
+  | 'unknown_ability'
+  | 'ability_not_ready'
+  | 'target_required';
 
-function planWave(waveId: string, startTick: number, rng: RngState, data: GameData): PendingSpawn[] {
-  const wave = findById(data.waves.waves, waveId, 'Welle');
+/** Wie viele Angreifer gefallen sind. */
+export function killedCount(state: BattleState): number {
+  return state.fallen.length;
+}
+
+function planWave(wave: BattleWave, startTick: number, rng: RngState): PendingSpawn[] {
   const plan: PendingSpawn[] = [];
   for (const g of wave.groups) {
     for (let i = 0; i < g.count; i++) {
       plan.push({ tick: startTick + g.startTick + i * g.intervalTicks + rngInt(rng, g.jitterTicks + 1), def: g.unit });
     }
   }
-  // Stabile Sortierung: gleiche Ticks behalten die Planreihenfolge.
-  return plan.map((p, i) => ({ p, i })).sort((a, b) => a.p.tick - b.p.tick || a.i - b.i).map((x) => x.p);
+  return plan;
+}
+
+/** Stabile Sortierung: gleiche Ticks behalten die bisherige Reihenfolge. */
+function sortPending(list: readonly PendingSpawn[]): PendingSpawn[] {
+  return list.map((p, i) => ({ p, i })).sort((a, b) => a.p.tick - b.p.tick || a.i - b.i).map((x) => x.p);
 }
 
 function newTower(t: CityTower): BattleTower {
-  return { slot: t.slot, def: t.def, level: t.level, cooldown: 0, lastShotTick: -1, targetX: 0, targetY: 0 };
+  return { slot: t.slot, def: t.def, level: t.level, cooldown: 0, disabledUntil: 0, lastShotTick: -1, targetX: 0, targetY: 0 };
 }
 
 export function towerLevel(t: CityTower, data: GameData): TowerLevelDef {
@@ -120,115 +159,179 @@ export function towerLevel(t: CityTower, data: GameData): TowerLevelDef {
   return level;
 }
 
+export type TowerActionError = 'unknown_slot' | 'unknown_tower' | 'slot_occupied' | 'slot_empty' | 'slot_locked' | 'tower_locked' | 'max_level';
+
+/**
+ * Goldkosten für Bau oder Ausbau eines Turms, oder der Grund, warum es nicht geht.
+ * Dieselbe Regel gilt in der Schlacht und im Stadtbau.
+ */
+export function towerActionCost(
+  towers: readonly CityTower[],
+  keepLevel: number,
+  action: { readonly type: 'BuildTower'; readonly slot: string; readonly tower: string } | { readonly type: 'UpgradeTower'; readonly slot: string },
+  data: GameData,
+): number | TowerActionError {
+  const slot = data.city.towerSlots.find((s) => s.id === action.slot);
+  if (!slot) return 'unknown_slot';
+  if (slot.keepLevel > keepLevel) return 'slot_locked';
+  const tower = towers.find((t) => t.slot === action.slot);
+  if (action.type === 'BuildTower') {
+    const def = data.towers.towers.find((t) => t.id === action.tower);
+    if (!def) return 'unknown_tower';
+    if (def.keepLevel > keepLevel) return 'tower_locked';
+    if (tower) return 'slot_occupied';
+    return def.levels[0]!.cost;
+  }
+  if (!tower) return 'slot_empty';
+  const next = findById(data.towers.towers, tower.def, 'Turm').levels[tower.level];
+  return next ? next.cost : 'max_level';
+}
+
 export function createBattle(setup: BattleSetup, seed: number, data: GameData): BattleState {
   const road = findById(data.roads.roads, setup.roadId, 'Straße');
   const rng = rngFromSeed(seed);
-  const pending = setup.autoRelease ? planWave(setup.waveId, 0, rng, data) : [];
-  findById(data.waves.waves, setup.waveId, 'Welle');
+  let pending: PendingSpawn[] = [];
+  if (setup.autoRelease) {
+    for (const wave of setup.waves) pending = pending.concat(planWave(wave, 0, rng));
+    pending = sortPending(pending);
+  }
   return {
     tick: 0,
     rng,
     setup,
     roadLength: roadLengthMilli(road),
-    released: setup.autoRelease,
+    releasedWaves: setup.autoRelease ? setup.waves.length : 0,
     pending,
     units: [],
     nextUnitId: 1,
     towers: setup.towers.map(newTower),
     gold: setup.gold,
     keepHp: setup.keepHp,
-    killed: 0,
+    gateHp: setup.gateHp,
+    depth: 0,
+    shieldUntil: 0,
+    abilityReadyAt: setup.abilities.map(() => 0),
+    fallen: [],
     leaked: 0,
     result: 'running',
   };
 }
 
-/** Kosten einer Bau- oder Ausbau-Aktion, oder der Grund, warum sie nicht geht. */
-function actionCost(state: BattleState, action: BattleAction, road: RoadDef, data: GameData): number | ActionError {
-  switch (action.type) {
-    case 'ReleaseWave':
-      return state.released ? 'wave_already_released' : 0;
-    case 'BuildTower': {
-      if (!road.towerSlots.some((s) => s.id === action.slot)) return 'unknown_slot';
-      const def = data.towers.towers.find((t) => t.id === action.tower);
-      if (!def) return 'unknown_tower';
-      if (state.towers.some((t) => t.slot === action.slot)) return 'slot_occupied';
-      return def.levels[0]!.cost;
-    }
-    case 'UpgradeTower': {
-      if (!road.towerSlots.some((s) => s.id === action.slot)) return 'unknown_slot';
-      const tower = state.towers.find((t) => t.slot === action.slot);
-      if (!tower) return 'slot_empty';
-      const next = findById(data.towers.towers, tower.def, 'Turm').levels[tower.level];
-      return next ? next.cost : 'max_level';
-    }
-  }
-}
-
 /** Prüft eine Eingabe gegen den Zustand. `null` heißt gültig. */
 export function validateBattleAction(state: BattleState, action: BattleAction, data: GameData): ActionError | null {
   if (state.result !== 'running') return 'battle_done';
-  const road = findById(data.roads.roads, state.setup.roadId, 'Straße');
-  const cost = actionCost(state, action, road, data);
-  if (typeof cost !== 'number') return cost;
-  return cost > state.gold ? 'not_enough_gold' : null;
-}
-
-function applyAction(state: BattleState, action: BattleAction, rng: RngState, road: RoadDef, data: GameData): BattleState {
-  const cost = actionCost(state, action, road, data);
-  if (typeof cost !== 'number' || cost > state.gold) return state;
   switch (action.type) {
     case 'ReleaseWave':
-      return { ...state, released: true, pending: planWave(state.setup.waveId, state.tick, rng, data) };
+      if (state.setup.playerSide !== 'attacker') return 'not_your_side';
+      return state.releasedWaves < state.setup.waves.length ? null : 'no_wave_left';
     case 'BuildTower':
+    case 'UpgradeTower': {
+      if (state.setup.playerSide !== 'defender') return 'not_your_side';
+      const cost = towerActionCost(state.towers, state.setup.keepLevel, action, data);
+      if (typeof cost !== 'number') return cost;
+      return cost > state.gold ? 'not_enough_gold' : null;
+    }
+    case 'UseAbility': {
+      if (state.setup.playerSide !== 'attacker') return 'not_your_side';
+      const index = state.setup.abilities.indexOf(action.ability);
+      const def = data.hero.abilities.find((a) => a.id === action.ability);
+      if (index < 0 || !def) return 'unknown_ability';
+      if (state.tick < state.abilityReadyAt[index]!) return 'ability_not_ready';
+      if (def.kind === 'disableTower') {
+        if (action.slot === null) return 'target_required';
+        if (!state.towers.some((t) => t.slot === action.slot)) return 'slot_empty';
+      }
+      return null;
+    }
+  }
+}
+
+function applyAction(state: BattleState, action: BattleAction, rng: RngState, data: GameData): BattleState {
+  if (validateBattleAction(state, action, data) !== null) return state;
+  switch (action.type) {
+    case 'ReleaseWave': {
+      const plan = planWave(state.setup.waves[state.releasedWaves]!, state.tick, rng);
+      return { ...state, releasedWaves: state.releasedWaves + 1, pending: sortPending([...state.pending, ...plan]) };
+    }
+    case 'BuildTower': {
+      const cost = towerActionCost(state.towers, state.setup.keepLevel, action, data) as number;
       return { ...state, gold: state.gold - cost, towers: [...state.towers, newTower({ slot: action.slot, def: action.tower, level: 1 })] };
-    case 'UpgradeTower':
+    }
+    case 'UpgradeTower': {
+      const cost = towerActionCost(state.towers, state.setup.keepLevel, action, data) as number;
+      return { ...state, gold: state.gold - cost, towers: state.towers.map((t) => (t.slot === action.slot ? { ...t, level: t.level + 1 } : t)) };
+    }
+    case 'UseAbility': {
+      const index = state.setup.abilities.indexOf(action.ability);
+      const def = findById(data.hero.abilities, action.ability, 'Fähigkeit');
+      const abilityReadyAt = state.abilityReadyAt.map((t, i) => (i === index ? state.tick + def.cooldownTicks : t));
+      if (def.kind === 'shield') return { ...state, abilityReadyAt, shieldUntil: state.tick + def.durationTicks };
       return {
         ...state,
-        gold: state.gold - cost,
-        towers: state.towers.map((t) => (t.slot === action.slot ? { ...t, level: t.level + 1 } : t)),
+        abilityReadyAt,
+        towers: state.towers.map((t) => (t.slot === action.slot ? { ...t, disabledUntil: state.tick + def.durationTicks } : t)),
       };
+    }
   }
+}
+
+/** Wegstrecke des Marktplatzes auf einer Straße der Länge `roadLength`. */
+export function marketMilli(roadLength: number, data: GameData): number {
+  return mulDiv(roadLength, data.rules.marketPermille, PERMILLE);
+}
+
+/** Schaden eines Treffers nach Rüstung und Schildwall, mindestens 1. */
+function damageTaken(base: number, def: UnitDef, shielded: boolean, shieldPermille: number): number {
+  let dmg = Math.max(1, base - def.armor);
+  if (shielded) dmg = Math.max(1, mulDiv(dmg, shieldPermille, PERMILLE));
+  return dmg;
 }
 
 /** Ein Zeitschritt. Ungültige Eingaben werden übergangen und ändern nichts. */
 export function stepBattle(state: BattleState, actions: readonly BattleAction[], data: GameData): BattleState {
   if (state.result !== 'running') return state;
-  const road = findById(data.roads.roads, state.setup.roadId, 'Straße');
+  const road: RoadDef = findById(data.roads.roads, state.setup.roadId, 'Straße');
   const rng: RngState = [...state.rng];
+  const unitDef = (id: string): UnitDef => findById(data.units.units, id, 'Einheit');
 
   // 1. Eingaben
   let s = state;
-  for (const action of actions) s = applyAction(s, action, rng, road, data);
+  for (const action of actions) s = applyAction(s, action, rng, data);
 
   // Haltepunkt: Solange kein Turm steht und der vorderste Angreifer dort angekommen ist,
   // steht die Welle still (keine Bewegung, Nachrücker verschieben sich um einen Tick).
   const hold = s.setup.holdMilliUntilTower;
   const frozen = hold > 0 && s.towers.length === 0 && s.units.some((u) => u.pos >= hold);
 
-  // 2. Aufstellen
   let nextUnitId = s.nextUnitId;
   let pending = s.pending;
   let keepHp = s.keepHp;
+  let gateHp = s.gateHp;
   let leaked = s.leaked;
   let units: Unit[] = [];
   if (frozen) {
     pending = pending.map((p) => ({ tick: p.tick + 1, def: p.def }));
     units = [...s.units];
   } else {
+    // 2. Aufstellen
     const spawned: Unit[] = [...s.units];
     let due = 0;
     while (due < pending.length && pending[due]!.tick <= s.tick) {
-      const def = findById(data.units.units, pending[due]!.def, 'Einheit');
+      const def = unitDef(pending[due]!.def);
       spawned.push({ id: nextUnitId++, def: def.id, pos: 0, hp: def.hp });
       due++;
     }
     if (due > 0) pending = pending.slice(due);
 
-    // 3. und 4. Bewegen, Ankunft
+    // 3. und 4. Bewegen, Tor, Ankunft
+    const gate = data.rules.gateMilli;
     for (const u of spawned) {
-      const def = findById(data.units.units, u.def, 'Einheit');
-      const pos = u.pos + def.speedMilliPerTick;
+      const def = unitDef(u.def);
+      let pos = u.pos + def.speedMilliPerTick;
+      if (gateHp > 0 && pos >= gate) {
+        pos = gate;
+        gateHp = Math.max(0, gateHp - def.siege);
+      }
       if (pos >= s.roadLength) {
         leaked++;
         if (!s.setup.unlosable) keepHp = Math.max(0, keepHp - def.keepDamage);
@@ -240,15 +343,22 @@ export function stepBattle(state: BattleState, actions: readonly BattleAction[],
 
   // 5. Türme
   let gold = s.gold;
-  let killed = s.killed;
+  let fallen = s.fallen;
+  const shielded = s.tick < s.shieldUntil;
+  const shieldPermille = data.hero.abilities.find((a) => a.kind === 'shield')?.damageTakenPermille ?? PERMILLE;
   const towers: BattleTower[] = [];
-  for (const slot of road.towerSlots) {
+  for (const slot of data.city.towerSlots) {
     const tower = s.towers.find((t) => t.slot === slot.id);
     if (!tower) continue;
+    if (s.tick < tower.disabledUntil) {
+      towers.push(tower);
+      continue;
+    }
     if (tower.cooldown > 0) {
       towers.push({ ...tower, cooldown: tower.cooldown - 1 });
       continue;
     }
+    const def = findById(data.towers.towers, tower.def, 'Turm');
     const level = towerLevel(tower, data);
     const rangeSq = level.rangeMilli * level.rangeMilli;
     // Ziel: am weitesten vorgerückte Einheit in Reichweite, bei Gleichstand die mit der kleinsten Kennung.
@@ -270,30 +380,54 @@ export function stepBattle(state: BattleState, actions: readonly BattleAction[],
       towers.push(tower);
       continue;
     }
-    const hit = target;
-    const hp = hit.hp - level.damage;
-    if (hp <= 0) {
-      units = units.filter((u) => u.id !== hit.id);
-      gold += findById(data.units.units, hit.def, 'Einheit').bounty;
-      killed++;
-    } else {
-      units = units.map((u) => (u.id === hit.id ? { ...u, hp } : u));
+    const base = slot.section === s.setup.heroSection ? mulDiv(level.damage, PERMILLE + data.hero.sectionBonusPermille, PERMILLE) : level.damage;
+    const splashSq = def.splashMilli * def.splashMilli;
+    const targetId = target.id;
+    const survivors: Unit[] = [];
+    for (const u of units) {
+      let hit = u.id === targetId;
+      if (!hit && def.splashMilli > 0) {
+        const [ux, uy] = roadPointMilli(road, u.pos);
+        hit = (ux - tx) * (ux - tx) + (uy - ty) * (uy - ty) <= splashSq;
+      }
+      if (!hit) {
+        survivors.push(u);
+        continue;
+      }
+      const ud = unitDef(u.def);
+      const hp = u.hp - damageTaken(base, ud, shielded, shieldPermille);
+      if (hp <= 0) {
+        gold += ud.bounty;
+        fallen = [...fallen, u.def];
+      } else {
+        survivors.push({ id: u.id, def: u.def, pos: u.pos, hp });
+      }
     }
+    units = survivors;
     towers.push({ ...tower, cooldown: level.cooldownTicks - 1, lastShotTick: s.tick, targetX: tx, targetY: ty });
   }
 
-  // 6. Ergebnis
-  let result: BattleResult = 'running';
-  if (keepHp <= 0) result = 'lost';
-  else if (s.released && pending.length === 0 && units.length === 0) result = 'won';
+  // 6. Durchbruchstiefe und Ergebnis
+  let depth = s.depth;
+  let front = 0;
+  for (const u of units) front = Math.max(front, u.pos);
+  if (depth < 1 && gateHp <= 0 && front > data.rules.gateMilli) depth = 1;
+  if (depth < 2 && front >= marketMilli(s.roadLength, data)) depth = 2;
+  if (leaked > 0) depth = 3;
 
-  return { ...s, tick: s.tick + 1, rng, pending, units, nextUnitId, towers, gold, keepHp, killed, leaked, result };
+  const tick = s.tick + 1;
+  let result: BattleResult = 'running';
+  if (keepHp <= 0) result = 'breached';
+  else if (s.releasedWaves === s.setup.waves.length && pending.length === 0 && units.length === 0) result = 'held';
+  else if (s.setup.maxTicks > 0 && tick >= s.setup.maxTicks) result = 'held';
+
+  return { ...s, tick, rng, pending, units, nextUnitId, towers, gold, keepHp, gateHp, depth, fallen, leaked, result };
 }
 
 /**
  * Prüfsumme des Zustands (FNV-1a, 32 Bit, über eine feste Folge von Ganzzahlen).
  * Dient dem Vergleich von Wiederholungen, später auch gegen die C#-Fassung.
- * Türme gehen in der Reihenfolge der Liste ein; Felder nur für die Darstellung bleiben außen vor.
+ * Felder nur für die Darstellung bleiben außen vor.
  */
 export function hashBattle(state: BattleState): number {
   let h = 0x811c9dc5;
@@ -304,7 +438,7 @@ export function hashBattle(state: BattleState): number {
   };
   add(state.tick);
   for (const w of state.rng) add(w);
-  add(state.released ? 1 : 0);
+  add(state.releasedWaves);
   add(state.pending.length);
   for (const p of state.pending) add(p.tick);
   add(state.units.length);
@@ -318,11 +452,16 @@ export function hashBattle(state: BattleState): number {
   for (const t of state.towers) {
     add(t.level);
     add(t.cooldown);
+    add(t.disabledUntil);
   }
   add(state.gold);
   add(state.keepHp);
-  add(state.killed);
+  add(state.gateHp);
+  add(state.depth);
+  add(state.shieldUntil);
+  for (const t of state.abilityReadyAt) add(t);
+  add(state.fallen.length);
   add(state.leaked);
-  add(state.result === 'running' ? 0 : state.result === 'won' ? 1 : 2);
+  add(state.result === 'running' ? 0 : state.result === 'held' ? 1 : 2);
   return h;
 }

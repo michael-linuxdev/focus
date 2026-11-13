@@ -1,4 +1,4 @@
-import { STATE_VERSION, createGame, type GameData, type GameState } from '../sim/index.ts';
+import { STATE_VERSION, createGame, reduceGame, type GameData, type GameState } from '../sim/index.ts';
 
 /**
  * Speicherstand lokal auf dem Gerät, mit Versionsnummer und Migrationen.
@@ -16,12 +16,24 @@ export interface KeyValueStore {
 type Migration = (old: Record<string, unknown>, data: GameData) => Record<string, unknown>;
 
 export const migrations: Readonly<Record<number, Migration>> = {
-  // 1 -> 2 (M1): Der M0-Stand kannte nur Uhr und Startwert. Stadt und Gold beginnen mit den Startwerten.
-  1: (old, data) => ({
-    ...createGame(typeof old['nextSeed'] === 'number' ? old['nextSeed'] : 1, typeof old['now'] === 'number' ? old['now'] : 0, data),
-    version: 2,
-  }),
+  // 1 -> 2 (M1): Der M0-Stand kannte nur Uhr und Startwert.
+  1: (old) => ({ version: 2, now: num(old['now'], 0), nextSeed: num(old['nextSeed'], 1), gold: null, towers: [], wavesWon: 0 }),
+  // 2 -> 3 (M2/M3): Gold wird zu Vorräten, dazu Gebäude, Burgfried, Heldin, Armee und Wiederholungen.
+  // Türme, Gold und gewonnene Wellen bleiben; der Tutorial-Schritt ergibt sich daraus beim Laden neu.
+  2: (old, data) => {
+    const fresh = createGame(num(old['nextSeed'], 1), num(old['now'], 0), data);
+    return {
+      ...fresh,
+      resources: { ...fresh.resources, gold: num(old['gold'], fresh.resources.gold) },
+      towers: Array.isArray(old['towers']) ? old['towers'] : [],
+      defensesWon: num(old['wavesWon'], 0),
+    };
+  },
 };
+
+function num(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
 
 export function migrate(
   raw: unknown,
@@ -47,6 +59,8 @@ export function loadGame(store: KeyValueStore, data: GameData): GameState | null
   let state: GameState | null = null;
   try {
     state = migrate(JSON.parse(text), data);
+    // Eine Zeitmeldung rechnet Fälliges ab und bringt den Tutorial-Schritt auf den Stand des geladenen Zustands.
+    if (state) state = reduceGame(state, { type: 'AdvanceTime', now: state.now }, data).state;
   } catch {
     state = null;
   }

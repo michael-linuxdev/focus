@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Einheiten (Geschwindigkeit in Tausendstel-Kacheln pro Tick, bounty in Gold, keepDamage in Burgfried-Leben)",
+  "title": "Einheiten (Geschwindigkeit in Tausendstel-Kacheln pro Tick, bounty in Gold, keepDamage in Burgfried-Leben, armor: Abzug je Treffer, siege: Schaden am Tor je Tick)",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -27,7 +27,9 @@
           "hp",
           "speedMilliPerTick",
           "bounty",
-          "keepDamage"
+          "keepDamage",
+          "armor",
+          "siege"
         ],
         "properties": {
           "id": {
@@ -47,6 +49,14 @@
             "minimum": 0
           },
           "keepDamage": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "armor": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "siege": {
             "type": "integer",
             "minimum": 0
           }

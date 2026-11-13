@@ -1,0 +1,126 @@
+{
+  "version": 1,
+  "preliminary": true,
+  "buildings": [
+    {
+      "id": "holzfaeller",
+      "cost": {
+        "gold": 40,
+        "wood": 0,
+        "stone": 0
+      },
+      "buildSeconds": 10,
+      "producePerHour": {
+        "gold": 0,
+        "wood": 1800,
+        "stone": 0
+      },
+      "protect": {
+        "gold": 0,
+        "wood": 0,
+        "stone": 0
+      },
+      "healTimePermille": 1000
+    },
+    {
+      "id": "steinbruch",
+      "cost": {
+        "gold": 40,
+        "wood": 0,
+        "stone": 0
+      },
+      "buildSeconds": 10,
+      "producePerHour": {
+        "gold": 0,
+        "wood": 0,
+        "stone": 1800
+      },
+      "protect": {
+        "gold": 0,
+        "wood": 0,
+        "stone": 0
+      },
+      "healTimePermille": 1000
+    },
+    {
+      "id": "kaserne",
+      "cost": {
+        "gold": 80,
+        "wood": 20,
+        "stone": 20
+      },
+      "buildSeconds": 15,
+      "producePerHour": {
+        "gold": 0,
+        "wood": 0,
+        "stone": 0
+      },
+      "protect": {
+        "gold": 0,
+        "wood": 0,
+        "stone": 0
+      },
+      "healTimePermille": 1000
+    },
+    {
+      "id": "hof",
+      "cost": {
+        "gold": 60,
+        "wood": 30,
+        "stone": 0
+      },
+      "buildSeconds": 120,
+      "producePerHour": {
+        "gold": 600,
+        "wood": 0,
+        "stone": 0
+      },
+      "protect": {
+        "gold": 0,
+        "wood": 0,
+        "stone": 0
+      },
+      "healTimePermille": 1000
+    },
+    {
+      "id": "speicher",
+      "cost": {
+        "gold": 60,
+        "wood": 40,
+        "stone": 40
+      },
+      "buildSeconds": 120,
+      "producePerHour": {
+        "gold": 0,
+        "wood": 0,
+        "stone": 0
+      },
+      "protect": {
+        "gold": 150,
+        "wood": 150,
+        "stone": 150
+      },
+      "healTimePermille": 1000
+    },
+    {
+      "id": "lazarett",
+      "cost": {
+        "gold": 60,
+        "wood": 30,
+        "stone": 30
+      },
+      "buildSeconds": 180,
+      "producePerHour": {
+        "gold": 0,
+        "wood": 0,
+        "stone": 0
+      },
+      "protect": {
+        "gold": 0,
+        "wood": 0,
+        "stone": 0
+      },
+      "healTimePermille": 500
+    }
+  ]
+}

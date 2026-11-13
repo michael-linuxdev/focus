@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Türme: eine Zeile je Stufe (cost in Gold für Bau bzw. Ausbau auf diese Stufe, Reichweite in Tausendstel-Kacheln, Schussfolge in Ticks)",
+  "title": "Türme: eine Zeile je Stufe (cost in Gold für Bau bzw. Ausbau auf diese Stufe, Reichweite in Tausendstel-Kacheln, Schussfolge in Ticks). splashMilli > 0: Flächenschaden um das Ziel",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -24,12 +24,22 @@
         "additionalProperties": false,
         "required": [
           "id",
+          "keepLevel",
+          "splashMilli",
           "levels"
         ],
         "properties": {
           "id": {
             "type": "string",
             "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "keepLevel": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "splashMilli": {
+            "type": "integer",
+            "minimum": 0
           },
           "levels": {
             "type": "array",

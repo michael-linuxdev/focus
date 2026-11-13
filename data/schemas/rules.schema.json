@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Schlacht- und Beuteregeln. lootMaxPermille ist die feste Verlustgrenze: höchster Anteil der ungeschützten Vorräte. depthLootPermille: Anteil davon je Durchbruchstiefe 0 bis 3",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "preliminary",
+    "gateMilli",
+    "marketPermille",
+    "attackMaxTicks",
+    "attackSpawnIntervalTicks",
+    "attackWaves",
+    "lootMaxPermille",
+    "depthLootPermille",
+    "maxReplays",
+    "productionIntervalSeconds"
+  ],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "preliminary": {
+      "type": "boolean"
+    },
+    "gateMilli": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "marketPermille": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 999
+    },
+    "attackMaxTicks": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "attackSpawnIntervalTicks": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "attackWaves": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "lootMaxPermille": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000
+    },
+    "depthLootPermille": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 1000
+      }
+    },
+    "maxReplays": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "productionIntervalSeconds": {
+      "type": "integer",
+      "minimum": 1
+    }
+  }
+}

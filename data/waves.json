@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "preliminary": true,
   "waves": [
     {
@@ -39,14 +39,66 @@
       ]
     },
     {
+      "id": "dorf_w4",
+      "groups": [
+        {
+          "unit": "raeuber",
+          "count": 18,
+          "startTick": 10,
+          "intervalTicks": 20,
+          "jitterTicks": 8
+        }
+      ]
+    },
+    {
+      "id": "dorf_w5",
+      "groups": [
+        {
+          "unit": "raeuber",
+          "count": 8,
+          "startTick": 10,
+          "intervalTicks": 5,
+          "jitterTicks": 2
+        },
+        {
+          "unit": "raeuber",
+          "count": 8,
+          "startTick": 220,
+          "intervalTicks": 5,
+          "jitterTicks": 2
+        },
+        {
+          "unit": "raeuber",
+          "count": 8,
+          "startTick": 430,
+          "intervalTicks": 5,
+          "jitterTicks": 2
+        }
+      ]
+    },
+    {
       "id": "dorf_loop",
       "groups": [
         {
           "unit": "raeuber",
-          "count": 20,
+          "count": 10,
           "startTick": 10,
-          "intervalTicks": 18,
+          "intervalTicks": 16,
           "jitterTicks": 8
+        },
+        {
+          "unit": "raeuber",
+          "count": 10,
+          "startTick": 260,
+          "intervalTicks": 5,
+          "jitterTicks": 2
+        },
+        {
+          "unit": "raeuber",
+          "count": 10,
+          "startTick": 480,
+          "intervalTicks": 5,
+          "jitterTicks": 2
         }
       ]
     }

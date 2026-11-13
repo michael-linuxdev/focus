@@ -1,16 +1,62 @@
-import { findById, type DefenseStepDef, type GameData } from './data.ts';
-import type { BattleInput, BattleSetup, CityTower } from './battle/battle.ts';
+import {
+  RESOURCE_KEYS, findById,
+  type BuildingDef, type ConditionDef, type DefenseDef, type GameData, type Resources, type TutorialStepDef, type UnitCount,
+} from './data.ts';
+import { mulDiv, PERMILLE } from './fixed.ts';
+import { towerActionCost, type BattleInput, type BattleSetup, type BattleState, type CityTower } from './battle/battle.ts';
+import { computeLoot } from './loot.ts';
 import { makeReplay, runBattle, type Replay } from './replay.ts';
 
 /**
- * Dauerhafter Spielzustand und seine Aktionen, Stand M1.
+ * Dauerhafter Spielzustand und seine Aktionen, Stand M3.
  * Jede Spielerhandlung ist eine benannte Aktion: erst `validateGameAction`, dann `reduceGame`.
- * Die Uhrzeit kommt ausschließlich über `AdvanceTime` herein.
+ * Die Uhrzeit kommt ausschließlich über `AdvanceTime` herein; dabei werden fällige Bauzeiten,
+ * Erträge, Ausbildung und Lazarett abgerechnet (`settle`).
  *
- * Eine Verteidigung wird nicht "gemeldet", sondern nachgerechnet: `ResolveDefense` bekommt nur die
- * Eingaben des Spielers; Startzustand und Startwert stammen aus dem Spielzustand. So prüft es später der Server.
+ * Schlachten werden nicht "gemeldet", sondern nachgerechnet: `ResolveDefense` und `ResolveAttack`
+ * bekommen nur die Eingaben des Spielers; Startzustand und Startwert stammen aus dem Spielzustand.
  */
-export const STATE_VERSION = 2;
+export const STATE_VERSION = 3;
+
+export interface Building {
+  readonly plot: string;
+  readonly def: string;
+  /** Fertig ab diesem Zeitpunkt (ms). */
+  readonly doneAt: number;
+  /** Bis hierhin ist der Ertrag ausgeschüttet (ms). */
+  readonly producedUntil: number;
+}
+
+export interface TroopBatch {
+  readonly unit: string;
+  readonly count: number;
+  readonly doneAt: number;
+}
+
+export interface Army {
+  /** Einsatzbereite Truppen je Einheitentyp. Gelesen wird immer in der Reihenfolge von `data.troops`. */
+  readonly ready: Readonly<Record<string, number>>;
+  readonly training: TroopBatch | null;
+  /** Besiegte Truppen: nicht verloren, sondern bis `doneAt` im Lazarett. */
+  readonly hospital: readonly TroopBatch[];
+}
+
+export interface SavedReplay {
+  readonly id: number;
+  readonly kind: 'defense' | 'attack';
+  readonly at: number;
+  readonly result: 'held' | 'breached';
+  readonly depth: number;
+  readonly loot: Resources;
+  readonly replay: Replay;
+}
+
+export interface AttackOutcome {
+  readonly camp: string;
+  readonly depth: number;
+  readonly loot: Resources;
+  readonly fallen: readonly UnitCount[];
+}
 
 export interface GameState {
   readonly version: number;
@@ -18,44 +64,264 @@ export interface GameState {
   readonly now: number;
   /** Startwert der nächsten Schlacht. */
   readonly nextSeed: number;
-  readonly gold: number;
+  readonly resources: Resources;
   readonly towers: readonly CityTower[];
-  /** Gewonnene Verteidigungen; bestimmt den Tutorial-Schritt. */
-  readonly wavesWon: number;
-  readonly lastDefense: Replay | null;
+  readonly buildings: readonly Building[];
+  readonly keepLevel: number;
+  /** Ausbau des Burgfrieds läuft bis zu diesem Zeitpunkt. */
+  readonly keepDoneAt: number | null;
+  readonly roadId: string;
+  /** Der Burgfried ist ausgebaut, der neue Straßenverlauf aber noch nicht gewählt. */
+  readonly roadChoicePending: boolean;
+  readonly hero: { readonly joined: boolean; readonly section: string | null };
+  readonly army: Army;
+  readonly defensesWon: number;
+  readonly attacksDone: number;
+  /** Index in `data.tutorial.steps`. */
+  readonly tutorialStep: number;
+  readonly replays: readonly SavedReplay[];
+  readonly nextReplayId: number;
+  readonly lastAttack: AttackOutcome | null;
 }
+
+export type Lineup = readonly (readonly UnitCount[])[];
 
 export type GameAction =
   | { readonly type: 'AdvanceTime'; readonly now: number }
-  | { readonly type: 'ResolveDefense'; readonly inputs: readonly BattleInput[] };
+  | { readonly type: 'ResolveDefense'; readonly inputs: readonly BattleInput[] }
+  | { readonly type: 'BuildTower'; readonly slot: string; readonly tower: string }
+  | { readonly type: 'UpgradeTower'; readonly slot: string }
+  | { readonly type: 'BuildBuilding'; readonly plot: string; readonly building: string }
+  | { readonly type: 'SkipTimerFree'; readonly plot: string }
+  | { readonly type: 'UpgradeKeep' }
+  | { readonly type: 'ChooseRoad'; readonly road: string }
+  | { readonly type: 'AssignHero'; readonly section: string }
+  | { readonly type: 'TrainTroops'; readonly unit: string; readonly count: number }
+  | { readonly type: 'ResolveAttack'; readonly camp: string; readonly lineup: Lineup; readonly inputs: readonly BattleInput[] };
 
-export type GameActionError = 'time_runs_backwards' | 'invalid_payload' | 'battle_not_finished';
+export type GameActionError =
+  | 'time_runs_backwards' | 'invalid_payload' | 'battle_not_finished'
+  | 'unknown_slot' | 'unknown_tower' | 'slot_occupied' | 'slot_empty' | 'slot_locked' | 'tower_locked' | 'max_level'
+  | 'not_enough_resources'
+  | 'unknown_plot' | 'unknown_building' | 'plot_occupied' | 'already_built' | 'nothing_to_skip' | 'skip_not_free'
+  | 'keep_max_level' | 'keep_busy' | 'road_choice_pending' | 'no_road_choice' | 'unknown_road'
+  | 'no_hero' | 'unknown_section'
+  | 'no_barracks' | 'unknown_troop' | 'training_busy'
+  | 'unknown_camp' | 'invalid_lineup' | 'not_enough_troops';
+
+const NO_RESOURCES: Resources = { gold: 0, wood: 0, stone: 0 };
 
 export function createGame(seed: number, now: number, data: GameData): GameState {
-  return { version: STATE_VERSION, now, nextSeed: seed >>> 0, gold: data.tutorial.start.gold, towers: [], wavesWon: 0, lastDefense: null };
+  const firstRoad = data.city.keepLevels[0]?.roads[0];
+  if (firstRoad === undefined) throw new Error('Stadt ohne Straße');
+  return {
+    version: STATE_VERSION,
+    now,
+    nextSeed: seed >>> 0,
+    resources: data.city.start.resources,
+    towers: [],
+    buildings: [],
+    keepLevel: 1,
+    keepDoneAt: null,
+    roadId: firstRoad,
+    roadChoicePending: false,
+    hero: { joined: false, section: null },
+    army: { ready: {}, training: null, hospital: [] },
+    defensesWon: 0,
+    attacksDone: 0,
+    tutorialStep: 0,
+    replays: [],
+    nextReplayId: 1,
+    lastAttack: null,
+  };
 }
 
-/** Der Verteidigungsschritt, der als Nächstes ansteht. */
-export function defenseStep(state: GameState, data: GameData): DefenseStepDef {
-  return data.tutorial.defenseSteps[state.wavesWon] ?? data.tutorial.afterTutorial;
+// ---------- Abfragen ----------
+
+export function canAfford(have: Resources, cost: Resources): boolean {
+  return RESOURCE_KEYS.every((k) => have[k] >= cost[k]);
+}
+
+function addResources(a: Resources, b: Resources, sign: 1 | -1 = 1): Resources {
+  return { gold: a.gold + sign * b.gold, wood: a.wood + sign * b.wood, stone: a.stone + sign * b.stone };
+}
+
+function scaleResources(a: Resources, n: number): Resources {
+  return { gold: a.gold * n, wood: a.wood * n, stone: a.stone * n };
+}
+
+/** Fertige Gebäude mit ihrer Definition, in der Reihenfolge des Zustands. */
+function finishedBuildings(state: GameState, data: GameData): BuildingDef[] {
+  return state.buildings.filter((b) => b.doneAt <= state.now).map((b) => findById(data.buildings.buildings, b.def, 'Gebäude'));
+}
+
+export function hasBuilding(state: GameState, building: string): boolean {
+  return state.buildings.some((b) => b.def === building && b.doneAt <= state.now);
+}
+
+/** Geschützter Grundstock: die Summe aller fertigen Speicher. */
+export function protectedStock(state: GameState, data: GameData): Resources {
+  return finishedBuildings(state, data).reduce((sum, b) => addResources(sum, b.protect), NO_RESOURCES);
+}
+
+export function readyTroops(state: GameState, unit: string): number {
+  return state.army.ready[unit] ?? 0;
+}
+
+export function tutorialStep(state: GameState, data: GameData): TutorialStepDef {
+  const step = data.tutorial.steps[Math.min(state.tutorialStep, data.tutorial.steps.length - 1)];
+  if (!step) throw new Error('Tutorial ohne Schritte');
+  return step;
+}
+
+/** Ob ein Teil der Oberfläche freigeschaltet ist (alle Schritte bis zum aktuellen zählen). */
+export function unlocked(state: GameState, feature: string, data: GameData): boolean {
+  return data.tutorial.steps.some((s, i) => i <= state.tutorialStep && s.unlocks.includes(feature));
+}
+
+/** Die Verteidigung, die als Nächstes ansteht. */
+export function defenseDef(state: GameState, data: GameData): DefenseDef {
+  return data.tutorial.defenses[state.defensesWon] ?? data.tutorial.afterDefenses;
 }
 
 /** Startzustand der nächsten Verteidigung, vollständig aus Spielzustand und Daten abgeleitet. */
 export function defenseSetup(state: GameState, data: GameData): BattleSetup {
-  const step = defenseStep(state, data);
-  const start = data.tutorial.start;
-  findById(data.roads.roads, start.roadId, 'Straße');
+  const def = defenseDef(state, data);
   return {
-    roadId: start.roadId,
-    waveId: step.wave,
+    playerSide: 'defender',
+    roadId: state.roadId,
+    keepLevel: state.keepLevel,
     towers: state.towers,
-    gold: state.gold,
-    keepHp: start.keepHp,
-    unlosable: step.unlosable,
-    autoRelease: step.autoRelease,
-    holdMilliUntilTower: step.holdMilliUntilTower,
+    gold: state.resources.gold,
+    keepHp: data.city.start.keepHp,
+    unlosable: def.unlosable,
+    holdMilliUntilTower: def.holdMilliUntilTower,
+    heroSection: state.hero.section,
+    gateHp: 0,
+    waves: [{ groups: findById(data.waves.waves, def.wave, 'Welle').groups }],
+    autoRelease: true,
+    abilities: [],
+    maxTicks: 0,
   };
 }
+
+function lineupError(state: GameState, lineup: Lineup, data: GameData): GameActionError | null {
+  if (lineup.length !== data.rules.attackWaves) return 'invalid_lineup';
+  let total = 0;
+  for (const troop of data.troops.troops) {
+    let sum = 0;
+    for (const wave of lineup) {
+      for (const entry of wave) {
+        if (!Number.isInteger(entry.count) || entry.count < 0) return 'invalid_lineup';
+        if (!data.troops.troops.some((t) => t.unit === entry.unit)) return 'invalid_lineup';
+        if (entry.unit === troop.unit) sum += entry.count;
+      }
+    }
+    if (sum > readyTroops(state, troop.unit)) return 'not_enough_troops';
+    total += sum;
+  }
+  return total > 0 ? null : 'invalid_lineup';
+}
+
+/** Startzustand eines Angriffs auf ein Lager. Die Aufstellung muss gültig sein (`validateGameAction`). */
+export function attackSetup(state: GameState, campId: string, lineup: Lineup, data: GameData): BattleSetup {
+  const camp = findById(data.camps.camps, campId, 'Lager');
+  return {
+    playerSide: 'attacker',
+    roadId: camp.roadId,
+    keepLevel: camp.keepLevel,
+    towers: camp.towers,
+    gold: 0,
+    keepHp: 1,
+    unlosable: false,
+    holdMilliUntilTower: 0,
+    heroSection: null,
+    gateHp: camp.gateHp,
+    waves: lineup.map((wave) => ({
+      groups: wave.filter((e) => e.count > 0).map((e) => ({ unit: e.unit, count: e.count, startTick: 0, intervalTicks: data.rules.attackSpawnIntervalTicks, jitterTicks: 0 })),
+    })),
+    autoRelease: false,
+    abilities: state.hero.joined ? data.hero.abilities.map((a) => a.id) : [],
+    maxTicks: data.rules.attackMaxTicks,
+  };
+}
+
+function conditionMet(state: GameState, cond: ConditionDef): boolean {
+  switch (cond.type) {
+    case 'defensesWon': return state.defensesWon >= cond.count;
+    case 'towerCount': return state.towers.length >= cond.count;
+    case 'towerLevel': return state.towers.some((t) => t.level >= cond.level);
+    case 'towerOfType': return state.towers.some((t) => t.def === cond.tower);
+    case 'buildingStarted': return state.buildings.some((b) => b.def === cond.building);
+    case 'buildingDone': return hasBuilding(state, cond.building);
+    case 'keepLevel': return state.keepLevel >= cond.level;
+    case 'roadChosen': return !state.roadChoicePending;
+    case 'heroAssigned': return state.hero.section !== null;
+    case 'troopsTrained': return readyTroops(state, cond.unit) >= cond.count;
+    case 'attacksDone': return state.attacksDone >= cond.count;
+    case 'never': return false;
+  }
+}
+
+// ---------- Zeit ----------
+
+/** Rechnet alles ab, was bis `state.now` fällig ist. Unabhängig davon, wie oft es aufgerufen wird. */
+function settle(state: GameState, data: GameData): GameState {
+  let s = state;
+
+  // Burgfried-Ausbau: neue Stufe, Straßenwahl steht an, die Heldin schließt sich an.
+  if (s.keepDoneAt !== null && s.keepDoneAt <= s.now) {
+    s = { ...s, keepLevel: s.keepLevel + 1, keepDoneAt: null, roadChoicePending: true };
+  }
+  if (!s.hero.joined && s.keepLevel >= data.hero.joinsAtKeepLevel) {
+    const ready = { ...s.army.ready };
+    for (const r of data.hero.retinue) ready[r.unit] = (ready[r.unit] ?? 0) + r.count;
+    s = { ...s, hero: { joined: true, section: null }, army: { ...s.army, ready } };
+  }
+
+  // Erträge: je Gebäude in ganzen Takten seit Fertigstellung, damit kein Rest verloren geht.
+  const intervalMs = data.rules.productionIntervalSeconds * 1000;
+  let resources = s.resources;
+  const buildings = s.buildings.map((b) => {
+    if (b.doneAt > s.now) return b;
+    const def = findById(data.buildings.buildings, b.def, 'Gebäude');
+    const before = Math.floor((b.producedUntil - b.doneAt) / intervalMs);
+    const after = Math.floor((s.now - b.doneAt) / intervalMs);
+    if (after <= before) return b;
+    const gain = { gold: 0, wood: 0, stone: 0 };
+    for (const k of RESOURCE_KEYS) {
+      const perInterval = def.producePerHour[k] * data.rules.productionIntervalSeconds;
+      gain[k] = mulDiv(after, perInterval, 3600) - mulDiv(before, perInterval, 3600);
+    }
+    resources = addResources(resources, gain);
+    return { ...b, producedUntil: b.doneAt + after * intervalMs };
+  });
+  s = { ...s, resources, buildings };
+
+  // Ausbildung und Lazarett
+  let ready = s.army.ready;
+  let training = s.army.training;
+  if (training && training.doneAt <= s.now) {
+    ready = { ...ready, [training.unit]: (ready[training.unit] ?? 0) + training.count };
+    training = null;
+  }
+  const hospital: TroopBatch[] = [];
+  for (const batch of s.army.hospital) {
+    if (batch.doneAt <= s.now) ready = { ...ready, [batch.unit]: (ready[batch.unit] ?? 0) + batch.count };
+    else hospital.push(batch);
+  }
+  if (ready !== s.army.ready || training !== s.army.training) s = { ...s, army: { ready, training, hospital } };
+
+  return s;
+}
+
+function advanceTutorial(state: GameState, data: GameData): GameState {
+  let step = state.tutorialStep;
+  while (step < data.tutorial.steps.length - 1 && conditionMet(state, data.tutorial.steps[step]!.done)) step++;
+  return step === state.tutorialStep ? state : { ...state, tutorialStep: step };
+}
+
+// ---------- Aktionen ----------
 
 function validInputs(inputs: readonly BattleInput[]): boolean {
   let last = 0;
@@ -66,13 +332,61 @@ function validInputs(inputs: readonly BattleInput[]): boolean {
   return true;
 }
 
-export function validateGameAction(state: GameState, action: GameAction): GameActionError | null {
+export function validateGameAction(state: GameState, action: GameAction, data: GameData): GameActionError | null {
   switch (action.type) {
     case 'AdvanceTime':
       if (!Number.isSafeInteger(action.now)) return 'invalid_payload';
       return action.now < state.now ? 'time_runs_backwards' : null;
     case 'ResolveDefense':
       return validInputs(action.inputs) ? null : 'invalid_payload';
+    case 'BuildTower':
+    case 'UpgradeTower': {
+      const cost = towerActionCost(state.towers, state.keepLevel, action, data);
+      if (typeof cost !== 'number') return cost;
+      return cost > state.resources.gold ? 'not_enough_resources' : null;
+    }
+    case 'BuildBuilding': {
+      if (!data.city.plots.some((p) => p.id === action.plot)) return 'unknown_plot';
+      const def = data.buildings.buildings.find((b) => b.id === action.building);
+      if (!def) return 'unknown_building';
+      if (state.buildings.some((b) => b.plot === action.plot)) return 'plot_occupied';
+      if (state.buildings.some((b) => b.def === action.building)) return 'already_built';
+      return canAfford(state.resources, def.cost) ? null : 'not_enough_resources';
+    }
+    case 'SkipTimerFree': {
+      const building = state.buildings.find((b) => b.plot === action.plot);
+      if (!building || building.doneAt <= state.now) return 'nothing_to_skip';
+      return tutorialStep(state, data).freeSkip ? null : 'skip_not_free';
+    }
+    case 'UpgradeKeep': {
+      const next = data.city.keepLevels.find((l) => l.level === state.keepLevel + 1);
+      if (!next) return 'keep_max_level';
+      if (state.keepDoneAt !== null) return 'keep_busy';
+      if (state.roadChoicePending) return 'road_choice_pending';
+      return canAfford(state.resources, next.cost) ? null : 'not_enough_resources';
+    }
+    case 'ChooseRoad': {
+      if (!state.roadChoicePending) return 'no_road_choice';
+      const level = data.city.keepLevels.find((l) => l.level === state.keepLevel);
+      return level?.roads.includes(action.road) ? null : 'unknown_road';
+    }
+    case 'AssignHero':
+      if (!state.hero.joined) return 'no_hero';
+      return data.city.sections.some((s) => s.id === action.section) ? null : 'unknown_section';
+    case 'TrainTroops': {
+      if (!hasBuilding(state, 'kaserne')) return 'no_barracks';
+      const troop = data.troops.troops.find((t) => t.unit === action.unit);
+      if (!troop) return 'unknown_troop';
+      if (!Number.isInteger(action.count) || action.count < 1 || action.count > 100) return 'invalid_payload';
+      if (state.army.training) return 'training_busy';
+      return canAfford(state.resources, scaleResources(troop.cost, action.count)) ? null : 'not_enough_resources';
+    }
+    case 'ResolveAttack': {
+      if (!data.camps.camps.some((c) => c.id === action.camp)) return 'unknown_camp';
+      const err = lineupError(state, action.lineup, data);
+      if (err) return err;
+      return validInputs(action.inputs) ? null : 'invalid_payload';
+    }
   }
 }
 
@@ -85,29 +399,131 @@ function nextSeed(seed: number): number {
   return (Math.imul(seed, 0x9e3779b1) + 1) >>> 0;
 }
 
-/** Zustand plus Aktion ergibt neuen Zustand. Ungültige Aktionen ändern nichts. */
-export function reduceGame(state: GameState, action: GameAction, data: GameData): ReduceResult {
-  const error = validateGameAction(state, action);
-  if (error) return { state, error };
+function withReplay(state: GameState, kind: SavedReplay['kind'], final: BattleState, loot: Resources, replay: Replay, data: GameData): GameState {
+  const saved: SavedReplay = { id: state.nextReplayId, kind, at: state.now, result: final.result === 'breached' ? 'breached' : 'held', depth: final.depth, loot, replay };
+  return { ...state, nextReplayId: state.nextReplayId + 1, replays: [...state.replays, saved].slice(-data.rules.maxReplays) };
+}
+
+function countFallen(fallen: readonly string[], data: GameData): UnitCount[] {
+  return data.troops.troops
+    .map((t) => ({ unit: t.unit, count: fallen.filter((f) => f === t.unit).length }))
+    .filter((c) => c.count > 0);
+}
+
+function apply(state: GameState, action: GameAction, data: GameData): GameState | GameActionError {
   switch (action.type) {
     case 'AdvanceTime':
-      return { state: { ...state, now: action.now }, error: null };
+      return settle({ ...state, now: action.now }, data);
     case 'ResolveDefense': {
       const setup = defenseSetup(state, data);
       const final = runBattle(setup, state.nextSeed, action.inputs, data);
-      if (final.result === 'running') return { state, error: 'battle_not_finished' };
-      const won = final.result === 'won';
+      if (final.result === 'running') return 'battle_not_finished';
+      const won = final.result === 'held';
+      const s: GameState = {
+        ...state,
+        nextSeed: nextSeed(state.nextSeed),
+        resources: { ...state.resources, gold: final.gold + (won ? defenseDef(state, data).victoryGold : 0) },
+        towers: final.towers.map((t) => ({ slot: t.slot, def: t.def, level: t.level })),
+        defensesWon: state.defensesWon + (won ? 1 : 0),
+      };
+      return withReplay(s, 'defense', final, NO_RESOURCES, makeReplay(setup, state.nextSeed, action.inputs, final, data), data);
+    }
+    case 'BuildTower': {
+      const cost = towerActionCost(state.towers, state.keepLevel, action, data) as number;
+      return { ...state, resources: { ...state.resources, gold: state.resources.gold - cost }, towers: [...state.towers, { slot: action.slot, def: action.tower, level: 1 }] };
+    }
+    case 'UpgradeTower': {
+      const cost = towerActionCost(state.towers, state.keepLevel, action, data) as number;
       return {
-        state: {
-          ...state,
-          nextSeed: nextSeed(state.nextSeed),
-          gold: final.gold + (won ? defenseStep(state, data).victoryGold : 0),
-          towers: final.towers.map((t) => ({ slot: t.slot, def: t.def, level: t.level })),
-          wavesWon: state.wavesWon + (won ? 1 : 0),
-          lastDefense: makeReplay(setup, state.nextSeed, action.inputs, final, data),
-        },
-        error: null,
+        ...state,
+        resources: { ...state.resources, gold: state.resources.gold - cost },
+        towers: state.towers.map((t) => (t.slot === action.slot ? { ...t, level: t.level + 1 } : t)),
       };
     }
+    case 'BuildBuilding': {
+      const def = findById(data.buildings.buildings, action.building, 'Gebäude');
+      const doneAt = state.now + def.buildSeconds * 1000;
+      return {
+        ...state,
+        resources: addResources(state.resources, def.cost, -1),
+        buildings: [...state.buildings, { plot: action.plot, def: def.id, doneAt, producedUntil: doneAt }],
+      };
+    }
+    case 'SkipTimerFree':
+      return { ...state, buildings: state.buildings.map((b) => (b.plot === action.plot ? { ...b, doneAt: state.now, producedUntil: state.now } : b)) };
+    case 'UpgradeKeep': {
+      const next = data.city.keepLevels.find((l) => l.level === state.keepLevel + 1)!;
+      return settle({ ...state, resources: addResources(state.resources, next.cost, -1), keepDoneAt: state.now + next.buildSeconds * 1000 }, data);
+    }
+    case 'ChooseRoad':
+      return { ...state, roadId: action.road, roadChoicePending: false };
+    case 'AssignHero':
+      return { ...state, hero: { joined: true, section: action.section } };
+    case 'TrainTroops': {
+      const troop = data.troops.troops.find((t) => t.unit === action.unit)!;
+      return {
+        ...state,
+        resources: addResources(state.resources, scaleResources(troop.cost, action.count), -1),
+        army: { ...state.army, training: { unit: troop.unit, count: action.count, doneAt: state.now + troop.trainSeconds * action.count * 1000 } },
+      };
+    }
+    case 'ResolveAttack': {
+      const camp = findById(data.camps.camps, action.camp, 'Lager');
+      const setup = attackSetup(state, action.camp, action.lineup, data);
+      const final = runBattle(setup, state.nextSeed, action.inputs, data);
+      if (final.result === 'running') return 'battle_not_finished';
+      const loot = computeLoot(camp.stock, camp.protected, final.depth, data.rules);
+      // Verlustgrenze: Besiegte Truppen sind nicht verloren, sie kommen ins Lazarett.
+      const fallen = countFallen(final.fallen, data);
+      const healPermille = finishedBuildings(state, data).reduce((min, b) => Math.min(min, b.healTimePermille), PERMILLE);
+      const ready = { ...state.army.ready };
+      const hospital = [...state.army.hospital];
+      for (const f of fallen) {
+        const troop = data.troops.troops.find((t) => t.unit === f.unit)!;
+        ready[f.unit] = (ready[f.unit] ?? 0) - f.count;
+        hospital.push({ unit: f.unit, count: f.count, doneAt: state.now + mulDiv(troop.healSeconds * f.count * 1000, healPermille, PERMILLE) });
+      }
+      const s: GameState = {
+        ...state,
+        nextSeed: nextSeed(state.nextSeed),
+        resources: addResources(state.resources, loot),
+        army: { ...state.army, ready, hospital },
+        attacksDone: state.attacksDone + 1,
+        lastAttack: { camp: camp.id, depth: final.depth, loot, fallen },
+      };
+      return withReplay(s, 'attack', final, loot, makeReplay(setup, state.nextSeed, action.inputs, final, data), data);
+    }
   }
+}
+
+/** Zustand plus Aktion ergibt neuen Zustand. Ungültige Aktionen ändern nichts. */
+export function reduceGame(state: GameState, action: GameAction, data: GameData): ReduceResult {
+  const error = validateGameAction(state, action, data);
+  if (error) return { state, error };
+  const next = apply(state, action, data);
+  if (typeof next === 'string') return { state, error: next };
+  return { state: advanceTutorial(next, data), error: null };
+}
+
+/**
+ * Vorschlag für die Aufstellung: Rammböcke und Gepanzerte voran, Leichte zuletzt, gleichmäßig auf die Wellen verteilt.
+ * Die Oberfläche startet damit; der Spieler ändert sie.
+ */
+export function defaultLineup(state: GameState, data: GameData): UnitCount[][] {
+  const waves = data.rules.attackWaves;
+  const lineup: UnitCount[][] = Array.from({ length: waves }, () => []);
+  const order = [...data.troops.troops].sort((a, b) => unitSiege(b.unit, data) - unitSiege(a.unit, data));
+  order.forEach((troop, rank) => {
+    const total = readyTroops(state, troop.unit);
+    // Belagerungsgerät ganz in die erste Welle, alles andere verteilt, schnellere Truppen eher hinten.
+    for (let w = 0; w < waves; w++) {
+      const count = rank === 0 ? (w === 0 ? total : 0) : Math.floor(total / waves) + (w < total % waves ? 1 : 0);
+      lineup[w]!.push({ unit: troop.unit, count });
+    }
+  });
+  return lineup;
+}
+
+function unitSiege(unit: string, data: GameData): number {
+  return findById(data.units.units, unit, 'Einheit').siege;
 }

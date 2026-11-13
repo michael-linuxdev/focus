@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "preliminary": true,
+  "id": "alruna",
+  "joinsAtKeepLevel": 2,
+  "sectionBonusPermille": 500,
+  "retinue": [
+    {
+      "unit": "gepanzert",
+      "count": 4
+    },
+    {
+      "unit": "ramme",
+      "count": 2
+    }
+  ],
+  "abilities": [
+    {
+      "id": "schildwall",
+      "kind": "shield",
+      "durationTicks": 100,
+      "cooldownTicks": 400,
+      "damageTakenPermille": 400
+    },
+    {
+      "id": "brandpfeile",
+      "kind": "disableTower",
+      "durationTicks": 140,
+      "cooldownTicks": 300,
+      "damageTakenPermille": 1000
+    }
+  ]
+}

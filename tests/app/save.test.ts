@@ -24,11 +24,22 @@ describe('Speicherstand', () => {
     expect(migrate({ version: 1 }, data, 3, steps)).toEqual({ version: 3, a: 1, b: 2 });
   });
 
-  it('ein Stand aus M0 (Version 1) wird übernommen statt verworfen', () => {
+  it('Stände aus M0 und M1 werden übernommen statt verworfen', () => {
     const store = memoryStore();
     store.setItem(SAVE_KEY, JSON.stringify({ version: 1, now: 5000, nextSeed: 77, battlesFinished: 3 }));
     expect(loadGame(store, data)).toEqual(createGame(77, 5000, data));
     expect(store.map.has(SAVE_BACKUP_KEY)).toBe(false);
+
+    const m1 = { version: 2, now: 9000, nextSeed: 5, gold: 120, wavesWon: 3, lastDefense: null,
+      towers: [{ slot: 's1', def: 'bogenturm', level: 2 }, { slot: 's2', def: 'bogenturm', level: 1 }] };
+    store.setItem(SAVE_KEY, JSON.stringify(m1));
+    const loaded = loadGame(store, data)!;
+    expect(loaded.version).toBe(3);
+    expect(loaded.resources).toEqual({ gold: 120, wood: 0, stone: 0 });
+    expect(loaded.towers).toEqual(m1.towers);
+    expect(loaded.defensesWon).toBe(3);
+    // Der Spieler landet dort, wo er im Ablauf stand: beim Holzfäller.
+    expect(data.tutorial.steps[loaded.tutorialStep]!.id).toBe('holzfaeller');
   });
 
   it('Unlesbares und Stände aus der Zukunft werden gesichert statt zerstört', () => {

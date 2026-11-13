@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "preliminary": true,
+  "gateMilli": 1000,
+  "marketPermille": 500,
+  "attackMaxTicks": 1800,
+  "attackSpawnIntervalTicks": 8,
+  "attackWaves": 3,
+  "lootMaxPermille": 300,
+  "depthLootPermille": [
+    0,
+    300,
+    600,
+    1000
+  ],
+  "maxReplays": 10,
+  "productionIntervalSeconds": 10
+}

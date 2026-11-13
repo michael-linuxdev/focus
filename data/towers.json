@@ -1,9 +1,11 @@
 {
-  "version": 1,
+  "version": 2,
   "preliminary": true,
   "towers": [
     {
       "id": "bogenturm",
+      "keepLevel": 1,
+      "splashMilli": 0,
       "levels": [
         {
           "cost": 50,
@@ -16,6 +18,25 @@
           "damage": 9,
           "rangeMilli": 2800,
           "cooldownTicks": 12
+        }
+      ]
+    },
+    {
+      "id": "katapult",
+      "keepLevel": 2,
+      "splashMilli": 1300,
+      "levels": [
+        {
+          "cost": 90,
+          "damage": 16,
+          "rangeMilli": 3200,
+          "cooldownTicks": 40
+        },
+        {
+          "cost": 120,
+          "damage": 22,
+          "rangeMilli": 3400,
+          "cooldownTicks": 36
         }
       ]
     }

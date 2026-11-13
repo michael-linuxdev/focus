@@ -1,70 +1,320 @@
 {
-  "version": 1,
+  "version": 2,
   "preliminary": true,
-  "start": {
-    "gold": 50,
-    "roadId": "dorf_1",
-    "keepHp": 10
-  },
-  "defenseSteps": [
+  "defenses": [
     {
-      "id": "erster_turm",
       "wave": "dorf_w1",
-      "autoRelease": true,
       "holdMilliUntilTower": 2400,
       "unlosable": true,
-      "victoryGold": 30,
-      "hints": [
-        {
-          "type": "buildTower",
-          "slot": "s1",
-          "tower": "bogenturm"
-        }
-      ]
+      "victoryGold": 30
+    },
+    {
+      "wave": "dorf_w2",
+      "holdMilliUntilTower": 0,
+      "unlosable": true,
+      "victoryGold": 30
+    },
+    {
+      "wave": "dorf_w3",
+      "holdMilliUntilTower": 0,
+      "unlosable": true,
+      "victoryGold": 40
+    },
+    {
+      "wave": "dorf_w4",
+      "holdMilliUntilTower": 0,
+      "unlosable": true,
+      "victoryGold": 60
+    },
+    {
+      "wave": "dorf_w5",
+      "holdMilliUntilTower": 0,
+      "unlosable": true,
+      "victoryGold": 80
+    }
+  ],
+  "afterDefenses": {
+    "wave": "dorf_loop",
+    "holdMilliUntilTower": 0,
+    "unlosable": false,
+    "victoryGold": 60
+  },
+  "steps": [
+    {
+      "id": "erster_turm",
+      "hint": {
+        "type": "slot",
+        "slot": "s1",
+        "tower": "bogenturm"
+      },
+      "done": {
+        "type": "defensesWon",
+        "count": 1
+      },
+      "freeSkip": false,
+      "autoDefense": true,
+      "unlocks": []
     },
     {
       "id": "zweiter_turm",
-      "wave": "dorf_w2",
-      "autoRelease": false,
-      "holdMilliUntilTower": 0,
-      "unlosable": true,
-      "victoryGold": 30,
-      "hints": [
-        {
-          "type": "buildTower",
-          "slot": "s2",
-          "tower": "bogenturm"
-        },
-        {
-          "type": "releaseWave"
-        }
+      "hint": {
+        "type": "slot",
+        "slot": "s2",
+        "tower": "bogenturm"
+      },
+      "done": {
+        "type": "towerCount",
+        "count": 2
+      },
+      "freeSkip": false,
+      "autoDefense": false,
+      "unlocks": []
+    },
+    {
+      "id": "welle_2",
+      "hint": {
+        "type": "button",
+        "button": "defend"
+      },
+      "done": {
+        "type": "defensesWon",
+        "count": 2
+      },
+      "freeSkip": false,
+      "autoDefense": false,
+      "unlocks": [
+        "defend"
       ]
     },
     {
       "id": "erster_ausbau",
-      "wave": "dorf_w3",
-      "autoRelease": false,
-      "holdMilliUntilTower": 0,
-      "unlosable": true,
-      "victoryGold": 40,
-      "hints": [
-        {
-          "type": "upgradeTower",
-          "slot": "s1"
-        },
-        {
-          "type": "releaseWave"
-        }
+      "hint": {
+        "type": "slot",
+        "slot": "s1",
+        "tower": "bogenturm"
+      },
+      "done": {
+        "type": "towerLevel",
+        "level": 2
+      },
+      "freeSkip": false,
+      "autoDefense": false,
+      "unlocks": []
+    },
+    {
+      "id": "welle_3",
+      "hint": {
+        "type": "button",
+        "button": "defend"
+      },
+      "done": {
+        "type": "defensesWon",
+        "count": 3
+      },
+      "freeSkip": false,
+      "autoDefense": false,
+      "unlocks": []
+    },
+    {
+      "id": "holzfaeller",
+      "hint": {
+        "type": "plot",
+        "plot": "p1",
+        "building": "holzfaeller"
+      },
+      "done": {
+        "type": "buildingStarted",
+        "building": "holzfaeller"
+      },
+      "freeSkip": false,
+      "autoDefense": false,
+      "unlocks": [
+        "building:holzfaeller",
+        "resources"
+      ]
+    },
+    {
+      "id": "timer_ueberspringen",
+      "hint": {
+        "type": "plot",
+        "plot": "p1",
+        "building": "holzfaeller"
+      },
+      "done": {
+        "type": "buildingDone",
+        "building": "holzfaeller"
+      },
+      "freeSkip": true,
+      "autoDefense": false,
+      "unlocks": []
+    },
+    {
+      "id": "steinbruch",
+      "hint": {
+        "type": "plot",
+        "plot": "p2",
+        "building": "steinbruch"
+      },
+      "done": {
+        "type": "buildingDone",
+        "building": "steinbruch"
+      },
+      "freeSkip": false,
+      "autoDefense": false,
+      "unlocks": [
+        "building:steinbruch"
+      ]
+    },
+    {
+      "id": "welle_4",
+      "hint": {
+        "type": "button",
+        "button": "defend"
+      },
+      "done": {
+        "type": "defensesWon",
+        "count": 4
+      },
+      "freeSkip": false,
+      "autoDefense": false,
+      "unlocks": []
+    },
+    {
+      "id": "burgfried_2",
+      "hint": {
+        "type": "keep"
+      },
+      "done": {
+        "type": "keepLevel",
+        "level": 2
+      },
+      "freeSkip": false,
+      "autoDefense": false,
+      "unlocks": [
+        "keep"
+      ]
+    },
+    {
+      "id": "strasse_waehlen",
+      "hint": null,
+      "done": {
+        "type": "roadChosen"
+      },
+      "freeSkip": false,
+      "autoDefense": false,
+      "unlocks": []
+    },
+    {
+      "id": "katapult",
+      "hint": {
+        "type": "slot",
+        "slot": "s3",
+        "tower": "katapult"
+      },
+      "done": {
+        "type": "towerOfType",
+        "tower": "katapult"
+      },
+      "freeSkip": false,
+      "autoDefense": false,
+      "unlocks": [
+        "towerChoice"
+      ]
+    },
+    {
+      "id": "heldin",
+      "hint": {
+        "type": "button",
+        "button": "hero"
+      },
+      "done": {
+        "type": "heroAssigned"
+      },
+      "freeSkip": false,
+      "autoDefense": false,
+      "unlocks": [
+        "hero"
+      ]
+    },
+    {
+      "id": "welle_5",
+      "hint": {
+        "type": "button",
+        "button": "defend"
+      },
+      "done": {
+        "type": "defensesWon",
+        "count": 5
+      },
+      "freeSkip": false,
+      "autoDefense": false,
+      "unlocks": []
+    },
+    {
+      "id": "kaserne",
+      "hint": {
+        "type": "plot",
+        "plot": "p3",
+        "building": "kaserne"
+      },
+      "done": {
+        "type": "buildingDone",
+        "building": "kaserne"
+      },
+      "freeSkip": false,
+      "autoDefense": false,
+      "unlocks": [
+        "building:kaserne"
+      ]
+    },
+    {
+      "id": "truppen",
+      "hint": {
+        "type": "plot",
+        "plot": "p3",
+        "building": "kaserne"
+      },
+      "done": {
+        "type": "troopsTrained",
+        "unit": "leicht",
+        "count": 6
+      },
+      "freeSkip": false,
+      "autoDefense": false,
+      "unlocks": [
+        "train"
+      ]
+    },
+    {
+      "id": "erster_angriff",
+      "hint": {
+        "type": "button",
+        "button": "attack"
+      },
+      "done": {
+        "type": "attacksDone",
+        "count": 1
+      },
+      "freeSkip": false,
+      "autoDefense": false,
+      "unlocks": [
+        "attack"
+      ]
+    },
+    {
+      "id": "freies_spiel",
+      "hint": null,
+      "done": {
+        "type": "never"
+      },
+      "freeSkip": false,
+      "autoDefense": false,
+      "unlocks": [
+        "replays",
+        "building:hof",
+        "building:speicher",
+        "building:lazarett"
       ]
     }
-  ],
-  "afterTutorial": {
-    "id": "freies_spiel",
-    "wave": "dorf_loop",
-    "autoRelease": false,
-    "holdMilliUntilTower": 0,
-    "unlosable": false,
-    "victoryGold": 30,
-    "hints": []
-  }
+  ]
 }
