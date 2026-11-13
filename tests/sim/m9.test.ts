@@ -50,7 +50,7 @@ describe('M9: Tagesziele wechseln', () => {
     const tower = g.towers.find((t) => t.level === 1)!;
     g = act(g, { type: 'UpgradeTower', slot: tower.slot });
     expect(g.daily.counters.towers).toBe(1);
-    expect(g.weekly.counters.towers).toBe(1);
+    expect(g.weekly.counters.towers).toBe(end.weekly.counters.towers + 1); // die Woche zählt die Türme des Ablaufs mit
   });
 });
 
