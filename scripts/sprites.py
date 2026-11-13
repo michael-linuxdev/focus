@@ -33,8 +33,10 @@ MAX_SIDE = 192
 
 def background_distance(rgb: np.ndarray) -> np.ndarray:
     """0 = reines Hintergrund-Magenta, 1 = weit weg davon. Der Hintergrundton wird aus den Bildecken gelesen."""
-    corners = np.concatenate([rgb[:12, :12].reshape(-1, 3), rgb[:12, -12:].reshape(-1, 3), rgb[-12:, :12].reshape(-1, 3), rgb[-12:, -12:].reshape(-1, 3)])
-    key = np.median(corners, axis=0)
+    # Die Ecke, die dem Soll-Magenta am nächsten kommt, gibt den Ton vor (bei Porträts liegen unten Motivteile in den Ecken).
+    patches = [rgb[:12, :12], rgb[:12, -12:], rgb[-12:, :12], rgb[-12:, -12:]]
+    medians = [np.median(p.reshape(-1, 3), axis=0) for p in patches]
+    key = min(medians, key=lambda m: float(((m - np.array([255.0, 0.0, 255.0])) ** 2).sum()))
     dist = np.sqrt(((rgb - key) ** 2).sum(axis=2))
     # Unter LOW gilt als Hintergrund, über HIGH als Motiv, dazwischen weiche Kante.
     low, high = 60.0, 130.0

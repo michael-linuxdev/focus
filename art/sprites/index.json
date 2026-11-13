@@ -142,5 +142,51 @@
    "w": 192,
    "h": 137
   }
+ ],
+ "stadt": [
+  {
+   "name": "burgfried_1",
+   "file": "stadt/burgfried_1.png",
+   "w": 156,
+   "h": 192
+  },
+  {
+   "name": "burgfried_2",
+   "file": "stadt/burgfried_2.png",
+   "w": 159,
+   "h": 192
+  },
+  {
+   "name": "marktplatz",
+   "file": "stadt/marktplatz.png",
+   "w": 192,
+   "h": 124
+  },
+  {
+   "name": "torhaus",
+   "file": "stadt/torhaus.png",
+   "w": 192,
+   "h": 184
+  },
+  {
+   "name": "torhaus_kaputt",
+   "file": "stadt/torhaus_kaputt.png",
+   "w": 192,
+   "h": 187
+  },
+  {
+   "name": "turmplatz",
+   "file": "stadt/turmplatz.png",
+   "w": 192,
+   "h": 127
+  }
+ ],
+ "heldin": [
+  {
+   "name": "alruna",
+   "file": "heldin/alruna.png",
+   "w": 141,
+   "h": 192
+  }
  ]
 }
