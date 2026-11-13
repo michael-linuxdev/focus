@@ -5,7 +5,7 @@ import {
   readyTroops, reduceGame, roadLengthMilli, roadPointMilli, stepBattle, towerActionCost, tutorialStep, unlocked, validateBattleAction, validateGameAction,
   type BattleAction, type BattleInput, type BattleState, type GameAction, type GameState, type Resources, type SavedReplay, type UnitCount,
 } from '../sim/index.ts';
-import { drawStage, formatSeconds, targetAt, tileCenter, type Effect, type Layout, type Scene } from '../render/stage.ts';
+import { FORECOURT, forecourtToRoad, shownPoint, drawStage, formatSeconds, targetAt, tileCenter, type Effect, type Layout, type Scene } from '../render/stage.ts';
 import { spriteAspect, unitSprite } from '../render/sprites.ts';
 import { Hud, compact, type Btn, type HudModel, type MapNode, type StepperRow } from '../ui/Hud.tsx';
 import { InstallGate, ReportPanel, type GateModel, type ReportModel } from '../ui/InstallGate.tsx';
@@ -511,10 +511,15 @@ function onTap(clientX: number, clientY: number): void {
 /** Pfeilhagel auf einen Punkt des Spielfelds (CSS-Pixel relativ zur Zeichenfläche). */
 function volleyAt(px: number, py: number): void {
   if (!layout || screen.kind !== 'battle') return;
-  const x = Math.round(((px - layout.ox) / layout.tile - 0.5) * MILLI);
-  const y = Math.round(((py - layout.oy) / layout.tile - 0.5) * MILLI);
+  let x = Math.round(((px - layout.ox) / layout.tile - 0.5) * MILLI);
+  let y = Math.round(((py - layout.oy) / layout.tile - 0.5) * MILLI);
   const { cols, rows } = data.roads.grid;
-  if (x < -MILLI / 2 || y < -MILLI / 2 || x > (cols - 0.5) * MILLI || y > (rows - 0.5) * MILLI) return;
+  if (x < -MILLI / 2 || y < -(FORECOURT + 0.5) * MILLI || x > (cols - 0.5) * MILLI || y > (rows - 0.5) * MILLI) return;
+  // Ein Tipp auf die Angreifer im Vorfeld gilt dem Ort, an dem sie nach den Regeln stehen (vor dem Tor).
+  const b = screen.battle;
+  const real = forecourtToRoad(x, y, findById(data.roads.roads, b.setup.roadId, 'Straße'), b.setup.gateHp > 0 && b.gateHp > 0, data);
+  if (real) [x, y] = real;
+  else if (y < -MILLI / 2) return;
   if (battleAct({ type: 'Volley', x, y })) {
     record('ability_used', { ability: 'pfeilhagel' });
     navigator.vibrate?.(8);
@@ -630,7 +635,10 @@ function buildScene(nowMs: number): Scene {
   const fight = screen.kind === 'battle' || screen.kind === 'replay' ? screen.battle : null;
   const base = {
     hint: hintTile(), effects, timeMs: nowMs, bottomInset: bottomInset(), cheapestTower,
-    volley: fight && fight.lastVolleyTick >= 0 ? { x: fight.lastVolleyX, y: fight.lastVolleyY, age: fight.tick - fight.lastVolleyTick } : null,
+    volley: fight && fight.lastVolleyTick >= 0 ? (() => {
+      const [x, y] = shownPoint(fight.lastVolleyX, fight.lastVolleyY, findById(data.roads.roads, fight.setup.roadId, 'Straße'), fight.setup.gateHp > 0 && fight.gateHp > 0, data);
+      return { x, y, age: fight.tick - fight.lastVolleyTick };
+    })() : null,
     haste: fight !== null && fight.tick < fight.hasteUntil,
     weakSection: screen.kind === 'city' && weak ? weak.section : null };
   if (screen.kind === 'battle' || screen.kind === 'replay') {
@@ -805,7 +813,7 @@ function buildHud(nowMs: number): HudModel {
           ...(game.hero.joined ? [t('attack.withHero', { name: heroName })] : []),
           total === 0 ? t('attack.empty') : t('attack.ready', { n: free }),
           ...(campStockPermille(game, s.camp, data) < 1000 ? [t('attack.loot', { p: Math.floor(campStockPermille(game, s.camp, data) / 10), h: data.rules.campRegenHours })] : []),
-          ...(findById(data.camps.camps, s.camp, 'Lager').kind === 'city' ? [t('attack.cityWarning', { h: data.rules.revengeAfterHours })] : []),
+          ...(findById(data.camps.camps, s.camp, 'Lager').kind === 'city' ? [game.beginnerUntil > game.now ? t('attack.cityWarningBeginner') : t('attack.cityWarning', { h: data.rules.revengeAfterHours })] : []),
           // Nur Einheiten mit Belagerungswert brechen das Tor; ohne sie bleibt der Angriff davor stehen.
           ...(total > 0 && !data.troops.troops.some((troop) => used(troop.unit) > 0 && findById(data.units.units, troop.unit, 'Einheit').siege > 0) ? [t('attack.noRam')] : []),
         ],

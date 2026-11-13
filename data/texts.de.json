@@ -1,5 +1,5 @@
 {
-  "version": 16,
+  "version": 17,
   "lang": "de",
   "texts": {
     "hud.defend": "Verteidigen",
@@ -349,6 +349,7 @@
     "hud.chapter": "Kapitel {n}: {text}",
     "hud.chapterReady": "Kapitel {n} geschafft – Belohnung abholen",
     "chronicle.sub": "Chronik · Kapitel {n} von {of}",
-    "train.fill": "Heer auffüllen: +{n} {unit}"
+    "train.fill": "Heer auffüllen: +{n} {unit}",
+    "attack.cityWarningBeginner": "Eine Stadt schlägt zurück. Dein Anfängerschutz bleibt; ihr Gegenangriff kommt, wenn er endet."
   }
 }

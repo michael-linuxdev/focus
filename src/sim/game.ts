@@ -17,7 +17,7 @@ import { fixedDefense, scaledDefense, scaledWave, wavesUnlocked, type PlannedDef
  * Schlachten werden nicht "gemeldet", sondern nachgerechnet: `ResolveDefense` und `ResolveAttack`
  * bekommen nur die Eingaben des Spielers; Startzustand und Startwert stammen aus dem Spielzustand.
  */
-export const STATE_VERSION = 11;
+export const STATE_VERSION = 12;
 
 export interface Building {
   readonly plot: string;
@@ -123,6 +123,8 @@ export interface GameState {
   readonly lastAttack: AttackOutcome | null;
   /** Bis zu diesem Zeitpunkt schützt ein Schild vor Nachbarstädten (nicht vor Räubern). */
   readonly shieldUntil: number;
+  /** Ende des Anfängerschutzes. Er bleibt bestehen, auch wenn der Spieler selbst eine Stadt angreift. */
+  readonly beginnerUntil: number;
   readonly worldSeen: boolean;
   /** PLATZHALTER: Mitgliedschaft in der simulierten Bot-Allianz. */
   readonly allianceJoined: boolean;
@@ -219,6 +221,7 @@ export function createGame(seed: number, now: number, data: GameData): GameState
     nextReplayId: 1,
     lastAttack: null,
     shieldUntil: now + data.rules.newPlayerShieldHours * HOUR_MS,
+    beginnerUntil: now + data.rules.newPlayerShieldHours * HOUR_MS,
     worldSeen: false,
     allianceJoined: false,
     daily: { day: Math.floor(now / DAY_MS), counters: NO_COUNTERS, claimed: [] },
@@ -972,7 +975,8 @@ function apply(state: GameState, action: GameAction, data: GameData): GameState 
         campRaids: { ...state.campRaids, [camp.id]: state.now },
         campsTaken: final.depth >= 3 && !state.campsTaken.includes(camp.id) ? [...state.campsTaken, camp.id] : state.campsTaken,
         // Wer eine Stadt angreift, verliert seinen Schild und muss mit dem Gegenangriff rechnen (bei mehreren zählt der erste).
-        ...(camp.kind === 'city' ? { shieldUntil: Math.min(state.shieldUntil, state.now), revenge: state.revenge ?? { camp: camp.id, dueAt: state.now + data.rules.revengeAfterHours * HOUR_MS } } : {}),
+        // Ausgenommen ist der Anfängerschutz: Er läuft weiter, der Gegenangriff wartet bis zu seinem Ende.
+        ...(camp.kind === 'city' ? { shieldUntil: Math.min(state.shieldUntil, Math.max(state.now, state.beginnerUntil)), revenge: state.revenge ?? { camp: camp.id, dueAt: state.now + data.rules.revengeAfterHours * HOUR_MS } } : {}),
         lastAttack: { camp: camp.id, depth: final.depth, loot, fallen },
       };
       return withReplay(s, 'attack', final, loot, makeReplay(setup, state.nextSeed, action.inputs, final, data), data);

@@ -179,7 +179,7 @@ der Verteidiger baut Türme (`BuildTower`, `UpgradeTower`), der Angreifer löst 
 - **Städte schlagen zurück.** Ein Angriff auf ein Ziel der Art `city` beendet den eigenen Schild sofort und setzt `revenge`
   (`camp`, `dueAt` = jetzt + `revengeAfterHours`; ein schon angekündigter bleibt). `ResolveRevenge` gilt, sobald `dueAt` erreicht ist
   und kein Schild mehr läuft: dieselbe Schlacht wie der Nachtangriff, ohne Eingaben, Verlust nach Tiefe, nie kostenlos. Die
-  Wiederholung trägt `from`. Mit echten Spielern ersetzt das der Angriff des Nachbarn; die Regeln zu Schild und Verlust bleiben.
+  Wiederholung trägt `from`. Der Anfängerschutz (`beginnerUntil`) fällt dabei nicht: `shieldUntil = min(shieldUntil, max(jetzt, beginnerUntil))`. Mit echten Spielern ersetzt das der Angriff des Nachbarn; die Regeln zu Schild und Verlust bleiben.
 
 ## Monatsbogen (M11)
 

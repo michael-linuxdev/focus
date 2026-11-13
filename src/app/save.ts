@@ -70,6 +70,8 @@ export const migrations: Readonly<Record<number, Migration>> = {
   9: (old) => ({ ...old, version: 10, campRaids: {}, revenge: null }),
   // 10 -> 11 (M11): Chronik. Schon vorhandener Fortschritt zählt, die Kapitel holt der Spieler nacheinander ab.
   10: (old) => ({ ...old, version: 11, campsTaken: [], chapter: 0, crownedAt: null }),
+  // 11 -> 12: Ende des Anfängerschutzes als eigener Wert. Für alte Stände gilt ein noch laufender Schild als Anfängerschutz.
+  11: (old) => ({ ...old, version: 12, beginnerUntil: num(old['shieldUntil'], 0) }),
 };
 
 function num(value: unknown, fallback: number): number {

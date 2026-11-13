@@ -71,12 +71,15 @@ Oberfläche: Die ersten beiden Turmstufen entstehen mit einem Tipp; ab Stufe 3 f
 ein Vielfaches kostet. Ist ein Ausbau gesperrt, sagt ein kurzer Text am Turm, welcher Burgfried fehlt. Nach dem geführten Ablauf zeigt
 eine Zeile oben links das offene Kapitel der Chronik.
 Seit M10: Wer eine Nachbarstadt angreift, verliert seinen Schild sofort; ihr Gegenangriff kommt nach einigen Stunden und wartet, solange ein Schild läuft.
+Ausgenommen ist der Anfängerschutz (bestätigt): Er läuft weiter, der Gegenangriff kommt erst nach seinem Ende.
+Darstellung: Oberhalb des Spielfelds liegt ein Vorfeld (`FORECOURT` in `src/render/stage.ts`). Wer vor dem geschlossenen Tor wartet, wird dort
+in Reihen gezeichnet, obwohl er nach den Regeln auf einem Punkt steht; Tipps und Treffer werden entsprechend umgerechnet.
 Nur Rammböcke brechen Tore (Leichte und Gepanzerte haben Belagerungswert 0).
 Eingreifen in der Verteidigung (nach dem ersten Spieltest ergänzt, steht nicht im ursprünglichen Auftrag): Ein Tipp ins
 Feld ruft einen Pfeilhagel auf den Punkt, ab der Heldin gibt es den Kampfruf. Jede Verteidigung endet mit ein bis drei
 Sternen und Bonusgold. Ab Welle 2 sind die Wellen so eng, dass ohne Eingreifen Räuber durchkommen; verlierbar werden
 die ersten fünf Wellen dadurch nicht. Fehlt für den nächsten Tutorial-Schritt nur Gold, zeigt der Hinweis auf „Verteidigen“.
-Seit M8 (vom Auftraggeber noch zu bestätigen): Eine selbst gestartete Verteidigung kostet nur Vorräte, wenn der Burgfried fällt
+Seit M8 (bestätigt): Eine selbst gestartete Verteidigung kostet nur Vorräte, wenn der Burgfried fällt
 (`defenseLossOnlyWhenBreached`); für den Nachtangriff gilt weiter die Durchbruchstiefe ab dem Marktplatz. Ohne das kostete jeder
 durchgekommene Räuber bis zu 30 % der ungeschützten Vorräte, bei vielen Verteidigungen am Tag.
 

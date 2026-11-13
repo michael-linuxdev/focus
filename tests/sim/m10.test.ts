@@ -124,9 +124,26 @@ describe('M10: Städte schlagen zurück (PLATZHALTER)', () => {
     expect(err(g, { type: 'ResolveRevenge' })).toBe('no_revenge');
   });
 
-  it('wer eine Stadt angreift, verliert seinen Schild; ihr Gegenangriff kommt nach der angekündigten Zeit', () => {
-    expect(end.shieldUntil).toBeGreaterThan(end.now);
+  it('der Anfängerschutz bleibt bei einem Angriff auf eine Stadt bestehen; der Gegenangriff wartet bis zu seinem Ende', () => {
+    expect(end.beginnerUntil).toBe(end.shieldUntil);
+    expect(end.beginnerUntil).toBeGreaterThan(end.now);
     let g = attack(armed(), city.id);
+    expect(g.shieldUntil).toBe(end.beginnerUntil);
+    expect(g.revenge).toMatchObject({ camp: city.id });
+    g = later(g, data.rules.revengeAfterHours + 1);
+    expect(err(g, { type: 'ResolveRevenge' })).toBe('revenge_not_due');
+    g = act(g, { type: 'AdvanceTime', now: end.beginnerUntil });
+    expect(validateGameAction(g, { type: 'ResolveRevenge' }, data)).toBeNull();
+    // Ein Schild nach einer Niederlage, der über den Anfängerschutz hinausreicht, fällt auf dessen Ende zurück.
+    const both = attack(armed({ ...end, shieldUntil: end.beginnerUntil + 5 * HOUR }), city.id);
+    expect(both.shieldUntil).toBe(end.beginnerUntil);
+  });
+
+  it('wer eine Stadt angreift, verliert seinen Schild; ihr Gegenangriff kommt nach der angekündigten Zeit', () => {
+    // Nach dem Anfängerschutz, mit einem Schild aus einer Niederlage.
+    const veteran = later({ ...end, raidDueAt: null }, data.rules.newPlayerShieldHours + 1);
+    expect(veteran.beginnerUntil).toBeLessThan(veteran.now);
+    let g = attack(armed({ ...veteran, shieldUntil: veteran.now + 6 * HOUR }), city.id);
     expect(g.shieldUntil).toBeLessThanOrEqual(g.now);
     expect(g.revenge).toEqual({ camp: city.id, dueAt: g.now + data.rules.revengeAfterHours * HOUR });
     expect(err(g, { type: 'ResolveRevenge' })).toBe('revenge_not_due');
@@ -142,17 +159,18 @@ describe('M10: Städte schlagen zurück (PLATZHALTER)', () => {
   });
 
   it('ein Schild schützt vor dem Gegenangriff, solange er läuft', () => {
-    let g = attack(armed(), city.id);
+    let g = attack(armed({ ...end, beginnerUntil: 0 }), city.id);
     g = later({ ...g, shieldUntil: g.now + 20 * HOUR }, data.rules.revengeAfterHours + 1);
     expect(err(g, { type: 'ResolveRevenge' })).toBe('revenge_not_due');
     expect(validateGameAction(later(g, 20), { type: 'ResolveRevenge' }, data)).toBeNull();
   });
 
   it('ein Stand aus M9 (Version 9) bekommt die neuen Felder', () => {
-    const { campRaids: _c, revenge: _r, ...rest } = end;
+    const { campRaids: _c, revenge: _r, beginnerUntil: _b, ...rest } = end;
     const map = new Map([[SAVE_KEY, JSON.stringify({ ...rest, version: 9 })]]);
     const loaded = loadGame({ getItem: (k) => map.get(k) ?? null, setItem: (k, v) => void map.set(k, v) }, data)!;
     expect(loaded.campRaids).toEqual({});
     expect(loaded.revenge).toBeNull();
+    expect(loaded.beginnerUntil).toBe(end.shieldUntil); // der laufende Schild gilt als Anfängerschutz
   });
 });
