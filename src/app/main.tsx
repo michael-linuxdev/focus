@@ -8,7 +8,9 @@ import {
 import { drawStage, formatSeconds, targetAt, tileCenter, type Effect, type Layout, type Scene } from '../render/stage.ts';
 import { spriteAspect } from '../render/sprites.ts';
 import { Hud, type Btn, type HudModel, type MapNode, type StepperRow } from '../ui/Hud.tsx';
+import { InstallGate, ReportPanel, type GateModel, type ReportModel } from '../ui/InstallGate.tsx';
 import { gameData as data } from './data.ts';
+import { detectPlatform, gateDue, installStepKeys, skipGate } from './install.ts';
 import { consumeTicks } from './loop.ts';
 import { loadGame, saveGame } from './save.ts';
 import { t } from './texts.ts';
@@ -86,6 +88,169 @@ const BATTLE_FLAG = 'mk.battle';
 let dev: { message: string | null; confirming: string | null } | null = null;
 let devTaps: number[] = [];
 
+// Fehler des Programms kommen ins Protokoll, damit ein Testbericht sie mitbringt (höchstens zehn je Sitzung).
+let errorCount = 0;
+function recordError(message: string, where: string): void {
+  if (errorCount++ < 10) record('error', { message: message.slice(0, 200), where });
+}
+window.addEventListener('error', (e) => recordError(String(e.message), `${(e.filename ?? '').split('/').pop() ?? ''}:${e.lineno}`));
+window.addEventListener('unhandledrejection', (e) => recordError(String((e.reason as { message?: unknown } | null)?.message ?? e.reason), 'promise'));
+
+// ---------- Installationshinweis ----------
+
+const platform = detectPlatform({
+  userAgent: navigator.userAgent, platform: navigator.platform, maxTouchPoints: navigator.maxTouchPoints,
+  standalone: matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches || (navigator as { standalone?: boolean }).standalone === true,
+});
+interface InstallPromptEvent extends Event { prompt(): Promise<void>; readonly userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }> }
+let installPrompt: InstallPromptEvent | null = null;
+/** Vollbild-Hinweis „Zuerst die App installieren"; solange er steht, ruht das Spiel. */
+let gate: { installed: boolean; message: string | null } | null = gateDue(platform, localStorage, Date.now()) ? { installed: false, message: null } : null;
+/** Der erste Tutorial-Schritt wird erst gezählt, wenn der Hinweis weg ist: Dort beginnt die Spielzeit. */
+let firstStepDue = !recorder.all().some((e) => e.type === 'tutorial_step');
+
+function recordFirstStep(): void {
+  if (!firstStepDue) return;
+  firstStepDue = false;
+  record('tutorial_step', { step: data.tutorial.steps[game.tutorialStep]!.id, index: game.tutorialStep });
+}
+
+function closeGate(how: 'skipped' | 'installed_continue'): void {
+  skipGate(localStorage, Date.now());
+  record('install_hint', { action: how });
+  gate = null;
+  recordFirstStep();
+}
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  installPrompt = e as InstallPromptEvent;
+  hudDirty = true;
+});
+window.addEventListener('appinstalled', () => {
+  record('install_hint', { action: 'installed' });
+  installPrompt = null;
+  if (gate) gate.installed = true;
+  hudDirty = true;
+});
+
+async function nativeInstall(): Promise<void> {
+  const prompt = installPrompt;
+  if (!prompt) return;
+  installPrompt = null;
+  record('install_hint', { action: 'native_prompt' });
+  await prompt.prompt();
+  const choice = await prompt.userChoice;
+  if (choice.outcome === 'accepted' && gate) gate.installed = true;
+  hudDirty = true;
+}
+
+function gateModel(g: NonNullable<typeof gate>): GateModel {
+  const needsOtherBrowser = platform.browser === 'inapp' || platform.browser === 'other';
+  return {
+    appTitle: data.game.title,
+    title: t(g.installed ? 'install.titleInstalled' : 'install.title'),
+    installedNote: g.installed ? t('install.installedNote', { name: data.game.shortTitle }) : null,
+    howTitle: t('install.how'),
+    detected: t('install.detected', { os: t(`install.os.${platform.os}`), browser: t(`install.browser.${platform.browser}`) }),
+    steps: installStepKeys(platform).map((key) => t(key)),
+    nativeLabel: installPrompt ? t('install.native') : null,
+    onNative: () => void nativeInstall(),
+    copyLabel: needsOtherBrowser ? t('install.copy') : null,
+    onCopy: () => {
+      const url = `${location.origin}/`;
+      navigator.clipboard?.writeText(url).then(() => { g.message = t('install.copied'); hudDirty = true; }, () => { g.message = url; hudDirty = true; });
+    },
+    message: g.message,
+    reasons: [1, 2, 3].map((n) => [t(`install.why${n}`), t(`install.why${n}.sub`)] as const),
+    warning: platform.os === 'ios' && platform.browser !== 'inapp' ? t('install.iosWarning') : null,
+    skipLabel: t(g.installed ? 'install.skipInstalled' : platform.os === 'desktop' ? 'install.skipDesktop' : 'install.skip'),
+    onSkip: () => closeGate(g.installed ? 'installed_continue' : 'skipped'),
+  };
+}
+
+// ---------- Testbericht ----------
+
+const NOTE_KEY = 'mk.note';
+const NOTES_KEY = 'mk.notes';
+const REPORT_KEY = 'mk.report';
+let report: { message: string | null } | null = null;
+let noteDraft = localStorage.getItem(NOTE_KEY) ?? '';
+
+function storedNotes(): { t: number; text: string }[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(NOTES_KEY) ?? '[]') as unknown;
+    return Array.isArray(parsed) ? (parsed as { t: number; text: string }[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Die Schaltfläche pulsiert, wenn es etwas Neues zu senden gibt: nach Minute 10 und an jedem weiteren Spieltag. */
+function reportDue(): boolean {
+  let last: { t: number } | null = null;
+  try {
+    last = JSON.parse(localStorage.getItem(REPORT_KEY) ?? 'null') as { t: number } | null;
+  } catch {
+    last = null;
+  }
+  if (last === null) return game.tutorialStep >= data.tutorial.steps.findIndex((s) => s.id === data.tutorial.minute10Step);
+  return localDay(last.t) !== localDay(Date.now());
+}
+
+async function sendReport(): Promise<void> {
+  const draft = noteDraft.trim();
+  const notes = draft === '' ? storedNotes() : [...storedNotes(), { t: clock(), text: draft }];
+  const file = { ...exportData(), notes };
+  const json = JSON.stringify(file, null, 1);
+  const base = `mk-testbericht-${file.install}-${localDay(file.exportedAt)}`;
+  const done = (via: string, message: string): void => {
+    localStorage.setItem(NOTES_KEY, JSON.stringify(notes));
+    localStorage.removeItem(NOTE_KEY);
+    localStorage.setItem(REPORT_KEY, JSON.stringify({ t: Date.now() }));
+    noteDraft = '';
+    record('report_sent', { via, events: file.events.length, note: draft !== '' });
+    if (report) report.message = message;
+    hudDirty = true;
+  };
+  // Teilen-Dialog des Geräts (Nachricht, Mail). Manche Browser teilen keine .json-Dateien, dann als Textdatei.
+  const candidates = [new File([json], `${base}.json`, { type: 'application/json' }), new File([json], `${base}.txt`, { type: 'text/plain' })];
+  const shareable = typeof navigator.share === 'function' ? candidates.find((f) => navigator.canShare?.({ files: [f] }) === true) : undefined;
+  if (shareable) {
+    try {
+      await navigator.share({ files: [shareable], title: t('report.shareText', { title: data.game.title }) });
+      done('share', t('report.sent'));
+      return;
+    } catch (e) {
+      if ((e as { name?: string }).name === 'AbortError') return; // abgebrochen: nichts gesendet
+    }
+  }
+  downloadText(json, `${base}.json`);
+  done('download', t('report.saved', { name: `${base}.json` }));
+}
+
+function reportModel(r: NonNullable<typeof report>): ReportModel {
+  return {
+    title: t('report.title'), intro: t('report.intro'), noteLabel: t('report.noteLabel'),
+    note: noteDraft,
+    onNote: (text) => { noteDraft = text; try { localStorage.setItem(NOTE_KEY, text); } catch { /* Entwurf bleibt nur im Arbeitsspeicher */ } },
+    sendLabel: t('report.send'), onSend: () => void sendReport(), message: r.message,
+    installLabel: platform.standalone ? null : t('report.install'),
+    onInstall: () => { report = null; gate = { installed: false, message: null }; record('install_hint', { action: 'opened' }); },
+    footer: t('report.footer', { id: recorder.install, n: recorder.count }),
+    closeLabel: t('report.close'), onClose: () => { report = null; },
+  };
+}
+
+function downloadText(text: string, name: string): void {
+  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = name;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
 function recordSteps(fromIndex: number): void {
   for (let i = fromIndex + 1; i <= game.tutorialStep; i++) record('tutorial_step', { step: data.tutorial.steps[i]!.id, index: i });
 }
@@ -100,6 +265,7 @@ function exportData(): ExportFile {
     minute10Step: data.tutorial.minute10Step,
     truncated: recorder.truncated,
     summary: summarize(events, data.tutorial.minute10Step),
+    notes: storedNotes(),
     events,
   };
 }
@@ -107,12 +273,7 @@ function exportData(): ExportFile {
 function downloadExport(): void {
   const file = exportData();
   const name = `mk-export-${file.install}-${localDay(file.exportedAt)}.json`;
-  const url = URL.createObjectURL(new Blob([JSON.stringify(file, null, 1)], { type: 'application/json' }));
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = name;
-  link.click();
-  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  downloadText(JSON.stringify(file, null, 1), name);
   if (dev) dev.message = t('dev.exported', { name });
 }
 
@@ -503,6 +664,7 @@ function buildHud(nowMs: number): HudModel {
     preview: null as HudModel['preview'],
     bottom: [] as Btn[],
     bottomSecondary: [] as Btn[],
+    corner: null as Btn | null,
     status: null as string | null,
     map: null as HudModel['map'],
     sheet: null as HudModel['sheet'],
@@ -654,7 +816,9 @@ function buildHud(nowMs: number): HudModel {
   const preview = unlocked(game, 'defend', data) ? wavePreview() : null;
   const weakBanner = weak ? t('raid.weakBanner', { section: t(`section.${weak.section}`) }) : null;
   const panel = cityPanel();
-  return { ...model, banner: model.banner ?? weakBanner, preview, bottom, bottomSecondary: second, status: unlocked(game, 'world', data) ? shieldText() : null, sheet: panel ? null : citySheet(hint), panel };
+  // Der Testbericht ist ab der ersten Rückkehr in die Stadt erreichbar; die erste Minute bleibt ohne Schaltflächen.
+  const corner: Btn | null = unlocked(game, 'defend', data) ? { id: 'report-open', label: t('report.button'), hint: reportDue(), onClick: () => { report = { message: null }; } } : null;
+  return { ...model, corner, banner: model.banner ?? weakBanner, preview, bottom, bottomSecondary: second, status: unlocked(game, 'world', data) ? shieldText() : null, sheet: panel ? null : citySheet(hint), panel };
 }
 
 /** Was in der nächsten Welle kommt: Einheiten nach Art zusammengezählt, in der Reihenfolge der Daten. */
@@ -898,7 +1062,7 @@ function frame(nowMs: number): void {
   last = nowMs;
   restMs = budget.restMs;
   const factor = speedFactor * (screen.kind === 'replay' ? screen.speed : screen.kind === 'battle' ? userSpeed : 1);
-  for (let i = 0; i < budget.ticks * factor && !dev; i++) stepScreen(nowMs);
+  for (let i = 0; i < budget.ticks * factor && !dev && !gate && !report; i++) stepScreen(nowMs);
   if (weak && nowMs > weak.until) weak = null;
   if (screen.kind !== 'battle') {
     tickClock();
@@ -926,7 +1090,7 @@ function frame(nowMs: number): void {
   if (hudDirty || nowMs - lastHudMs >= HUD_EVERY_MS) {
     hudDirty = false;
     lastHudMs = nowMs;
-    render(dev ? devPage() : <Hud m={buildHud(nowMs)} />, uiRoot);
+    render(gate ? <InstallGate m={gateModel(gate)} /> : report ? <ReportPanel m={reportModel(report)} /> : dev ? devPage() : <Hud m={buildHud(nowMs)} />, uiRoot);
   }
   requestAnimationFrame(frame);
 }
@@ -987,8 +1151,9 @@ window.addEventListener('hashchange', () => { if (location.hash === '#dev') dev 
 };
 
 // Start: Sitzung beginnt. Lief beim letzten Schließen eine Schlacht, zählt sie als abgebrochen.
-record('app_open', { step: tutorialStep(game, data).id, fresh: loaded === null });
-if (loaded === null) record('tutorial_step', { step: data.tutorial.steps[0]!.id, index: 0 });
+record('app_open', { step: tutorialStep(game, data).id, fresh: loaded === null, os: platform.os, browser: platform.browser, standalone: platform.standalone });
+if (gate) record('install_hint', { action: 'shown' });
+else recordFirstStep();
 const abandoned = localStorage.getItem(BATTLE_FLAG);
 if (abandoned !== null) {
   record('action_cancelled', { what: 'battle_abandoned', kind: abandoned });

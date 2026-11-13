@@ -115,6 +115,23 @@ describe('Kennzahlen', () => {
     expect(summarize([], 'kaserne')).toMatchObject({ events: 0, reachedMinute10: false, returnedNextDay: false, firstDay: null });
   });
 
+  it('die Spielzeit beginnt mit dem ersten Tutorial-Schritt, nicht mit dem Installationshinweis davor', () => {
+    const events = play((r, wait) => {
+      r.record('app_open', { fresh: true });
+      r.record('install_hint', { action: 'shown' });
+      wait(90_000); // liest die Anleitung
+      r.record('install_hint', { action: 'skipped' });
+      r.record('tutorial_step', { step: 'erster_turm', index: 0 });
+      wait(7000);
+      r.record('tower_built', { tower: 'bogenturm' });
+      wait(300_000);
+      r.record('tutorial_step', { step: 'kaserne', index: 14 });
+    });
+    const s = summarize(events, 'kaserne');
+    expect(s.secondsToFirstTower).toBe(7);
+    expect(s.secondsToMinute10).toBe(307);
+  });
+
   it('mehrere Exporte ergeben die Anteile über alle Spieler', () => {
     const file = (events: GameEvent[], install: string): ExportFile => ({
       format: 1, app: { title: 't', dataVersion: '1', stateVersion: 5 }, install, exportedAt: T0, minute10Step: 'kaserne', truncated: false,

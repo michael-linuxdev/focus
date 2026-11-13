@@ -16,7 +16,54 @@ const SHOTS = process.env.SHOTS ?? 'test-results';
   const server = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort'], { stdio: 'ignore' });
   const browser = await chromium.launch();
   try {
+    // Installationshinweis: Im Handy-Browser steht er vor dem Spiel, das Spiel ruht solange.
+    {
+      const ctx = await browser.newContext({ ...devices['iPhone 13'] });
+      const p = await ctx.newPage();
+      const gateErrors = [];
+      p.on('pageerror', (e) => gateErrors.push(String(e)));
+      for (let i = 0; ; i++) {
+        try { await p.goto(BASE); break; } catch (e) { if (i > 40) throw e; await new Promise((r) => setTimeout(r, 250)); }
+      }
+      await p.getByTestId('gate').waitFor();
+      await p.screenshot({ path: path.join(SHOTS, '00-installationshinweis.png') });
+      assert.equal(await p.getByTestId('gate-title').textContent(), 'Zuerst die App installieren');
+      assert.equal(await p.getByTestId('gate-detected').textContent(), 'Erkannt: iPhone / iPad · Safari');
+      assert.equal(await p.getByTestId('gate-steps').locator('li').count(), 3);
+      assert.match(await p.getByTestId('gate-steps').textContent(), /Zum Home-Bildschirm/);
+      assert.equal(await p.getByTestId('gate-steps').locator('svg').count(), 1, 'Teilen-Symbol im ersten Schritt');
+      assert.equal(await p.getByTestId('gate-warning').count(), 1, 'Hinweis: Browser-Spielstand wandert auf dem iPhone nicht in die App');
+      assert.doesNotMatch(await p.getByTestId('gate').textContent(), /⟦/, 'kein fehlender Text');
+      const tick = () => p.evaluate(() => window.__mk.state().battle?.tick ?? -1);
+      const before = await tick();
+      await p.waitForTimeout(600);
+      assert.equal(await tick(), before, 'das Spiel ruht hinter dem Hinweis');
+      const skipBox = await p.getByTestId('gate-skip').boundingBox();
+      assert.ok(skipBox && skipBox.height >= 44, 'Tippfläche „ohne Installation weiter" mindestens 44 px');
+      await p.getByTestId('gate-skip').tap();
+      await p.waitForFunction((b) => (window.__mk.state().battle?.tick ?? -1) > b, before);
+      assert.equal(await p.getByTestId('gate').count(), 0);
+      let ev = await p.evaluate(() => window.__mk.exportData().events.map((e) => [e.type, e.data.action ?? e.data.index ?? null]));
+      const at = (type, value) => ev.findIndex((e) => e[0] === type && e[1] === value);
+      assert.ok(at('install_hint', 'shown') >= 0 && at('install_hint', 'shown') < at('install_hint', 'skipped'));
+      assert.ok(at('install_hint', 'skipped') < at('tutorial_step', 0), 'die Spielzeit beginnt erst nach dem Hinweis');
+      await p.reload();
+      await p.waitForFunction(() => window.__mk?.state().screen === 'battle');
+      await p.waitForTimeout(300);
+      assert.equal(await p.getByTestId('gate').count(), 0, 'nach „ohne Installation weiter" bleibt der Hinweis einige Stunden weg');
+      // Sechs Stunden später steht er wieder da.
+      await p.evaluate(() => localStorage.setItem('mk.gate', String(Date.now() - 6 * 3600 * 1000 - 1000)));
+      await p.reload();
+      await p.getByTestId('gate').waitFor();
+      ev = await p.evaluate(() => window.__mk.exportData().events.filter((e) => e.type === 'tutorial_step').length);
+      assert.equal(ev, 1, 'der erste Schritt wird nur einmal gezählt');
+      assert.deepEqual(gateErrors, []);
+      await ctx.close();
+    }
+
     const context = await browser.newContext({ ...devices['Pixel 7'] });
+    // Der Ablauf selbst läuft ohne den Hinweis (als hätte der Spieler „ohne Installation weiter" getippt).
+    await context.addInitScript(() => localStorage.setItem('mk.gate', String(Date.now())));
     const page = await context.newPage();
     const errors = [];
     page.on('pageerror', (e) => errors.push(String(e)));
@@ -321,7 +368,9 @@ const SHOTS = process.env.SHOTS ?? 'test-results';
     }
     assert.equal(exported.events.filter((e) => e.type === 'tutorial_step').length, exported.summary.lastStepIndex + 1, 'jeder Tutorial-Schritt genau einmal');
     for (const e of exported.events) assert.deepEqual(Object.keys(e).sort(), ['data', 'day', 'lapse', 'seq', 'session', 't', 'type']);
-    assert.doesNotMatch(JSON.stringify(exported), /Mozilla|Android|Pixel|userAgent/i, 'keine Gerätedaten im Export');
+    // Nur grob Betriebssystem und Browserfamilie beim Start, keine Kennung des Geräts oder Browsers.
+    assert.doesNotMatch(JSON.stringify(exported), /Mozilla|Pixel|userAgent|AppleWebKit|Build\//i, 'keine Gerätekennung im Export');
+    assert.deepEqual(Object.keys(exported.events.find((e) => e.type === 'app_open').data).sort(), ['browser', 'fresh', 'os', 'standalone', 'step']);
     // Dieselben Kennzahlen aus der Datei, mit dem Auswerteskript.
     const out = require('node:child_process').execFileSync('node', ['scripts/metrics.ts', exportPath], { encoding: 'utf8' });
     assert.match(out, /Minute 10 erreicht:\s+100 %/);
@@ -329,6 +378,24 @@ const SHOTS = process.env.SHOTS ?? 'test-results';
     assert.match(out, /Rückkehr am nächsten Tag:\s+100 %/);
     await click('dev-close');
     if (await page.getByTestId('raid-ok').count()) await click('raid-ok');
+
+    // Testbericht: für Tester mit einem Tipp erreichbar, mit freiwilliger Anmerkung.
+    await click('report-open');
+    await page.getByTestId('report').waitFor();
+    await page.getByTestId('report-note').fill('Welle 4 war zu schwer');
+    await shot('31-testbericht');
+    const [reportFile] = await Promise.all([page.waitForEvent('download'), page.getByTestId('report-send').tap()]);
+    assert.match(reportFile.suggestedFilename(), /^mk-testbericht-[0-9a-f]{12}-\d{4}-\d{2}-\d{2}\.json$/);
+    const reportPath = path.join(SHOTS, 'testbericht.json');
+    await reportFile.saveAs(reportPath);
+    const sentReport = JSON.parse(require('node:fs').readFileSync(reportPath, 'utf8'));
+    assert.equal(sentReport.notes.at(-1).text, 'Welle 4 war zu schwer');
+    assert.ok(sentReport.events.length >= exported.events.length);
+    await page.getByTestId('report-message').waitFor();
+    assert.equal(await page.getByTestId('report-note').inputValue(), '', 'die Anmerkung ist übergeben');
+    assert.match(require('node:child_process').execFileSync('node', ['scripts/metrics.ts', reportPath], { encoding: 'utf8' }), /Minute 10 erreicht:\s+100 %/);
+    await click('report-close');
+    assert.equal((await page.evaluate(() => window.__mk.exportData().events.at(-1))).type, 'report_sent');
 
     // Installierbarkeit und Offline-Betrieb, Speicherstand überlebt Neuladen.
     const manifestHref = await page.locator('link[rel=manifest]').getAttribute('href');

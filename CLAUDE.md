@@ -1,7 +1,8 @@
 # Mittelalter-Königreich (Arbeitstitel) – PWA-Prototyp
 
-Spielbarer Prototyp der ersten 30 Spielminuten eines Mobile-Strategiespiels. Später Neuumsetzung in
-Unity 6 / C# mit Metaplay; deshalb zählt portierbare Spiellogik mehr als alles andere.
+Spielbarer Prototyp eines Mobile-Strategiespiels. Stand: die ersten 30 Spielminuten; Ziel: der erste Spielmonat,
+mit Testern gespielt. Macht das Spaß, folgt die Neuumsetzung in Unity 6 / C# mit Metaplay; deshalb zählt
+portierbare Spiellogik mehr als alles andere.
 Der Name steht nur in `data/game.json`.
 
 Kernidee, an der jede Designentscheidung gemessen wird: Jede Stadt ist eine Tower-Defense-Karte,
@@ -87,8 +88,16 @@ die ersten fünf Wellen dadurch nicht. Fehlt für den nächsten Tutorial-Schritt
 
 - Entwicklerseite: fünf schnelle Tipps auf die Anzeige oben rechts („Welle n“) oder `#dev` an die Adresse hängen.
   Zeigt die drei Kennzahlen, alle Ereignisse, Export als Datei, Zeitraffer, Schlachttempo, Zurücksetzen.
-- Ereignisse bleiben auf dem Gerät (`localStorage`, Schlüssel `mk.ev.*`). Keine personenbezogenen Daten, keine fremden
-  Dienste, nichts wird gesendet. Felder eines Ereignisses: Zeit, Tag, Sitzung, Nummer, Art, wenige Spielwerte, Zeitraffer-Merker.
+- Die Aufzeichnung läuft immer mit. Ereignisse bleiben auf dem Gerät (`localStorage`, Schlüssel `mk.ev.*`). Keine
+  personenbezogenen Daten, keine fremden Dienste, nichts wird von selbst gesendet. Felder eines Ereignisses: Zeit, Tag,
+  Sitzung, Nummer, Art, wenige Spielwerte, Zeitraffer-Merker. `app_open` nennt grob Betriebssystem und Browserfamilie
+  (keine Gerätekennung), `error` die Fehlermeldung des Programms.
+- Testbericht: Schaltfläche „Testbericht“ in der Stadt (ab der ersten Rückkehr dorthin). Ein Tipp übergibt die Exportdatei
+  samt freiwilliger Anmerkung an den Teilen-Dialog des Geräts, sonst als Download. Dieselbe Datei liest `npm run metrics`.
+- Installationshinweis (`src/app/install.ts`, `src/ui/InstallGate.tsx`, Vorbild: Repository `einbuergerung`): Im Handy-Browser
+  steht vor dem Spiel „Zuerst die App installieren“ mit der Anleitung für Gerät und Browser. „Ohne Installation weiter“ gilt
+  sechs Stunden, am Computer dauerhaft. Das Spiel ruht solange; die Spielzeit der Kennzahlen beginnt erst danach.
+  Browsertests setzen `mk.gate`, um den Hinweis zu überspringen.
 - Sendestelle: `EventSink` in `src/telemetry/events.ts`; der Prototyp nutzt `noSink`.
 - Neue Messpunkte nur über `record(...)` in `src/app/main.tsx`; neue Arten in `EventType` eintragen.
 - „Minute 10 erreicht“ heißt: Tutorial-Schritt `minute10Step` aus `data/tutorial.json` erreicht.

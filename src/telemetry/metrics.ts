@@ -11,7 +11,7 @@ export interface Summary {
   readonly daysActive: number;
   /** Kennzahl 1: Der Spieler hat das Ende des Abschnitts "Minute 6 bis 10" erreicht. */
   readonly reachedMinute10: boolean;
-  /** Sekunden vom ersten Ereignis bis dahin (Wanduhr, inklusive Pausen). */
+  /** Sekunden vom ersten Tutorial-Schritt bis dahin (Wanduhr, inklusive Pausen, ohne den Installationshinweis davor). */
   readonly secondsToMinute10: number | null;
   /** Kennzahl 2: Beitritt zur Allianz. */
   readonly joinedAlliance: boolean;
@@ -46,6 +46,8 @@ export function summarize(events: readonly GameEvent[], minute10Step: string): S
   const opens = sorted.filter((e) => e.type === 'app_open' || e.type === 'app_reopen');
   const steps = sorted.filter((e) => e.type === 'tutorial_step');
   const minute10 = steps.find((e) => e.data['step'] === minute10Step);
+  // Die Spielzeit beginnt mit dem ersten Schritt: Davor kann der Installationshinweis stehen.
+  const start = steps[0] ?? first;
   let lastStep: string | null = null;
   let lastStepIndex = -1;
   for (const e of steps) {
@@ -76,13 +78,13 @@ export function summarize(events: readonly GameEvent[], minute10Step: string): S
     firstDay,
     daysActive: days.size,
     reachedMinute10: minute10 !== undefined,
-    secondsToMinute10: minute10 && first ? Math.round((minute10.t - first.t) / 1000) : null,
+    secondsToMinute10: minute10 && start ? Math.max(0, Math.round((minute10.t - start.t) / 1000)) : null,
     joinedAlliance: sorted.some((e) => e.type === 'alliance_joined'),
     returnedNextDay: opens.some((e) => dayNumber(e.day) === firstNumber + 1),
     returnedLater: opens.some((e) => dayNumber(e.day) > firstNumber),
     lastStep,
     lastStepIndex,
-    secondsToFirstTower: firstTower && first ? Math.round((firstTower.t - first.t) / 1000) : null,
+    secondsToFirstTower: firstTower && start ? Math.max(0, Math.round((firstTower.t - start.t) / 1000)) : null,
     towersBuilt: sorted.filter((e) => e.type === 'tower_built').length,
     defenses: {
       held: ends.filter((e) => e.data['kind'] !== 'attack' && e.data['result'] === 'held').length,
@@ -104,6 +106,8 @@ export interface ExportFile {
   readonly minute10Step: string;
   readonly truncated: boolean;
   readonly summary: Summary;
+  /** Freiwillige Anmerkungen des Testers aus dem Testbericht. */
+  readonly notes?: readonly { readonly t: number; readonly text: string }[];
   readonly events: readonly GameEvent[];
 }
 

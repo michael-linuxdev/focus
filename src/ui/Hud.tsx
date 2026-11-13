@@ -59,6 +59,8 @@ export interface HudModel {
   readonly bottom: readonly Btn[];
   /** Zweite, kleinere Reihe über der Hauptleiste. */
   readonly bottomSecondary: readonly Btn[];
+  /** Kleine Schaltfläche unter der Anzeige oben rechts (Testbericht); nur in der Stadt. */
+  readonly corner: Btn | null;
   /** Kleine Statuszeile unter den Vorräten (Schild). */
   readonly status: string | null;
   readonly map: { readonly title: string; readonly nodes: readonly MapNode[]; readonly back: Btn } | null;
@@ -165,6 +167,10 @@ export function Hud({ m }: { m: HudModel }) {
           <Icon name="schild" size={14} />
           {m.status}
         </div>
+      )}
+
+      {m.corner && !m.sheet && !m.panel && !m.map && (
+        <button data-testid={m.corner.id} class={`corner${m.corner.hint ? ' pulse' : ''}`} onClick={m.corner.onClick}>{m.corner.label}</button>
       )}
 
       {m.map && (

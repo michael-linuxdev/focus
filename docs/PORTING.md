@@ -187,6 +187,9 @@ Die Oberfläche spielt sie über dieselbe `stepBattle`-Funktion ab und vergleich
   `alliance_joined`; Rückkehr am nächsten Tag = `app_open` oder `app_reopen` am Kalendertag nach dem ersten Ereignis.
 - Übernommen werden die Ereignisarten und die Definition der Kennzahlen. Neu geschrieben werden Speicherung und Versand:
   im Prototyp liegen die Ereignisse im Gerätespeicher, die Sendestelle `EventSink` ist leer.
+- Nur Prototyp, nicht zu übernehmen: Installationshinweis (`install_hint`), Testbericht von Hand (`report_sent`, Feld `notes`
+  der Exportdatei) und die grobe Plattformangabe in `app_open`. Die Zeiten der Kennzahlen zählen ab dem ersten
+  `tutorial_step`, nicht ab `app_open`.
 - Der Tag stammt von der Geräteuhr. Auf dem Server zählt die Serverzeit, und die Installationskennung wird durch die Spielerkennung ersetzt.
 
 ## Annahmen des Prototyps, die auf einem Server nicht gelten

@@ -1,7 +1,8 @@
 /**
  * Ereignisaufzeichnung: lokal auf dem Gerät, ohne personenbezogene Daten und ohne fremde Dienste.
- * Ein Ereignis trägt Zeitstempel, Sitzungsnummer und wenige Spielwerte, sonst nichts
- * (kein Gerät, kein Browser, kein Ort, kein Name).
+ * Ein Ereignis trägt Zeitstempel, Sitzungsnummer und wenige Spielwerte, sonst nichts (kein Ort, kein Name,
+ * keine Gerätekennung). `app_open` nennt nur grob Betriebssystem und Browserfamilie, damit sich Fehler
+ * einem Gerätetyp zuordnen lassen; `error` trägt die Fehlermeldung des Programms.
  */
 export type EventValue = string | number | boolean | null;
 
@@ -25,7 +26,8 @@ export type EventType =
   | 'tutorial_step' | 'tower_built' | 'building_started'
   | 'battle_start' | 'battle_end'
   | 'action_cancelled' | 'ability_used'
-  | 'alliance_joined' | 'help_requested' | 'goal_claimed' | 'raid_report';
+  | 'alliance_joined' | 'help_requested' | 'goal_claimed' | 'raid_report'
+  | 'install_hint' | 'report_sent' | 'error';
 
 /**
  * Sendestelle. Der Prototyp sendet nichts (`noSink`). Später kann hier ein eigener Empfänger
@@ -86,6 +88,7 @@ export class Recorder {
   }
 
   get install(): string { return this.meta.install; }
+  get count(): number { return this.meta.count; }
   get session(): number { return this.meta.session; }
   get truncated(): boolean { return this.meta.truncated; }
 
