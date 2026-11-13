@@ -17,6 +17,7 @@ die der Spieler selbst baut. Dieselbe Mechanik trägt Einstieg, Stadtausbau und 
 | Bauen (prüft Typen) | `npm run build` |
 | Browsertest in Handygröße (nach dem Bauen, Bildschirmfotos nach `test-results/`) | `npm run test:e2e` |
 | Gebauten Stand ansehen | `npm run preview` |
+| Ablauf des Tutorial-Bots ausgeben | `FLOW_LOG=flow.txt npm test` |
 
 Kein Commit mit fehlschlagenden Tests. Vor jeder Fertigmeldung: `npm test && npm run build && npm run test:e2e`.
 
@@ -52,7 +53,8 @@ Abgestimmte Auslegungen: Der Schild schützt vor Nachbarstädten, nicht vor Räu
 unterliegt denselben Grenzen. Türme entstehen während einer Welle sofort, Bauzeiten gelten für
 Gebäude, Ausbau und Burgfried. Tutorial-Schritte hängen am Fortschritt, nicht an der Uhr.
 Im ersten Schritt wartet die Welle am Haltepunkt, bis der erste Turm steht;
-Tutorial-Wellen sind `unlosable` (kein Burgfried-Schaden). Nachtangriff: beim ersten Öffnen nach mindestens vier Stunden Abwesenheit (Wert in den Daten).
+die ersten fünf Wellen sind `unlosable` (kein Burgfried-Schaden). Türme entstehen auch im Stadtbau sofort.
+Die Heldin kommandiert einen Abschnitt und führt zugleich Angriffe. Lazarett gilt immer, das Gebäude verkürzt nur die Zeit. Nachtangriff: beim ersten Öffnen nach mindestens vier Stunden Abwesenheit (Wert in den Daten).
 
 ## Ordner
 
@@ -60,6 +62,9 @@ Tutorial-Wellen sind `unlosable` (kein Burgfried-Schaden). Nachtangriff: beim er
 - `src/sim/` Spiellogik · `src/app/` Hülle (Schleife, Uhr, Speicher, Service Worker)
 - `src/render/` Canvas-Darstellung (liest nur) · `src/ui/` Preact-Oberfläche (löst nur Aktionen aus)
 - `tests/sim/`, `tests/app/` Vitest · `tests/e2e/` Browsertest mit Playwright
+- `tests/sim/bot.ts` spielt den geführten Ablauf nach den Hinweisen durch; nach jeder Änderung an `data/tutorial.json`
+  oder an Kosten zeigt `flow.test.ts`, ob der Ablauf noch ohne Sackgasse und ohne lange Wartezeit durchläuft
+- `window.__mk` (in `src/app/main.tsx`): Zustand lesen, Zeitraffer (`skip`) und Schlachttempo (`speed`) für Browsertests
 
 ## Konventionen
 
