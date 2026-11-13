@@ -1,5 +1,5 @@
 {
-  "version": 4,
+  "version": 5,
   "preliminary": true,
   "buildings": [
     {
@@ -661,7 +661,7 @@
           "healTimePermille": 1000,
           "keepLevel": 8,
           "armyCap": 120,
-          "troopHpPermille": 4900
+          "troopHpPermille": 6500
         }
       ]
     },
@@ -1015,9 +1015,9 @@
             "stone": 60000
           },
           "capacity": {
-            "gold": 240000,
-            "wood": 240000,
-            "stone": 240000
+            "gold": 300000,
+            "wood": 300000,
+            "stone": 300000
           },
           "healTimePermille": 1000,
           "keepLevel": 5,
@@ -1042,9 +1042,9 @@
             "stone": 85000
           },
           "capacity": {
-            "gold": 330000,
-            "wood": 330000,
-            "stone": 330000
+            "gold": 480000,
+            "wood": 480000,
+            "stone": 480000
           },
           "healTimePermille": 1000,
           "keepLevel": 6,
@@ -1069,9 +1069,9 @@
             "stone": 120000
           },
           "capacity": {
-            "gold": 460000,
-            "wood": 460000,
-            "stone": 460000
+            "gold": 700000,
+            "wood": 700000,
+            "stone": 700000
           },
           "healTimePermille": 1000,
           "keepLevel": 7,
@@ -1096,9 +1096,9 @@
             "stone": 180000
           },
           "capacity": {
-            "gold": 700000,
-            "wood": 700000,
-            "stone": 700000
+            "gold": 1000000,
+            "wood": 1000000,
+            "stone": 1000000
           },
           "healTimePermille": 1000,
           "keepLevel": 8,

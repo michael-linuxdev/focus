@@ -132,6 +132,42 @@ describe('Kennzahlen', () => {
     expect(s.secondsToMinute10).toBe(307);
   });
 
+  it('der Spielmonat: letzter aktiver Tag, Burgfried, Welle, Kapitel und Krönung', () => {
+    const events = play((r, wait, restart) => {
+      r.record('app_open', { fresh: true });
+      r.record('tutorial_step', { step: 'erster_turm', index: 0 });
+      r.record('battle_end', { kind: 'defense', result: 'held', wave: 9 });
+      r.record('battle_end', { kind: 'defense', result: 'breached', wave: 12 });
+      r.record('keep_level', { level: 3 });
+      r.record('error', { message: 'x', where: 'y' });
+      wait(8 * DAY);
+      r = restart();
+      r.record('app_open');
+      r.record('keep_level', { level: 5 });
+      r.record('chapter_claimed', { chapter: 'mauern', index: 1 });
+      r.record('report_sent', { via: 'share' });
+      wait(20 * DAY);
+      r = restart();
+      r.record('app_open');
+      r.record('crowned', { day: 29 });
+    });
+    const s = summarize(events, 'kaserne');
+    expect(s).toMatchObject({ lastActiveDay: 28, activeDay7: true, activeDay30: false, maxKeepLevel: 5, maxWave: 9, chaptersClaimed: 1, crownedOnDay: 29, reportsSent: 1, errors: 1 });
+    expect(summarize([], 'kaserne')).toMatchObject({ lastActiveDay: 0, activeDay7: false, maxKeepLevel: 1, maxWave: 0, crownedOnDay: null });
+  });
+
+  it('Quoten für Tag 7 und Tag 30 zählen nur Exporte, die alt genug sind', () => {
+    const file = (events: GameEvent[], exportedAt: number): ExportFile => ({
+      format: 1, app: { title: 't', dataVersion: '1', stateVersion: 11 }, install: 'x', exportedAt, minute10Step: 'kaserne', truncated: false,
+      summary: summarize(events, 'kaserne'), events,
+    });
+    const stayed = play((r, wait, restart) => { r.record('app_open'); r.record('keep_level', { level: 4 }); wait(9 * DAY); restart().record('app_open'); });
+    const left = play((r) => { r.record('app_open'); r.record('keep_level', { level: 2 }); });
+    const young = play((r) => { r.record('app_open'); });
+    const a = aggregate([file(stayed, T0 + 10 * DAY), file(left, T0 + 12 * DAY), file(young, T0 + 2 * DAY)]);
+    expect(a).toMatchObject({ players: 3, day7: 50, oldEnough7: 2, day30: null, oldEnough30: 0, crowned: 0, medianKeepLevel: 2 });
+  });
+
   it('mehrere Exporte ergeben die Anteile über alle Spieler', () => {
     const file = (events: GameEvent[], install: string): ExportFile => ({
       format: 1, app: { title: 't', dataVersion: '1', stateVersion: 5 }, install, exportedAt: T0, minute10Step: 'kaserne', truncated: false,
@@ -141,7 +177,7 @@ describe('Kennzahlen', () => {
     const b = play((r) => { r.record('app_open'); r.record('tutorial_step', { step: 'kaserne', index: 14 }); });
     const c = play((r) => { r.record('app_open'); });
     const d = play((r, wait, restart) => { r.record('app_open'); wait(DAY); restart().record('app_open'); });
-    expect(aggregate([file(a, 'a'), file(b, 'b'), file(c, 'c'), file(d, 'd')])).toEqual({ players: 4, minute10: 50, alliance: 25, nextDay: 25, withTimeLapse: 0 });
+    expect(aggregate([file(a, 'a'), file(b, 'b'), file(c, 'c'), file(d, 'd')])).toMatchObject({ players: 4, minute10: 50, alliance: 25, nextDay: 25, withTimeLapse: 0 });
     expect(aggregate([])).toMatchObject({ players: 0, minute10: 0 });
   });
 });

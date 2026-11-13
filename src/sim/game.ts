@@ -1,6 +1,6 @@
 import {
   RESOURCE_KEYS, findById,
-  type BuildingLevelDef, type ConditionDef, type DefenseDef, type GameData, type GoalCounter, type GoalDef, type Resources, type TutorialStepDef, type UnitCount,
+  type BuildingLevelDef, type ConditionDef, type DefenseDef, type ChapterDef, type GameData, type GoalCounter, type GoalDef, type Resources, type TutorialStepDef, type UnitCount,
 } from './data.ts';
 import { mulDiv, PERMILLE } from './fixed.ts';
 import { towerActionCost, type BattleInput, type BattleSetup, type BattleState, type CityTower } from './battle/battle.ts';
@@ -17,7 +17,7 @@ import { fixedDefense, scaledDefense, scaledWave, wavesUnlocked, type PlannedDef
  * Schlachten werden nicht "gemeldet", sondern nachgerechnet: `ResolveDefense` und `ResolveAttack`
  * bekommen nur die Eingaben des Spielers; Startzustand und Startwert stammen aus dem Spielzustand.
  */
-export const STATE_VERSION = 10;
+export const STATE_VERSION = 11;
 
 export interface Building {
   readonly plot: string;
@@ -139,6 +139,12 @@ export interface GameState {
   readonly raidsResolved: number;
   /** Zeitpunkt des letzten Angriffs je Ziel (ms); danach wachsen dessen Vorräte nach. */
   readonly campRaids: Readonly<Record<string, number>>;
+  /** Ziele, die der Spieler schon einmal bis zum Burgfried erobert hat (Tiefe 3). */
+  readonly campsTaken: readonly string[];
+  /** Chronik: Zahl der abgeschlossenen Kapitel. */
+  readonly chapter: number;
+  /** Zeitpunkt der Krönung (letztes Kapitel abgeschlossen), sonst `null`. */
+  readonly crownedAt: number | null;
   /** PLATZHALTER: Eine angegriffene Bot-Stadt schlägt zurück, frühestens zu diesem Zeitpunkt. */
   readonly revenge: { readonly camp: string; readonly dueAt: number } | null;
 }
@@ -163,6 +169,7 @@ export type GameAction =
   | { readonly type: 'ClaimDailyGoal'; readonly goal: string }
   | { readonly type: 'ClaimWeeklyGoal' }
   | { readonly type: 'ClaimLoginReward' }
+  | { readonly type: 'ClaimChapter' }
   | { readonly type: 'AcknowledgeRaid' }
   | { readonly type: 'ResolveNightRaid' }
   | { readonly type: 'ResolveRevenge' }
@@ -180,7 +187,7 @@ export type GameActionError =
   | 'no_barracks' | 'unknown_troop' | 'training_busy'
   | 'unknown_camp' | 'target_shielded' | 'target_locked' | 'army_full' | 'no_revenge' | 'revenge_not_due' | 'invalid_lineup' | 'not_enough_troops'
   | 'already_joined' | 'no_alliance' | 'nothing_to_help' | 'help_already_requested'
-  | 'unknown_goal' | 'goal_not_reached' | 'goal_already_claimed' | 'goal_not_active' | 'login_already_claimed'
+  | 'unknown_goal' | 'goal_not_reached' | 'goal_already_claimed' | 'goal_not_active' | 'login_already_claimed' | 'chronicle_done'
   | 'no_raid_announced' | 'raid_not_due' | 'nothing_to_dismiss';
 
 const NO_RESOURCES: Resources = { gold: 0, wood: 0, stone: 0 };
@@ -223,6 +230,9 @@ export function createGame(seed: number, now: number, data: GameData): GameState
     raidReport: null,
     raidsResolved: 0,
     campRaids: {},
+    campsTaken: [],
+    chapter: 0,
+    crownedAt: null,
     revenge: null,
   };
 }
@@ -609,6 +619,28 @@ export function scaledReward(base: Resources, state: GameState, data: GameData):
   return { gold: mulDiv(base.gold, permille, PERMILLE), wood: mulDiv(base.wood, permille, PERMILLE), stone: mulDiv(base.stone, permille, PERMILLE) };
 }
 
+/** Das offene Kapitel der Chronik, sonst `null` (Chronik vollendet). */
+export function currentChapter(state: GameState, data: GameData): ChapterDef | null {
+  return data.chronicle.chapters[state.chapter] ?? null;
+}
+
+/** Fortschritt des offenen Kapitels: erreicht und verlangt. */
+export function chapterProgress(state: GameState, data: GameData): { readonly have: number; readonly need: number } | null {
+  const goal = currentChapter(state, data)?.goal;
+  if (!goal) return null;
+  const cities = state.campsTaken.filter((id) => data.camps.camps.some((c) => c.id === id && c.kind === 'city')).length;
+  switch (goal.type) {
+    case 'keepLevel': return { have: Math.min(state.keepLevel, goal.level), need: goal.level };
+    case 'wavesCleared': return { have: Math.min(state.wavesCleared, goal.count), need: goal.count };
+    case 'citiesTaken': return { have: Math.min(cities, goal.count), need: goal.count };
+    case 'buildingLevel': {
+      const level = state.buildings.find((b) => b.def === goal.building && b.doneAt <= state.now)?.level ?? 0;
+      return { have: Math.min(level, goal.level), need: goal.level };
+    }
+    case 'cityTaken': return { have: state.campsTaken.includes(goal.city) ? 1 : 0, need: 1 };
+  }
+}
+
 /** Die Belohnung für die Rückkehr, die heute abgeholt werden kann, sonst `null`. */
 export function loginReward(state: GameState, data: GameData): Resources | null {
   if (state.login.day === state.daily.day) return null;
@@ -725,6 +757,11 @@ export function validateGameAction(state: GameState, action: GameAction, data: G
     }
     case 'ClaimLoginReward':
       return loginReward(state, data) === null ? 'login_already_claimed' : null;
+    case 'ClaimChapter': {
+      const progress = chapterProgress(state, data);
+      if (!progress) return 'chronicle_done';
+      return progress.have >= progress.need ? null : 'goal_not_reached';
+    }
     case 'AcknowledgeRaid':
       return state.raidDueAt === null ? 'no_raid_announced' : null;
     case 'ResolveNightRaid':
@@ -841,6 +878,11 @@ function apply(state: GameState, action: GameAction, data: GameData): GameState 
     }
     case 'ClaimWeeklyGoal':
       return { ...state, resources: addResources(state.resources, scaledReward(weeklyGoal(state, data).reward, state, data)), weekly: { ...state.weekly, claimed: true } };
+    case 'ClaimChapter': {
+      const chapter = currentChapter(state, data)!;
+      const last = state.chapter + 1 >= data.chronicle.chapters.length;
+      return { ...state, resources: addResources(state.resources, scaledReward(chapter.reward, state, data)), chapter: state.chapter + 1, crownedAt: last ? state.now : state.crownedAt };
+    }
     case 'ClaimLoginReward':
       return { ...state, resources: addResources(state.resources, loginReward(state, data)!), login: { day: state.daily.day, claims: state.login.claims + 1 } };
     case 'AcknowledgeRaid':
@@ -928,6 +970,7 @@ function apply(state: GameState, action: GameAction, data: GameData): GameState 
         army: { ...state.army, ready, hospital },
         attacksDone: state.attacksDone + 1,
         campRaids: { ...state.campRaids, [camp.id]: state.now },
+        campsTaken: final.depth >= 3 && !state.campsTaken.includes(camp.id) ? [...state.campsTaken, camp.id] : state.campsTaken,
         // Wer eine Stadt angreift, verliert seinen Schild und muss mit dem Gegenangriff rechnen (bei mehreren zählt der erste).
         ...(camp.kind === 'city' ? { shieldUntil: Math.min(state.shieldUntil, state.now), revenge: state.revenge ?? { camp: camp.id, dueAt: state.now + data.rules.revengeAfterHours * HOUR_MS } } : {}),
         lastAttack: { camp: camp.id, depth: final.depth, loot, fallen },

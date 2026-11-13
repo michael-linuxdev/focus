@@ -68,6 +68,8 @@ export const migrations: Readonly<Record<number, Migration>> = {
   },
   // 9 -> 10 (M10): Vorräte der Ziele wachsen nach, Städte schlagen zurück.
   9: (old) => ({ ...old, version: 10, campRaids: {}, revenge: null }),
+  // 10 -> 11 (M11): Chronik. Schon vorhandener Fortschritt zählt, die Kapitel holt der Spieler nacheinander ab.
+  10: (old) => ({ ...old, version: 11, campsTaken: [], chapter: 0, crownedAt: null }),
 };
 
 function num(value: unknown, fallback: number): number {

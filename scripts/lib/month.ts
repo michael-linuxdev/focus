@@ -33,6 +33,9 @@ export interface MonthRun {
   readonly bands: readonly { won: number; lost: number; stars: number; leaked: number; bossTries: number; bossWon: number; raids: number; raidMarket: number; seconds: number }[];
   readonly attacks: { readonly count: number; readonly cities: number; readonly depth: readonly number[] };
   readonly revenges: number;
+  /** Tag, an dem Kapitel n der Chronik abgeschlossen wurde (Index = Zahl der abgeschlossenen Kapitel), und Tag der Krönung. */
+  readonly chapterDay: readonly (number | null)[];
+  readonly crownDay: number | null;
   readonly raids: { readonly held: number; readonly breached: number; readonly market: number };
   /** Sitzungen, in denen es außer Verteidigen nichts zu tun gab. */
   readonly idleSessions: number;
@@ -63,6 +66,9 @@ export function playMonth(start: GameState, data: GameData, options: MonthOption
   const plotOf = (def: string): string | null => game.buildings.find((b) => b.def === def)?.plot ?? null;
 
   const attacks = { count: 0, cities: 0, depth: [0, 0, 0, 0] };
+  const chapterDay: (number | null)[] = Array.from({ length: data.chronicle.chapters.length + 1 }, () => null);
+  let crownDay: number | null = null;
+  let currentDay = 1;
   let revenges = 0;
   const attackBest = (): void => {
     if (game.army.training) return;
@@ -101,6 +107,7 @@ export function playMonth(start: GameState, data: GameData, options: MonthOption
       attackBest();
       for (const g of data.goals.goals) act({ type: 'ClaimDailyGoal', goal: g.id });
       act({ type: 'ClaimWeeklyGoal' });
+      while (act({ type: 'ClaimChapter' })) { chapterDay[game.chapter] ??= currentDay; if (game.crownedAt !== null) crownDay ??= currentDay; }
       act({ type: 'ClaimLoginReward' });
       for (const b of game.buildings) if (buildingBusyUntil(b, game.now) !== null) act({ type: 'RequestHelp', plot: b.plot });
       if (act({ type: 'UpgradeKeep' })) { did = true; continue; }
@@ -148,6 +155,7 @@ export function playMonth(start: GameState, data: GameData, options: MonthOption
 
   for (let day = 1; day <= options.days; day++) {
     let defenses = 0;
+    currentDay = day;
     for (const hour of options.sessionHours) {
       const at = t0 + (day - 1) * 24 * HOUR + hour * HOUR;
       if (at <= game.now) continue;
@@ -186,5 +194,5 @@ export function playMonth(start: GameState, data: GameData, options: MonthOption
     }
     days.push({ day, keep: game.keepLevel, gold: game.resources.gold, wood: game.resources.wood, stone: game.resources.stone, defenses, lost, wave: waveNumber(game, data) });
   }
-  return { game, keepDay, days, idleSessions, sessions, fresh, repeats, raids, bands, attacks, revenges };
+  return { game, keepDay, days, idleSessions, sessions, fresh, repeats, raids, bands, attacks, revenges, chapterDay, crownDay };
 }

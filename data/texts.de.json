@@ -1,5 +1,5 @@
 {
-  "version": 14,
+  "version": 15,
   "lang": "de",
   "texts": {
     "hud.defend": "Verteidigen",
@@ -307,6 +307,34 @@
     "effect.army": "Heer bis {n}, Truppen {p} % zäher",
     "raid.revenge": "Vergeltung aus {name}",
     "raid.revengeDue": "Gegenangriff aus {name} in {time}",
-    "building.kaserneFull": "Heer ist voll"
+    "building.kaserneFull": "Heer ist voll",
+    "chronicle.title": "Chronik · Kapitel {n} von {of}",
+    "chronicle.done": "Chronik vollendet",
+    "chronicle.claimed": "Kapitel abgeschlossen: {name}",
+    "chapter.mauern": "Die ersten Mauern",
+    "chapter.hauptmann": "Der Hauptmann fällt",
+    "chapter.festung": "Eine Festung",
+    "chapter.eroberung": "Die erste Eroberung",
+    "chapter.heer": "Ein Heer",
+    "chapter.bollwerk": "Das Bollwerk",
+    "chapter.ritterschlag": "Ritterschlag",
+    "chapter.herzogtum": "Herzogtum",
+    "chapter.feldzug": "Der Feldzug",
+    "chapter.grenzmark": "Die Grenzmark",
+    "chapter.koenigsburg": "Die Königsburg",
+    "chapter.letzter_hauptmann": "Der letzte Hauptmann",
+    "chapter.krone": "Die Krone",
+    "chgoal.keepLevel": "Baue den Burgfried auf Stufe {n} aus",
+    "chgoal.wavesCleared": "Schlage Welle {n}",
+    "chgoal.citiesTaken": "Erobere {n} Städte bis zum Burgfried",
+    "chgoal.citiesTaken1": "Erobere eine Stadt bis zum Burgfried",
+    "chgoal.buildingLevel": "Baue {name} auf Stufe {n} aus",
+    "chgoal.cityTaken": "Erobere {name} bis zum Burgfried",
+    "crown.banner": "Die Krone ist dein!",
+    "crown.title": "Du trägst die Krone",
+    "crown.text": "Vom ersten Turm bis zur Königsburg: Du hast die Chronik vollendet, an Tag {day}.",
+    "crown.thanks": "Danke fürs Testen. Schick uns jetzt bitte deinen Testbericht.",
+    "crown.ok": "Weiterspielen",
+    "crown.report": "Testbericht senden"
   }
 }

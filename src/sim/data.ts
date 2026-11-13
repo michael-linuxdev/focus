@@ -347,6 +347,22 @@ export interface GoalDef {
   readonly reward: Resources;
 }
 
+/** Ziel eines Kapitels der Chronik. */
+export type ChapterGoalDef =
+  | { readonly type: 'keepLevel'; readonly level: number }
+  /** So viele berechnete Wellen geschlagen. */
+  | { readonly type: 'wavesCleared'; readonly count: number }
+  /** So viele verschiedene Städte bis zum Burgfried erobert. */
+  | { readonly type: 'citiesTaken'; readonly count: number }
+  | { readonly type: 'buildingLevel'; readonly building: string; readonly level: number }
+  | { readonly type: 'cityTaken'; readonly city: string };
+
+export interface ChapterDef {
+  readonly id: string;
+  readonly goal: ChapterGoalDef;
+  readonly reward: Resources;
+}
+
 export interface GameData {
   readonly game: GameConfig;
   readonly roads: RoadsData;
@@ -361,6 +377,8 @@ export interface GameData {
   readonly waves: { readonly version: number; readonly waves: readonly WaveDef[]; readonly scaling: WaveScalingDef };
   readonly tutorial: TutorialData;
   readonly alliance: AllianceData;
+  /** Chronik des ersten Spielmonats: Kapitel in fester Reihenfolge, das letzte ist die Krönung. */
+  readonly chronicle: { readonly version: number; readonly chapters: readonly ChapterDef[] };
   readonly goals: {
     readonly version: number;
     /** Tagesziele: die ersten `dailyFixed` gelten jeden Tag, dazu `dailyRotating` aus dem Rest, reihum nach Tagesnummer. */

@@ -1,7 +1,7 @@
 import { render } from 'preact';
 import { registerSW } from 'virtual:pwa-register';
 import {
-  MILLI, STATE_VERSION, armyCapacity, armySize, campStockPermille, activeGoals, loginReward, scaledReward, weeklyGoal, attackSetup, buildingBusyUntil, buildingLevel, canAfford, keepRequirement, storageCapacity, cityHint, createBattle, createGame, dataVersion, defaultLineup, defenseStars, defenseDef, defenseSetup, starGold, waveNumber, wavesUnlocked, findById, hashBattle,
+  MILLI, STATE_VERSION, chapterProgress, currentChapter, armyCapacity, armySize, campStockPermille, activeGoals, loginReward, scaledReward, weeklyGoal, attackSetup, buildingBusyUntil, buildingLevel, canAfford, keepRequirement, storageCapacity, cityHint, createBattle, createGame, dataVersion, defaultLineup, defenseStars, defenseDef, defenseSetup, starGold, waveNumber, wavesUnlocked, findById, hashBattle,
   readyTroops, reduceGame, roadLengthMilli, roadPointMilli, stepBattle, towerActionCost, tutorialStep, unlocked, validateBattleAction, validateGameAction,
   type BattleAction, type BattleInput, type BattleState, type GameAction, type GameState, type Resources, type SavedReplay, type UnitCount,
 } from '../sim/index.ts';
@@ -303,7 +303,10 @@ function tickClock(): void {
   recordSteps(before.tutorialStep);
   // Der Ausbau des Burgfrieds bekommt seine eigene Meldung. Die Heldin meldet sich erst, wenn der neue
   // Straßenverlauf gewählt ist, damit sie den Erfolg nicht überdeckt.
-  if (game.keepLevel > before.keepLevel) showBanner(t('banner.keep', { n: game.keepLevel }), null);
+  if (game.keepLevel > before.keepLevel) {
+    showBanner(t('banner.keep', { n: game.keepLevel }), null);
+    record('keep_level', { level: game.keepLevel });
+  }
   if (before.hero.joined !== game.hero.joined) heroBannerDue = true;
   // PLATZHALTER Bot-Allianz: jede angerechnete Hilfe wird als kleiner Text an der Baustelle gezeigt.
   for (const b of game.buildings) {
@@ -396,6 +399,8 @@ function finishBattle(s: Extract<Screen, { kind: 'battle' }>): void {
   record('battle_end', {
     kind: s.side, result: s.battle.result, depth: s.battle.depth, ticks: s.battle.tick, leaked: s.battle.leaked, fallen: s.battle.fallen.length,
     stars: s.side === 'defense' ? defenseStars(s.battle, playedDefense, data) : 0,
+    // Für die Auswertung des Monats: welche Welle bzw. welches Ziel, und wie weit der Spieler damit ist.
+    ...(s.side === 'defense' ? { wave: waveNumber(game, data) - (s.battle.result === 'held' && !playedDefense.repeat ? 1 : 0), repeat: playedDefense.repeat, boss: playedDefense.boss } : { target: s.camp }),
   });
   if (s.side === 'attack') {
     screen = { kind: 'result' };
@@ -830,10 +835,53 @@ function buildHud(nowMs: number): HudModel {
   return { ...model, corner, full, banner: model.banner ?? weakBanner, preview, bottom, bottomSecondary: second, status: unlocked(game, 'world', data) ? shieldText() : null, sheet: panel ? null : citySheet(hint), panel };
 }
 
+function openReport(): void {
+  report = { message: null };
+}
+
+/** Nach der Krönung zeigt die Stadt einmal den Abschluss. */
+let crownPanel = false;
+
+/** Das offene Kapitel der Chronik als erste Zeile der Ziele: Titel, was zu tun ist, Fortschritt, Belohnung. */
+function chapterOption(): Btn[] {
+  const chapter = currentChapter(game, data);
+  const progress = chapterProgress(game, data);
+  const total = data.chronicle.chapters.length;
+  if (!chapter || !progress) return [{ id: 'chapter', label: t('chronicle.done'), sub: t('crown.title'), disabled: true, onClick: () => undefined }];
+  const goal = chapter.goal;
+  const what = goal.type === 'keepLevel' ? t('chgoal.keepLevel', { n: goal.level })
+    : goal.type === 'wavesCleared' ? t('chgoal.wavesCleared', { n: data.tutorial.defenses.length + goal.count })
+    : goal.type === 'citiesTaken' ? (goal.count === 1 ? t('chgoal.citiesTaken1') : t('chgoal.citiesTaken', { n: goal.count }))
+    : goal.type === 'buildingLevel' ? t('chgoal.buildingLevel', { name: t(`building.${goal.building}`), n: goal.level })
+    : t('chgoal.cityTaken', { name: t(`target.${goal.city}`) });
+  const ready = progress.have >= progress.need;
+  return [{
+    id: 'chapter', label: `${t('chronicle.title', { n: game.chapter + 1, of: total })}: ${t(`chapter.${chapter.id}`)}`,
+    sub: `${what} · ${t('goal.progress', { have: progress.have, n: progress.need })}`, cost: scaledReward(chapter.reward, game, data),
+    disabled: !ready, hint: ready,
+    onClick: () => {
+      if (!dispatch({ type: 'ClaimChapter' })) return;
+      record('chapter_claimed', { chapter: chapter.id, index: game.chapter });
+      if (game.crownedAt !== null) {
+        record('crowned', { day: daysPlayed() });
+        sheet = null;
+        showBanner(t('crown.banner'), () => { crownPanel = true; });
+      } else showBanner(t('chronicle.claimed', { name: t(`chapter.${chapter.id}`) }), null);
+    },
+  }];
+}
+
+/** Spieltag seit dem ersten Start dieser Installation (ab 1), aus der Aufzeichnung. */
+function daysPlayed(): number {
+  const first = recorder.all()[0]?.t ?? clock();
+  return Math.floor((clock() - first) / 86_400_000) + 1;
+}
+
 /** Es gibt etwas abzuholen: Rückkehr-Belohnung, ein Tagesziel oder das Wochenziel. */
 function goalsClaimable(): boolean {
   return validateGameAction(game, { type: 'ClaimLoginReward' }, data) === null
     || validateGameAction(game, { type: 'ClaimWeeklyGoal' }, data) === null
+    || validateGameAction(game, { type: 'ClaimChapter' }, data) === null
     || activeGoals(game, data).some((g) => validateGameAction(game, { type: 'ClaimDailyGoal', goal: g.id }, data) === null);
 }
 
@@ -887,6 +935,15 @@ function openAttack(camp: string): void {
 /** Meldungen, die sich in der Stadtansicht von selbst öffnen: Bericht zum Nachtangriff, Ankündigung. */
 function cityPanel(): HudModel['panel'] {
   if (game.roadChoicePending) return null;
+  if (crownPanel) {
+    return {
+      title: t('crown.title'), lines: [t('crown.text', { day: daysPlayed() }), t('crown.thanks')], rows: [],
+      buttons: [
+        { id: 'crown-report', label: t('crown.report'), hint: true, onClick: () => { crownPanel = false; openReport(); } },
+        { id: 'crown-ok', label: t('crown.ok'), quiet: true, onClick: () => { crownPanel = false; } },
+      ],
+    };
+  }
   const report = game.raidReport === null ? null : game.replays.find((r) => r.id === game.raidReport);
   if (report) {
     const lines = [report.result === 'held' && report.depth === 0 ? t('raid.held') : depthText(report.depth)];
@@ -1026,6 +1083,7 @@ function citySheet(hint: ReturnType<typeof tutorialStep>['hint']): HudModel['she
     return {
       ...close, title: t('goals.title'),
       options: [
+        ...chapterOption(),
         // Belohnung für die Rückkehr: einmal am Tag, reihum größer.
         (() => {
           const reward = loginReward(game, data);

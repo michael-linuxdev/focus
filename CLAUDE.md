@@ -1,6 +1,6 @@
 # Mittelalter-Königreich (Arbeitstitel) – PWA-Prototyp
 
-Spielbarer Prototyp eines Mobile-Strategiespiels. Stand: die ersten 30 Spielminuten; Ziel: der erste Spielmonat,
+Spielbarer Prototyp eines Mobile-Strategiespiels: der erste Spielmonat, von der ersten Welle bis zur Krönung,
 mit Testern gespielt. Macht das Spaß, folgt die Neuumsetzung in Unity 6 / C# mit Metaplay; deshalb zählt
 portierbare Spiellogik mehr als alles andere.
 Der Name steht nur in `data/game.json`.
@@ -20,7 +20,7 @@ die der Spieler selbst baut. Dieselbe Mechanik trägt Einstieg, Stadtausbau und 
 | Gebauten Stand ansehen | `npm run preview` |
 | Ablauf des Tutorial-Bots ausgeben | `FLOW_LOG=flow.txt npm test` |
 | Balance: Schlachten massenhaft durchrechnen, Siegquoten ausgeben | `npm run balance` (optional `-- 500` Startwerte) |
-| Spielmonat durchrechnen: an welchem Tag welche Burgfried-Stufe erreicht wird | `npm run month` (optional `-- eifrig`) |
+| Spielmonat durchrechnen: Burgfried, Wellen, Nachtangriffe, Angriffe und Chronik nach Tagen | `npm run month` (optional `-- eifrig`) |
 | Kennzahlen aus Exportdateien (eine je Spieler) | `npm run metrics -- a.json b.json` |
 | Leistung mit gedrosselter CPU und langsamem Netz (nach dem Bauen) | `npm run perf` |
 | Speicherstand am Ende des Ablaufs erzeugen | `node scripts/make-save.ts > stand.json` |
@@ -105,6 +105,7 @@ durchgekommene Räuber bis zu 30 % der ungeschützten Vorräte, bei vielen Verte
   Browsertests setzen `mk.gate`, um den Hinweis zu überspringen.
 - Sendestelle: `EventSink` in `src/telemetry/events.ts`; der Prototyp nutzt `noSink`.
 - Neue Messpunkte nur über `record(...)` in `src/app/main.tsx`; neue Arten in `EventType` eintragen.
+- Kennzahlen des Monats aus den Exporten: noch dabei an Tag 7 und Tag 30, höchste Burgfried-Stufe, höchste Welle, Kapitel, Tag der Krönung.
 - „Minute 10 erreicht“ heißt: Tutorial-Schritt `minute10Step` aus `data/tutorial.json` erreicht.
 - Balance-Werte nie nach Gefühl ändern: erst `npm run balance`, dann Daten ändern, dann wieder laufen lassen.
 - Kosten und Bauzeiten des Monats ebenso: erst `npm run month`, dann Daten ändern, dann wieder laufen lassen. Dasselbe gilt für `waves.scaling`.
@@ -124,5 +125,6 @@ durchgekommene Räuber bis zu 30 % der ungeschützten Vorräte, bei vielen Verte
 - Arbeit in Meilensteinen; nach jedem anhalten und Bericht geben. M0 bis M5: die ersten 30 Minuten. M6: Testpaket.
   M7: Wachstum (Burgfried bis 8, Ausbaustufen, Lagerplatz). M8: Gegner (berechnete Wellen, Ritter, Hauptmann, Nachtangriff wächst mit).
   M9: Tagesrhythmus (wechselnde Tagesziele, Wochenziel, Belohnung für die Rückkehr). M10: Welt (Ringe je Burgfried-Stufe,
-  Beute wächst nach, Heeresgröße über die Kaserne, Städte schlagen zurück). Offen: M11 Monatsbogen.
+  Beute wächst nach, Heeresgröße über die Kaserne, Städte schlagen zurück). M11: Monatsbogen (Chronik bis zur Krönung, Kennzahlen für Tag 7 und 30,
+  Abgleich des Tempos über den Monat). Der Spielmonat ist damit durchgängig spielbar; offen sind Feinschliff und eigene Bilder.
 - Veröffentlichung: Push auf `main` baut und veröffentlicht nach `focus.micana.de` (GitHub Pages).

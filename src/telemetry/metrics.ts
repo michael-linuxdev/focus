@@ -30,6 +30,20 @@ export interface Summary {
   readonly cancelled: Readonly<Record<string, number>>;
   /** Ereignisse mit Zeitraffer sind enthalten: nicht für echte Auswertungen verwenden. */
   readonly usedTimeLapse: boolean;
+  // ---- Spielmonat ----
+  /** Letzter Tag mit geöffneter App, gezählt ab dem ersten Tag (0 = nur am ersten Tag gespielt). */
+  readonly lastActiveDay: number;
+  /** Die App wurde an Tag 7 bzw. Tag 30 nach dem ersten Tag oder später noch geöffnet. */
+  readonly activeDay7: boolean;
+  readonly activeDay30: boolean;
+  readonly maxKeepLevel: number;
+  /** Höchste geschlagene Welle (Nummer wie in der Anzeige), 0 wenn nicht erfasst. */
+  readonly maxWave: number;
+  readonly chaptersClaimed: number;
+  /** Spieltag der Krönung (ab 1), sonst `null`. */
+  readonly crownedOnDay: number | null;
+  readonly reportsSent: number;
+  readonly errors: number;
 }
 
 function dayNumber(day: string): number {
@@ -72,6 +86,9 @@ export function summarize(events: readonly GameEvent[], minute10Step: string): S
     cancelled[what] = (cancelled[what] ?? 0) + 1;
   }
   const firstNumber = firstDay === null ? 0 : dayNumber(firstDay);
+  const lastActiveDay = Math.max(0, ...opens.map((e) => dayNumber(e.day) - firstNumber));
+  const crowned = sorted.find((e) => e.type === 'crowned');
+  const num = (v: unknown): number => (typeof v === 'number' ? v : 0);
   return {
     events: sorted.length,
     sessions: new Set(sorted.map((e) => e.session)).size,
@@ -93,6 +110,15 @@ export function summarize(events: readonly GameEvent[], minute10Step: string): S
     attacks: { count: byDepth.reduce((a, b) => a + b, 0), byDepth },
     cancelled,
     usedTimeLapse: sorted.some((e) => e.lapse),
+    lastActiveDay,
+    activeDay7: lastActiveDay >= 7,
+    activeDay30: lastActiveDay >= 30,
+    maxKeepLevel: Math.max(1, ...sorted.filter((e) => e.type === 'keep_level').map((e) => num(e.data['level']))),
+    maxWave: Math.max(0, ...ends.filter((e) => e.data['kind'] === 'defense' && e.data['result'] === 'held').map((e) => num(e.data['wave']))),
+    chaptersClaimed: sorted.filter((e) => e.type === 'chapter_claimed').length,
+    crownedOnDay: crowned ? dayNumber(crowned.day) - firstNumber + 1 : null,
+    reportsSent: sorted.filter((e) => e.type === 'report_sent').length,
+    errors: sorted.filter((e) => e.type === 'error').length,
   };
 }
 
@@ -112,8 +138,27 @@ export interface ExportFile {
 }
 
 /** Anteile über mehrere Installationen (ein Export je Spieler). */
-export function aggregate(files: readonly ExportFile[]): { players: number; minute10: number; alliance: number; nextDay: number; withTimeLapse: number } {
+export interface Aggregate {
+  players: number; minute10: number; alliance: number; nextDay: number; withTimeLapse: number;
+  /** Anteil der Spieler, die an Tag 7 bzw. 30 oder später noch gespielt haben, unter denen, deren Export alt genug dafür ist. */
+  day7: number | null; day30: number | null;
+  /** So viele Exporte sind alt genug für die jeweilige Quote. */
+  oldEnough7: number; oldEnough30: number;
+  crowned: number;
+  /** Mittlere (Median) höchste Burgfried-Stufe. */
+  medianKeepLevel: number;
+}
+
+export function aggregate(files: readonly ExportFile[]): Aggregate {
   const fresh = files.map((f) => summarize(f.events, f.minute10Step));
+  // Alt genug für Tag n: Der Export entstand mindestens n Tage nach dem ersten Ereignis.
+  const age = (f: ExportFile): number => (f.events[0] ? Math.floor((f.exportedAt - f.events[0].t) / 86_400_000) : 0);
+  const old = (n: number): Summary[] => fresh.filter((_, i) => age(files[i]!) >= n);
+  const retention = (n: number): number | null => {
+    const group = old(n);
+    return group.length === 0 ? null : Math.round((group.filter((s) => s.lastActiveDay >= n).length * 1000) / group.length) / 10;
+  };
+  const keeps = fresh.map((s) => s.maxKeepLevel).sort((a, b) => a - b);
   const share = (pick: (s: Summary) => boolean): number => (fresh.length === 0 ? 0 : Math.round((fresh.filter(pick).length * 1000) / fresh.length) / 10);
   return {
     players: fresh.length,
@@ -121,5 +166,11 @@ export function aggregate(files: readonly ExportFile[]): { players: number; minu
     alliance: share((s) => s.joinedAlliance),
     nextDay: share((s) => s.returnedNextDay),
     withTimeLapse: fresh.filter((s) => s.usedTimeLapse).length,
+    day7: retention(7),
+    day30: retention(30),
+    oldEnough7: old(7).length,
+    oldEnough30: old(30).length,
+    crowned: share((s) => s.crownedOnDay !== null),
+    medianKeepLevel: keeps.length === 0 ? 0 : keeps[Math.floor((keeps.length - 1) / 2)]!,
   };
 }

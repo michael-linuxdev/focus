@@ -1,6 +1,7 @@
 import alliance from '../../data/alliance.json';
 import buildings from '../../data/buildings.json';
 import camps from '../../data/camps.json';
+import chronicle from '../../data/chronicle.json';
 import city from '../../data/city.json';
 import game from '../../data/game.json';
 import goals from '../../data/goals.json';
@@ -19,4 +20,4 @@ import type { GameData } from '../sim/index.ts';
  * Die Datendateien, gebündelt für die Spiellogik. Die Form sichern die Schemas in `data/schemas/`
  * (geprüft in `tests/sim/data.test.ts`), deshalb hier die eine Typ-Zusicherung.
  */
-export const gameData = { game, roads, city, buildings, units, troops, towers, hero, rules, camps, waves, tutorial, alliance, goals } as unknown as GameData;
+export const gameData = { game, roads, city, buildings, units, troops, towers, hero, rules, camps, waves, tutorial, alliance, goals, chronicle } as unknown as GameData;

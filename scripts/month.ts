@@ -18,6 +18,7 @@ console.log('Burgfried-Stufe erreicht an Tag: ' + run.keepDay.map((d, level) => 
 console.log(`Sitzungen ohne etwas zu bauen: ${run.idleSessions} von ${run.sessions}`);
 console.log(`Neue Wellen: ${run.fresh.won} gewonnen, ${run.fresh.lost} verloren · Wiederholungen: ${run.repeats} · Nachtangriffe: ${run.raids.held} gehalten, ${run.raids.breached} Burgfried gefallen, ${run.raids.market} bis zum Marktplatz`);
 console.log(`Angriffe: ${run.attacks.count} (davon ${run.attacks.cities} auf Städte), Tiefe 0/1/2/3: ${run.attacks.depth.join('/')} · Gegenangriffe: ${run.revenges}`);
+console.log('Chronik, Kapitel abgeschlossen an Tag: ' + run.chapterDay.slice(1).map((d, i) => `${i + 1}: ${d ?? '–'}`).join(' · ') + ` · Krönung: ${run.crownDay === null ? 'nicht im Monat' : `Tag ${run.crownDay}`}`);
 console.log('Burgfried  neue Wellen gew./verl.  Sterne im Schnitt  durchgekommen im Schnitt  Sekunden  Anführer gew./Versuche  Nachtangriffe bis Marktplatz');
 run.bands.forEach((b, level) => {
   const n = b.won + b.lost;

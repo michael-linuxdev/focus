@@ -903,57 +903,47 @@
         {
           "slot": "s1",
           "def": "bogenturm",
-          "level": 5
+          "level": 4
         },
         {
           "slot": "s2",
           "def": "katapult",
-          "level": 5
+          "level": 4
         },
         {
           "slot": "s3",
           "def": "bogenturm",
-          "level": 5
+          "level": 4
         },
         {
           "slot": "s4",
           "def": "pechnase",
-          "level": 5
+          "level": 4
         },
         {
           "slot": "s5",
           "def": "bogenturm",
-          "level": 5
+          "level": 4
         },
         {
           "slot": "s6",
           "def": "wachstube",
-          "level": 5
+          "level": 4
         },
         {
           "slot": "s7",
           "def": "katapult",
-          "level": 5
+          "level": 4
         },
         {
           "slot": "s8",
           "def": "bogenturm",
-          "level": 5
+          "level": 4
         },
         {
           "slot": "s9",
           "def": "katapult",
-          "level": 5
-        },
-        {
-          "slot": "s10",
-          "def": "bogenturm",
-          "level": 5
-        },
-        {
-          "slot": "s11",
-          "def": "pechnase",
-          "level": 5
+          "level": 4
         }
       ],
       "stock": {

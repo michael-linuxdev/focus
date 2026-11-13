@@ -51,6 +51,27 @@ describe('Der erste Spielmonat im Durchlauf', () => {
     }
   });
 
+  it('die Krone ist das Ziel des Monats: erreichbar, aber erst in der letzten Woche', () => {
+    expect(casual.crownDay ?? 999).toBeGreaterThanOrEqual(22);
+    expect(casual.crownDay ?? 999).toBeLessThanOrEqual(30);
+    expect(eager.crownDay ?? 999).toBeGreaterThanOrEqual(20);
+    expect(eager.crownDay ?? 999).toBeLessThanOrEqual(30);
+    // Kein Kapitel hält länger als elf Tage auf, und in der ersten Woche gibt es mehrere.
+    for (const run of [casual, eager]) {
+      const days = run.chapterDay.slice(1).map((d) => d ?? 999);
+      expect(days.filter((d) => d <= 7).length).toBeGreaterThanOrEqual(5);
+      days.forEach((d, i) => { if (i > 0) expect(d - days[i - 1]!, `Kapitel ${i + 1}`).toBeLessThanOrEqual(11); });
+    }
+  });
+
+  it('Angriffe gehören dazu: Lager und Städte in jedem erreichten Ring, Städte schlagen zurück', () => {
+    for (const run of [casual, eager]) {
+      expect(run.attacks.count).toBeGreaterThanOrEqual(60);
+      expect(run.attacks.depth[3]! / run.attacks.count).toBeGreaterThanOrEqual(0.4);
+      expect(run.revenges).toBeGreaterThanOrEqual(10);
+    }
+  });
+
   it('eine Runde dauert auch spät im Monat keine zwei Minuten', () => {
     for (const band of casual.bands) {
       const n = band.won + band.lost;
