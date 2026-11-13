@@ -18,6 +18,10 @@ die der Spieler selbst baut. Dieselbe Mechanik trägt Einstieg, Stadtausbau und 
 | Browsertest in Handygröße (nach dem Bauen, Bildschirmfotos nach `test-results/`) | `npm run test:e2e` |
 | Gebauten Stand ansehen | `npm run preview` |
 | Ablauf des Tutorial-Bots ausgeben | `FLOW_LOG=flow.txt npm test` |
+| Balance: Schlachten massenhaft durchrechnen, Siegquoten ausgeben | `npm run balance` (optional `-- 500` Startwerte) |
+| Kennzahlen aus Exportdateien (eine je Spieler) | `npm run metrics -- a.json b.json` |
+| Leistung mit gedrosselter CPU und langsamem Netz (nach dem Bauen) | `npm run perf` |
+| Speicherstand am Ende des Ablaufs erzeugen | `node scripts/make-save.ts > stand.json` |
 
 Kein Commit mit fehlschlagenden Tests. Vor jeder Fertigmeldung: `npm test && npm run build && npm run test:e2e`.
 
@@ -66,10 +70,23 @@ Nach jedem Nachtangriff ist der nächste angekündigt.
 - `data/` Datendateien und Schemas (werden unverändert nach Unity übernommen)
 - `src/sim/` Spiellogik · `src/app/` Hülle (Schleife, Uhr, Speicher, Service Worker)
 - `src/render/` Canvas-Darstellung (liest nur) · `src/ui/` Preact-Oberfläche (löst nur Aktionen aus)
+- `src/telemetry/` Ereignisaufzeichnung (lokal), Kennzahlen, Entwicklerseite
+- `scripts/` Balance, Auswertung, Hilfen; laufen direkt mit Node (TypeScript ohne Bauen)
 - `tests/sim/`, `tests/app/` Vitest · `tests/e2e/` Browsertest mit Playwright
-- `tests/sim/bot.ts` spielt den geführten Ablauf nach den Hinweisen durch; nach jeder Änderung an `data/tutorial.json`
+- `scripts/lib/bot.ts` spielt den geführten Ablauf nach den Hinweisen durch; nach jeder Änderung an `data/tutorial.json`
   oder an Kosten zeigt `flow.test.ts`, ob der Ablauf noch ohne Sackgasse und ohne lange Wartezeit durchläuft
 - `window.__mk` (in `src/app/main.tsx`): Zustand lesen, Zeitraffer (`skip`) und Schlachttempo (`speed`) für Browsertests
+
+## Messung
+
+- Entwicklerseite: fünf schnelle Tipps auf die Anzeige oben rechts („Welle n“) oder `#dev` an die Adresse hängen.
+  Zeigt die drei Kennzahlen, alle Ereignisse, Export als Datei, Zeitraffer, Schlachttempo, Zurücksetzen.
+- Ereignisse bleiben auf dem Gerät (`localStorage`, Schlüssel `mk.ev.*`). Keine personenbezogenen Daten, keine fremden
+  Dienste, nichts wird gesendet. Felder eines Ereignisses: Zeit, Tag, Sitzung, Nummer, Art, wenige Spielwerte, Zeitraffer-Merker.
+- Sendestelle: `EventSink` in `src/telemetry/events.ts`; der Prototyp nutzt `noSink`.
+- Neue Messpunkte nur über `record(...)` in `src/app/main.tsx`; neue Arten in `EventType` eintragen.
+- „Minute 10 erreicht“ heißt: Tutorial-Schritt `minute10Step` aus `data/tutorial.json` erreicht.
+- Balance-Werte nie nach Gefühl ändern: erst `npm run balance`, dann Daten ändern, dann wieder laufen lassen.
 
 ## Konventionen
 

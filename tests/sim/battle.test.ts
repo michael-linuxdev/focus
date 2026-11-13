@@ -67,17 +67,17 @@ describe('Wiederholungen', () => {
           "depth": 3,
           "fallen": 0,
           "gateHp": 0,
-          "hash": 1978114766,
+          "hash": 3003967525,
           "result": "breached",
           "tick": 529,
         },
         "defense": {
           "gold": 50,
-          "hash": 65299507,
+          "hash": 185966099,
           "killed": 10,
           "leaked": 0,
           "result": "held",
-          "tick": 429,
+          "tick": 397,
         },
       }
     `);

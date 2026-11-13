@@ -14,9 +14,8 @@ const COLORS = {
   shot: '#f4e3a1', gold: '#e9b949', deny: '#e2574c', hint: '#ffffff', hero: '#c084fc', building: '#a7b8c9', disabled: '#ff8a3d',
 } as const;
 
-/** Platz für die Leisten oben und unten (CSS-Pixel). */
+/** Platz für die Leiste oben (CSS-Pixel). Der Platz unten hängt von der Ansicht ab und kommt mit der Szene. */
 const TOP = 56;
-const BOTTOM = 104;
 
 export interface Layout {
   readonly tile: number;
@@ -24,10 +23,10 @@ export interface Layout {
   readonly oy: number;
 }
 
-export function computeLayout(width: number, height: number, data: GameData): Layout {
+export function computeLayout(width: number, height: number, bottom: number, data: GameData): Layout {
   const { cols, rows } = data.roads.grid;
-  const tile = Math.min(width / cols, (height - TOP - BOTTOM) / rows);
-  return { tile, ox: (width - tile * cols) / 2, oy: TOP + (height - TOP - BOTTOM - tile * rows) / 2 };
+  const tile = Math.min(width / cols, (height - TOP - bottom) / rows);
+  return { tile, ox: (width - tile * cols) / 2, oy: TOP + (height - TOP - bottom - tile * rows) / 2 };
 }
 
 /** Mitte einer Kachel in CSS-Pixeln relativ zum Canvas. */
@@ -100,6 +99,8 @@ export interface Scene {
   readonly hint: { readonly x: number; readonly y: number; readonly cost: string | null } | null;
   readonly effects: readonly Effect[];
   readonly timeMs: number;
+  /** Höhe der Schaltflächen am unteren Rand in CSS-Pixeln; das Spielfeld nutzt den Rest. */
+  readonly bottomInset: number;
 }
 
 export function drawStage(canvas: HTMLCanvasElement, scene: Scene, data: GameData): Layout {
@@ -111,7 +112,7 @@ export function drawStage(canvas: HTMLCanvasElement, scene: Scene, data: GameDat
     canvas.width = Math.round(w * dpr);
     canvas.height = Math.round(h * dpr);
   }
-  const layout = computeLayout(w, h, data);
+  const layout = computeLayout(w, h, scene.bottomInset, data);
   const ctx = canvas.getContext('2d');
   if (!ctx) return layout;
   const { cols, rows } = data.roads.grid;

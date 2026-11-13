@@ -24,6 +24,7 @@ const march = (unit: string, count: number, towers: BattleSetup['towers'], extra
 
 describe('Pechnase', () => {
   const pech = [{ slot: 's1', def: 'pechnase', level: 1 }];
+  const pechLevel = data.towers.towers.find((t) => t.id === 'pechnase')!.levels[0]!;
 
   it('bremst alle im Umkreis', () => {
     const plain = runBattle(march('leicht', 1, []), 1, [], data);
@@ -38,7 +39,7 @@ describe('Pechnase', () => {
       s = stepBattle(s, [], data);
       if (s.units[0]) insideSteps.push(s.units[0].pos - before);
     }
-    expect(Math.min(...insideSteps)).toBe(Math.trunc((32 * 550) / 1000));
+    expect(Math.min(...insideSteps)).toBe(Math.trunc((32 * pechLevel.slowPermille) / 1000));
     expect(Math.max(...insideSteps)).toBe(32);
   });
 
@@ -48,7 +49,7 @@ describe('Pechnase', () => {
       for (let i = 0; i < 260 && s.units.length > 0; i++) s = stepBattle(s, [], data);
       return s.units[0]?.hp ?? 0;
     };
-    // Bogenturm: 6 - 3 Rüstung = 3 je Schuss. Pechnase: 3 ohne Abzug, dazu bleibt die Einheit länger im Umkreis.
+    // Rüstung zieht dem Bogenturm je Schuss 3 ab, der Pechnase nichts; dazu bleibt die Einheit länger im Umkreis.
     expect(hpLeft('pechnase')).toBeLessThan(110);
     expect(hpLeft('pechnase')).toBeLessThanOrEqual(hpLeft('bogenturm'));
   });
@@ -56,6 +57,7 @@ describe('Pechnase', () => {
 
 describe('Wachstube', () => {
   const guard = [{ slot: 's2', def: 'wachstube', level: 1 }];
+  const guardLevel = data.towers.towers.find((t) => t.id === 'wachstube')!.levels[0]!;
 
   it('die Miliz steht auf dem nächstgelegenen Punkt der Straße hinter dem Tor', () => {
     const road = data.roads.roads[0]!;
@@ -81,8 +83,8 @@ describe('Wachstube', () => {
     expect(fellAt).toBeGreaterThan(0);
     // Nachrücken: nach der Wartezeit steht wieder Miliz.
     let later = createBattle(march('gepanzert', 3, guard, { keepHp: 99 }), 1, data);
-    for (let i = 0; i < fellAt + 240 + 2; i++) later = stepBattle(later, [], data);
-    expect(later.towers[0]!.militiaHp).toBe(120);
+    for (let i = 0; i < fellAt + guardLevel.militiaRespawnTicks + 2; i++) later = stepBattle(later, [], data);
+    expect(later.towers[0]!.militiaHp).toBe(guardLevel.militiaHp);
   });
 
   it('Rammböcke räumen Miliz schnell weg, nehmen dabei aber besonders viel Schaden', () => {
@@ -102,7 +104,7 @@ describe('Wachstube', () => {
     const armored = run('gepanzert');
     expect(ram.hpAfter).toBeGreaterThanOrEqual(0); // der Rammbock bricht die Miliz
     expect(ram.held).toBeLessThan(armored.held > 0 ? armored.held : 9999);
-    // Pro Treffer der Miliz: Rammbock 8 * 3 - 1 = 23, Gepanzerter 8 - 3 = 5.
+    // Pro Treffer der Miliz: Rammbock Schaden * 3 - 1 Rüstung, Gepanzerter Schaden - 3 Rüstung.
     expect(ram.lost / Math.max(1, ram.held)).toBeGreaterThan(armored.lost / Math.max(1, armored.held) || 0);
   });
 });

@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Geführter Ablauf. defenses: Verteidigungen in Reihenfolge, danach afterDefenses. steps: Schritte mit Hinweis und Abschlussbedingung; unlocks schaltet Teile der Oberfläche frei",
+  "title": "Geführter Ablauf. defenses: Verteidigungen in Reihenfolge, danach afterDefenses. steps: Schritte mit Hinweis und Abschlussbedingung; unlocks schaltet Teile der Oberfläche frei. minute10Step: Schritt, dessen Erreichen in der Messung als \"Minute 10 erreicht\" zählt",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -8,7 +8,8 @@
     "preliminary",
     "defenses",
     "afterDefenses",
-    "steps"
+    "steps",
+    "minute10Step"
   ],
   "properties": {
     "version": {
@@ -463,6 +464,10 @@
           }
         }
       }
+    },
+    "minute10Step": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
     }
   }
 }

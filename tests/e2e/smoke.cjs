@@ -254,6 +254,48 @@ const SHOTS = process.env.SHOTS ?? 'test-results';
     await shot('29-schwachstelle');
     assert.match(await page.getByTestId('banner').textContent(), /Schwachstelle/);
 
+    // Messung: versteckte Entwicklerseite, Kennzahlen, Export als Datei, Rückkehr am nächsten Tag.
+    const openDev = async () => {
+      for (let i = 0; i < 5; i++) await page.getByTestId('top-right').tap({ force: true });
+      await page.getByTestId('dev').waitFor();
+    };
+    assert.equal(await page.getByTestId('dev').count(), 0, 'Entwicklerseite ist im Spiel nicht sichtbar');
+    await openDev();
+    await shot('30-entwicklerseite');
+    assert.equal(await page.getByTestId('kpi-minute10').getAttribute('data-value'), 'true');
+    assert.equal(await page.getByTestId('kpi-alliance').getAttribute('data-value'), 'true');
+    assert.equal(await page.getByTestId('kpi-nextday').getAttribute('data-value'), 'false');
+    await click('dev-1d'); // Zeitraffer: einen Tag weiter, dann die App neu öffnen
+    await click('dev-close');
+    await page.reload();
+    await page.waitForFunction(() => window.__mk?.state().screen === 'city');
+    await openDev();
+    assert.equal(await page.getByTestId('kpi-nextday').getAttribute('data-value'), 'true');
+    assert.equal(await page.getByTestId('dev-lapse').count(), 1, 'Zeitraffer ist im Export gekennzeichnet');
+    const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('dev-export').tap()]);
+    const exportPath = path.join(SHOTS, 'export.json');
+    await download.saveAs(exportPath);
+    const exported = JSON.parse(require('node:fs').readFileSync(exportPath, 'utf8'));
+    assert.match(download.suggestedFilename(), /^mk-export-[0-9a-f]{12}-\d{4}-\d{2}-\d{2}\.json$/);
+    assert.equal(exported.format, 1);
+    assert.deepEqual([exported.summary.reachedMinute10, exported.summary.joinedAlliance, exported.summary.returnedNextDay], [true, true, true]);
+    assert.ok(exported.summary.secondsToFirstTower >= 6, 'Zeit bis zum ersten Turm ist erfasst');
+    assert.equal(exported.summary.sessions, 2);
+    const types = new Set(exported.events.map((e) => e.type));
+    for (const type of ['app_open', 'app_close', 'tutorial_step', 'tower_built', 'building_started', 'battle_start', 'battle_end', 'action_cancelled', 'alliance_joined', 'help_requested', 'goal_claimed', 'raid_report']) {
+      assert.ok(types.has(type), `Ereignis ${type} ist aufgezeichnet`);
+    }
+    assert.equal(exported.events.filter((e) => e.type === 'tutorial_step').length, exported.summary.lastStepIndex + 1, 'jeder Tutorial-Schritt genau einmal');
+    for (const e of exported.events) assert.deepEqual(Object.keys(e).sort(), ['data', 'day', 'lapse', 'seq', 'session', 't', 'type']);
+    assert.doesNotMatch(JSON.stringify(exported), /Mozilla|Android|Pixel|userAgent/i, 'keine Gerätedaten im Export');
+    // Dieselben Kennzahlen aus der Datei, mit dem Auswerteskript.
+    const out = require('node:child_process').execFileSync('node', ['scripts/metrics.ts', exportPath], { encoding: 'utf8' });
+    assert.match(out, /Minute 10 erreicht:\s+100 %/);
+    assert.match(out, /Allianz beigetreten:\s+100 %/);
+    assert.match(out, /Rückkehr am nächsten Tag:\s+100 %/);
+    await click('dev-close');
+    if (await page.getByTestId('raid-ok').count()) await click('raid-ok');
+
     // Installierbarkeit und Offline-Betrieb, Speicherstand überlebt Neuladen.
     const manifestHref = await page.locator('link[rel=manifest]').getAttribute('href');
     const manifest = await (await page.request.get(new URL(manifestHref, BASE).href)).json();

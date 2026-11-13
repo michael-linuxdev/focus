@@ -1,7 +1,7 @@
 import { render } from 'preact';
 import { registerSW } from 'virtual:pwa-register';
 import {
-  MILLI, attackSetup, canAfford, cityHint, createBattle, createGame, defaultLineup, defenseDef, defenseSetup, findById, hashBattle,
+  MILLI, STATE_VERSION, attackSetup, canAfford, cityHint, createBattle, createGame, dataVersion, defaultLineup, defenseDef, defenseSetup, findById, hashBattle,
   readyTroops, reduceGame, roadLengthMilli, roadPointMilli, stepBattle, towerActionCost, tutorialStep, unlocked, validateBattleAction, validateGameAction,
   type BattleAction, type BattleInput, type BattleState, type GameAction, type GameState, type Resources, type SavedReplay, type UnitCount,
 } from '../sim/index.ts';
@@ -11,6 +11,9 @@ import { gameData as data } from './data.ts';
 import { consumeTicks } from './loop.ts';
 import { loadGame, saveGame } from './save.ts';
 import { t } from './texts.ts';
+import { DevPage } from '../telemetry/DevPage.tsx';
+import { Recorder, localDay, type EventType, type EventValue } from '../telemetry/events.ts';
+import { summarize, type ExportFile } from '../telemetry/metrics.ts';
 
 /**
  * Hülle um die Spiellogik: Uhr, Zufalls-Startwert, Speicher, Bildschleife und der Wechsel zwischen
@@ -37,10 +40,17 @@ const SAVE_EVERY_MS = 5000;
 const heroName = t(`hero.${data.hero.id}`);
 
 /** Uhr der Hülle. Der Versatz ist der Zeitraffer für Tests und die Entwicklerseite. */
-let clockOffsetMs = 0;
+// Er wird gespeichert, damit die Spielzeit nach einem Neuladen nicht hinter den Spielstand zurückfällt.
+const LAPSE_KEY = 'mk.lapse';
+let clockOffsetMs = Number(localStorage.getItem(LAPSE_KEY) ?? 0) || 0;
+function addLapse(seconds: number): void {
+  clockOffsetMs += seconds * 1000;
+  localStorage.setItem(LAPSE_KEY, String(clockOffsetMs));
+}
 const clock = (): number => Date.now() + clockOffsetMs;
 
-let game: GameState = loadGame(localStorage, data) ?? createGame(crypto.getRandomValues(new Uint32Array(1))[0] ?? 1, clock(), data);
+const loaded = loadGame(localStorage, data);
+let game: GameState = loaded ?? createGame(crypto.getRandomValues(new Uint32Array(1))[0] ?? 1, clock(), data);
 let screen: Screen = { kind: 'city' };
 let sheet: Sheet = null;
 let effects: Effect[] = [];
@@ -54,11 +64,65 @@ let lastSaveMs = 0;
 let victoryGold = 0;
 /** Nach einer Wiederholung hervorgehobener schwacher Abschnitt. */
 let weak: { section: string; until: number } | null = null;
+/** Die Oberfläche wird höchstens zehnmal pro Sekunde neu aufgebaut, nach Eingaben sofort. */
+let hudDirty = true;
+let lastHudMs = 0;
+const HUD_EVERY_MS = 100;
+
+// ---------- Messung (lokal, ohne personenbezogene Daten) ----------
+
+const randomId = (): string => Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => b.toString(16).padStart(2, '0')).join('');
+const recorder = new Recorder(localStorage, clock, () => clockOffsetMs !== 0, randomId);
+const record = (type: EventType, values: Readonly<Record<string, EventValue>> = {}): void => recorder.record(type, values);
+/** Merker für eine laufende Schlacht, damit ein Abbruch durch Schließen der App beim nächsten Start auffällt. */
+const BATTLE_FLAG = 'mk.battle';
+let dev: { message: string | null; confirming: string | null } | null = null;
+let devTaps: number[] = [];
+
+function recordSteps(fromIndex: number): void {
+  for (let i = fromIndex + 1; i <= game.tutorialStep; i++) record('tutorial_step', { step: data.tutorial.steps[i]!.id, index: i });
+}
+
+function exportData(): ExportFile {
+  const events = recorder.all();
+  return {
+    format: 1,
+    app: { title: data.game.title, dataVersion: dataVersion(data), stateVersion: STATE_VERSION },
+    install: recorder.install,
+    exportedAt: clock(),
+    minute10Step: data.tutorial.minute10Step,
+    truncated: recorder.truncated,
+    summary: summarize(events, data.tutorial.minute10Step),
+    events,
+  };
+}
+
+function downloadExport(): void {
+  const file = exportData();
+  const name = `mk-export-${file.install}-${localDay(file.exportedAt)}.json`;
+  const url = URL.createObjectURL(new Blob([JSON.stringify(file, null, 1)], { type: 'application/json' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = name;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  if (dev) dev.message = t('dev.exported', { name });
+}
+
+function openDevOnTaps(): void {
+  const now = performance.now();
+  devTaps = [...devTaps.filter((x) => now - x < 3000), now];
+  if (devTaps.length >= 5) {
+    devTaps = [];
+    dev = { message: null, confirming: null };
+  }
+}
 const WEAK_MS = 12000;
 
 // ---------- Spielzustand ändern ----------
 
 function save(): void {
+  if (resetting) return;
   saveGame(localStorage, game);
   lastSaveMs = performance.now();
 }
@@ -68,6 +132,7 @@ function tickClock(): void {
   if (now <= game.now) return;
   const before = game;
   game = reduceGame(game, { type: 'AdvanceTime', now }, data).state;
+  recordSteps(before.tutorialStep);
   if (before.hero.joined !== game.hero.joined) showBanner(t('banner.hero', { name: heroName }), null);
   // PLATZHALTER Bot-Allianz: jede angerechnete Hilfe wird als kleiner Text an der Baustelle gezeigt.
   for (const b of game.buildings) {
@@ -91,9 +156,12 @@ function tickClock(): void {
 /** Einzige Stelle, an der die Oberfläche den Spielzustand ändert. */
 function dispatch(action: GameAction): boolean {
   tickClock();
+  const before = game.tutorialStep;
   const result = reduceGame(game, action, data);
   if (result.error) return false;
   game = result.state;
+  recordSteps(before);
+  hudDirty = true;
   save();
   return true;
 }
@@ -103,6 +171,7 @@ function showBanner(text: string, then: (() => void) | null): void {
 }
 
 function deny(x: number, y: number): void {
+  record('action_cancelled', { what: 'not_affordable' });
   effects.push({ kind: 'deny', x, y, text: '', start: performance.now() });
   goldDeniedUntil = performance.now() + 500;
 }
@@ -119,12 +188,16 @@ function startDefense(): void {
   tickClock();
   sheet = null;
   victoryGold = defenseDef(game, data).victoryGold;
+  record('battle_start', { kind: 'defense', wave: defenseDef(game, data).wave });
+  localStorage.setItem(BATTLE_FLAG, 'defense');
   screen = { kind: 'battle', side: 'defense', battle: createBattle(defenseSetup(game, data), game.nextSeed, data), inputs: [], queued: [], camp: '', lineup: [], targeting: null };
 }
 
 function startAttack(camp: string, lineup: UnitCount[][]): void {
   tickClock();
   if (validateGameAction(game, { type: 'ResolveAttack', camp, lineup, inputs: [] }, data) !== null) return;
+  record('battle_start', { kind: 'attack', target: camp, troops: lineup.reduce((n, w) => n + w.reduce((k, e) => k + e.count, 0), 0) });
+  localStorage.setItem(BATTLE_FLAG, 'attack');
   screen = { kind: 'battle', side: 'attack', battle: createBattle(attackSetup(game, camp, lineup, data), game.nextSeed, data), inputs: [], queued: [], camp, lineup, targeting: null };
 }
 
@@ -137,6 +210,7 @@ function battleAct(action: BattleAction): boolean {
   if (screen.kind !== 'battle') return false;
   if (validateBattleAction(screen.battle, action, data) !== null) return false;
   screen.queued.push(action);
+  hudDirty = true;
   return true;
 }
 
@@ -146,6 +220,8 @@ function finishBattle(s: Extract<Screen, { kind: 'battle' }>): void {
     ? dispatch({ type: 'ResolveDefense', inputs: s.inputs })
     : dispatch({ type: 'ResolveAttack', camp: s.camp, lineup: s.lineup, inputs: s.inputs });
   if (!ok || game.replays[game.replays.length - 1]?.replay.finalHash !== expected) desync = true;
+  localStorage.removeItem(BATTLE_FLAG);
+  record('battle_end', { kind: s.side, result: s.battle.result, depth: s.battle.depth, ticks: s.battle.tick, leaked: s.battle.leaked, fallen: s.battle.fallen.length });
   if (s.side === 'attack') {
     screen = { kind: 'result' };
     return;
@@ -204,8 +280,11 @@ function onTap(clientX: number, clientY: number): void {
     if (!building) {
       if (buildableBuildings().length > 0) sheet = { kind: 'building', plot: plot.id };
     } else if (building.doneAt > game.now) {
-      if (!dispatch({ type: 'SkipTimerFree', plot: plot.id }) && !dispatch({ type: 'RequestHelp', plot: plot.id })) deny(plot.x, plot.y);
-      else effects.push({ kind: 'ring', x: plot.x, y: plot.y, text: '', start: performance.now() });
+      if (dispatch({ type: 'SkipTimerFree', plot: plot.id })) effects.push({ kind: 'ring', x: plot.x, y: plot.y, text: '', start: performance.now() });
+      else if (dispatch({ type: 'RequestHelp', plot: plot.id })) {
+        record('help_requested', { building: building.def });
+        effects.push({ kind: 'ring', x: plot.x, y: plot.y, text: '', start: performance.now() });
+      } else deny(plot.x, plot.y);
     } else if (building.def === 'kaserne' && unlocked(game, 'train', data)) {
       sheet = { kind: 'train' };
     }
@@ -218,8 +297,15 @@ function onTap(clientX: number, clientY: number): void {
 
 /** Baut oder verbessert einen Turm: in der Schlacht als Schlachtaktion, sonst als Spielaktion. */
 function buildTower(action: { type: 'BuildTower'; slot: string; tower: string } | { type: 'UpgradeTower'; slot: string }): void {
-  const ok = screen.kind === 'battle' ? battleAct(action) : dispatch(action);
+  const inBattle = screen.kind === 'battle';
+  const towersNow = screen.kind === 'battle' ? screen.battle.towers : game.towers;
+  const def = action.type === 'BuildTower' ? action.tower : towersNow.find((tw) => tw.slot === action.slot)?.def ?? '';
+  const ok = inBattle ? battleAct(action) : dispatch(action);
   const slot = findById(data.city.towerSlots, action.slot, 'Bauplatz');
+  if (ok) {
+    record('tower_built', { tower: def, slot: action.slot, upgrade: action.type === 'UpgradeTower', inBattle });
+    navigator.vibrate?.(12);
+  }
   if (!ok) deny(slot.x, slot.y);
   else if (screen.kind !== 'battle') effects.push({ kind: 'ring', x: slot.x, y: slot.y, text: '', start: performance.now() });
   sheet = null;
@@ -298,9 +384,17 @@ function hintTile(): Scene['hint'] {
   return null;
 }
 
+/** Platz, den die Schaltflächen unten brauchen; das Spielfeld bekommt den Rest. */
+function bottomInset(): number {
+  if (screen.kind === 'battle') return screen.side === 'defense' ? 16 : 88;
+  if (screen.kind === 'replay') return 88;
+  if (!unlocked(game, 'defend', data)) return 16;
+  return unlocked(game, 'hero', data) ? 138 : 88;
+}
+
 function buildScene(nowMs: number): Scene {
   const cheapestTower = Math.min(...availableTowers().map((tw) => tw.levels[0]!.cost));
-  const base = { hint: hintTile(), effects, timeMs: nowMs, cheapestTower, weakSection: screen.kind === 'city' && weak ? weak.section : null };
+  const base = { hint: hintTile(), effects, timeMs: nowMs, bottomInset: bottomInset(), cheapestTower, weakSection: screen.kind === 'city' && weak ? weak.section : null };
   if (screen.kind === 'battle' || screen.kind === 'replay') {
     const b = screen.battle;
     const attack = b.setup.playerSide === 'attacker';
@@ -343,6 +437,7 @@ function buildHud(nowMs: number): HudModel {
     showAllResources: unlocked(game, 'resources', data),
     goldDenied: nowMs < goldDeniedUntil,
     topRight: t('hud.wave', { n: game.defensesWon + 1 }),
+    onTopRight: openDevOnTaps,
     depth: null as number | null,
     banner: banner?.text ?? null,
     bottom: [] as Btn[],
@@ -443,7 +538,7 @@ function buildHud(nowMs: number): HudModel {
         rows,
         buttons: [
           { id: 'attack-go', label: t('attack.go'), disabled: total === 0, hint: hint?.type === 'button' && hint.button === 'attack', onClick: () => startAttack(s.camp, s.lineup) },
-          { id: 'attack-close', label: t('attack.close'), quiet: true, onClick: () => { if (unlocked(game, 'world', data)) screen = { kind: 'world' }; else toCity(); } },
+          { id: 'attack-close', label: t('attack.close'), quiet: true, onClick: () => { record('action_cancelled', { what: 'attack_setup' }); if (unlocked(game, 'world', data)) screen = { kind: 'world' }; else toCity(); } },
         ],
       },
     };
@@ -530,7 +625,7 @@ function towerSheet(): HudModel['sheet'] {
   const hint = tutorialStep(game, data).hint;
   const gold = screen.kind === 'battle' ? screen.battle.gold : game.resources.gold;
   return {
-    title: t('sheet.tower'), closeLabel: t('sheet.close'), onClose: () => { sheet = null; },
+    title: t('sheet.tower'), closeLabel: t('sheet.close'), onClose: () => { record('action_cancelled', { what: 'sheet_tower' }); sheet = null; },
     options: availableTowers().map((tw) => ({
       id: `tower-${tw.id}`, label: t(`tower.${tw.id}`), sub: t(`tower.${tw.id}.sub`), cost: { gold: tw.levels[0]!.cost, wood: 0, stone: 0 }, disabled: tw.levels[0]!.cost > gold,
       hint: hint?.type === 'slot' && hint.slot === slot && hint.tower === tw.id,
@@ -540,7 +635,7 @@ function towerSheet(): HudModel['sheet'] {
 }
 
 function citySheet(hint: ReturnType<typeof tutorialStep>['hint']): HudModel['sheet'] {
-  const close = { closeLabel: t('sheet.close'), onClose: () => { sheet = null; } };
+  const close = { closeLabel: t('sheet.close'), onClose: () => { record('action_cancelled', { what: `sheet_${sheet?.kind ?? ''}` }); sheet = null; } };
   if (game.roadChoicePending) {
     const level = data.city.keepLevels.find((l) => l.level === game.keepLevel);
     return {
@@ -560,7 +655,7 @@ function citySheet(hint: ReturnType<typeof tutorialStep>['hint']): HudModel['she
       options: buildableBuildings().map((b) => ({
         id: `building-${b.id}`, label: t(`building.${b.id}`), sub: formatSeconds(b.buildSeconds), cost: b.cost,
         disabled: !canAfford(game.resources, b.cost), hint: hint?.type === 'plot' && hint.building === b.id,
-        onClick: () => { if (dispatch({ type: 'BuildBuilding', plot, building: b.id })) sheet = null; },
+        onClick: () => { if (dispatch({ type: 'BuildBuilding', plot, building: b.id })) { record('building_started', { building: b.id }); sheet = null; } },
       })),
     };
   }
@@ -592,7 +687,7 @@ function citySheet(hint: ReturnType<typeof tutorialStep>['hint']): HudModel['she
     if (game.allianceJoined) return { ...close, title: name, note: `${t('alliance.members', { names })} · ${t('alliance.helpHint')}`, options: [] };
     return {
       ...close, title: `${name} ${t('alliance.invite')}`, note: t('alliance.members', { names }),
-      options: [{ id: 'alliance-join', label: t('alliance.join'), sub: t('alliance.reward'), cost: data.alliance.joinReward, hint: true, onClick: () => void dispatch({ type: 'JoinAlliance' }) }],
+      options: [{ id: 'alliance-join', label: t('alliance.join'), sub: t('alliance.reward'), cost: data.alliance.joinReward, hint: true, onClick: () => { if (dispatch({ type: 'JoinAlliance' })) record('alliance_joined'); } }],
     };
   }
   if (sheet.kind === 'goals') {
@@ -604,7 +699,7 @@ function citySheet(hint: ReturnType<typeof tutorialStep>['hint']): HudModel['she
         return {
           id: `goal-${g.id}`, label: t(`goal.${g.id}`, { n: g.count }), sub: claimed ? t('goal.claimed') : t('goal.progress', { have, n: g.count }), cost: g.reward,
           disabled: claimed || have < g.count, hint: !claimed && have >= g.count,
-          onClick: () => void dispatch({ type: 'ClaimDailyGoal', goal: g.id }),
+          onClick: () => { if (dispatch({ type: 'ClaimDailyGoal', goal: g.id })) record('goal_claimed', { goal: g.id }); },
         };
       }),
     };
@@ -653,6 +748,41 @@ function stepScreen(nowMs: number): void {
   }
 }
 
+function devPage() {
+  const d = dev!;
+  const confirm = (what: string, run: () => void): void => {
+    if (d.confirming === what) run();
+    else d.confirming = what;
+  };
+  const events = recorder.all();
+  return (
+    <DevPage
+      install={recorder.install}
+      session={recorder.session}
+      summary={summarize(events, data.tutorial.minute10Step)}
+      events={events}
+      truncated={recorder.truncated}
+      speed={speedFactor}
+      message={d.message}
+      confirming={d.confirming}
+      onExport={downloadExport}
+      onSkip={(seconds) => { addLapse(seconds); tickClock(); }}
+      onSpeed={() => { speedFactor = speedFactor >= 4 ? 1 : speedFactor * 2; }}
+      onClearEvents={() => confirm('clear', () => { recorder.clear(); d.confirming = null; })}
+      onReset={() => confirm('reset', () => {
+        localStorage.removeItem('mk.save');
+        localStorage.removeItem(LAPSE_KEY);
+        localStorage.removeItem(BATTLE_FLAG);
+        resetting = true;
+        location.reload();
+      })}
+      onClose={() => { dev = null; }}
+    />
+  );
+}
+/** Nach "Spielstand zurücksetzen" darf das Verlassen der Seite den alten Stand nicht wieder speichern. */
+let resetting = false;
+
 let last = performance.now();
 let restMs = 0;
 function frame(nowMs: number): void {
@@ -660,14 +790,18 @@ function frame(nowMs: number): void {
   last = nowMs;
   restMs = budget.restMs;
   const factor = speedFactor * (screen.kind === 'replay' ? screen.speed : 1);
-  for (let i = 0; i < budget.ticks * factor; i++) {
-    stepScreen(nowMs);
-  }
+  for (let i = 0; i < budget.ticks * factor && !dev; i++) stepScreen(nowMs);
   if (weak && nowMs > weak.until) weak = null;
   if (screen.kind !== 'battle') {
     tickClock();
     // Rückkehr nach Abwesenheit: Der angekündigte Nachtangriff wird jetzt berechnet und als Bericht gezeigt.
-    if (screen.kind === 'city' && game.raidReport === null && validateGameAction(game, { type: 'ResolveNightRaid' }, data) === null) dispatch({ type: 'ResolveNightRaid' });
+    if (screen.kind === 'city' && game.raidReport === null && validateGameAction(game, { type: 'ResolveNightRaid' }, data) === null && dispatch({ type: 'ResolveNightRaid' })) {
+      const raid = game.replays[game.replays.length - 1];
+      if (raid) {
+        record('battle_end', { kind: 'raid', result: raid.result, depth: raid.depth, ticks: raid.replay.finalTick });
+        record('raid_report', { result: raid.result, depth: raid.depth, lost: raid.loot.gold + raid.loot.wood + raid.loot.stone });
+      }
+    }
     if (nowMs - lastSaveMs > SAVE_EVERY_MS) save();
   }
   if (banner && nowMs >= banner.until) {
@@ -677,7 +811,11 @@ function frame(nowMs: number): void {
   }
   effects = effects.filter((e) => nowMs - e.start < EFFECT_KEEP_MS);
   layout = drawStage(canvas, buildScene(nowMs), data);
-  render(<Hud m={buildHud(nowMs)} />, uiRoot);
+  if (hudDirty || nowMs - lastHudMs >= HUD_EVERY_MS) {
+    hudDirty = false;
+    lastHudMs = nowMs;
+    render(dev ? devPage() : <Hud m={buildHud(nowMs)} />, uiRoot);
+  }
   requestAnimationFrame(frame);
 }
 
@@ -685,7 +823,21 @@ canvas.addEventListener('pointerdown', (e) => {
   e.preventDefault();
   onTap(e.clientX, e.clientY);
 });
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') save(); });
+let hiddenAt = 0;
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    if (resetting) return;
+    save();
+    hiddenAt = clock();
+    record('app_close', { screen: screen.kind, step: tutorialStep(game, data).id });
+  } else {
+    record('app_reopen', { awaySeconds: Math.round((clock() - hiddenAt) / 1000) });
+    hudDirty = true;
+  }
+});
+// Jede Eingabe auf der Oberfläche baut sie im nächsten Bild neu auf.
+document.addEventListener('click', () => { hudDirty = true; }, true);
+window.addEventListener('hashchange', () => { if (location.hash === '#dev') dev = { message: null, confirming: null }; });
 
 // Nur für Browsertests und die spätere Entwicklerseite: Zustand lesen, Orte finden, Zeitraffer. Ändert keine Regeln.
 (window as unknown as { __mk: unknown }).__mk = {
@@ -708,9 +860,21 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
     const c = tileCenter(layout, x, y);
     return { x: rect.left + c.x, y: rect.top + c.y };
   },
-  skip: (seconds: number) => { clockOffsetMs += seconds * 1000; },
+  skip: addLapse,
   speed: (factor: number) => { speedFactor = factor; },
+  exportData,
+  openDev: () => { dev = { message: null, confirming: null }; },
 };
+
+// Start: Sitzung beginnt. Lief beim letzten Schließen eine Schlacht, zählt sie als abgebrochen.
+record('app_open', { step: tutorialStep(game, data).id, fresh: loaded === null });
+if (loaded === null) record('tutorial_step', { step: data.tutorial.steps[0]!.id, index: 0 });
+const abandoned = localStorage.getItem(BATTLE_FLAG);
+if (abandoned !== null) {
+  record('action_cancelled', { what: 'battle_abandoned', kind: abandoned });
+  localStorage.removeItem(BATTLE_FLAG);
+}
+if (location.hash === '#dev') dev = { message: null, confirming: null };
 
 tickClock();
 toCity();

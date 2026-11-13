@@ -1,6 +1,6 @@
 # Umzug nach Unity 6 / C# / Metaplay
 
-Stand: M4. Dieses Dokument wird mit jedem Meilenstein nachgezogen.
+Stand: M5. Dieses Dokument wird mit jedem Meilenstein nachgezogen.
 
 ## Was übernommen wird
 
@@ -10,6 +10,7 @@ Stand: M4. Dieses Dokument wird mit jedem Meilenstein nachgezogen.
 | Regeln | `src/sim/` | Eins zu eins nach C# übertragen: gleiche Funktionen, gleiche Reihenfolge, gleiche Ganzzahlrechnung. |
 | Aktionen und Zustandsmodell | `src/sim/game.ts`, `src/sim/battle/battle.ts` | Grundlage für Spielermodell und Aktionen in Metaplay. Jede Aktion hat bereits eine Prüf-Funktion. |
 | Wiederholungen | Format `Replay` in `src/sim/replay.ts` | Als Prüffälle: jede gespeicherte Wiederholung muss in C# denselben `finalTick` und `finalHash` liefern. |
+| Balance-Skript | `scripts/balance.ts`, `scripts/lib/bot.ts` | Als Vorlage: dieselben Auswertungen gegen die C#-Logik laufen lassen; gleiche Daten müssen gleiche Quoten liefern. |
 | Prüfvektoren | Snapshots in `tests/sim/rng.test.ts` und `tests/sim/battle.test.ts` | Zuerst portieren; stimmen sie, stimmt die Grundlage. |
 | Abläufe der Oberfläche | `src/ui/`, Tutorial-Daten | Nur als Vorlage. |
 
@@ -164,6 +165,18 @@ Die Oberfläche spielt sie über dieselbe `stepBattle`-Funktion ab und vergleich
 | `ClaimDailyGoal { goal }` | Spiel | Ziel bekannt, Zähler erreicht, heute noch nicht abgeholt |
 | `ReleaseWave` | Schlacht (Angreifer) | noch eine Welle übrig |
 | `UseAbility { ability, slot }` | Schlacht (Angreifer) | Fähigkeit vorhanden und bereit; `disableTower` braucht einen Turm als Ziel |
+
+## Messung
+
+- Ereignisformat (`GameEvent` in `src/telemetry/events.ts`): `t` (ms), `day` (Kalendertag des Geräts), `session`, `seq`, `type`,
+  `data` (wenige Spielwerte), `lapse` (mit Zeitraffer entstanden). Arten: `app_open`, `app_close`, `app_reopen`, `tutorial_step`,
+  `tower_built`, `building_started`, `battle_start`, `battle_end`, `action_cancelled`, `alliance_joined`, `help_requested`,
+  `goal_claimed`, `raid_report`.
+- Kennzahlen (`summarize` in `src/telemetry/metrics.ts`): Minute 10 erreicht = Schritt `minute10Step` erreicht; Allianz = Ereignis
+  `alliance_joined`; Rückkehr am nächsten Tag = `app_open` oder `app_reopen` am Kalendertag nach dem ersten Ereignis.
+- Übernommen werden die Ereignisarten und die Definition der Kennzahlen. Neu geschrieben werden Speicherung und Versand:
+  im Prototyp liegen die Ereignisse im Gerätespeicher, die Sendestelle `EventSink` ist leer.
+- Der Tag stammt von der Geräteuhr. Auf dem Server zählt die Serverzeit, und die Installationskennung wird durch die Spielerkennung ersetzt.
 
 ## Annahmen des Prototyps, die auf einem Server nicht gelten
 

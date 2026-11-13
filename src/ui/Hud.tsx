@@ -45,6 +45,8 @@ export interface HudModel {
   readonly showAllResources: boolean;
   readonly goldDenied: boolean;
   readonly topRight: string;
+  /** Versteckter Zugang zur Entwicklerseite: mehrfaches Tippen auf die Anzeige oben rechts. */
+  readonly onTopRight: () => void;
   /** Durchbruchstiefe 0 bis 3 als drei Marken; `null` blendet sie aus. */
   readonly depth: number | null;
   readonly banner: string | null;
@@ -126,11 +128,11 @@ export function Hud({ m }: { m: HudModel }) {
               ))}
             </span>
           )}
-          <span data-testid="top-right">{m.topRight}</span>
+          <span data-testid="top-right" style={{ pointerEvents: 'auto', padding: '10px 0 10px 10px' }} onClick={m.onTopRight}>{m.topRight}</span>
         </span>
       </div>
 
-      {m.status !== null && <div data-testid="status" class="bar" style={{ top: 'calc(env(safe-area-inset-top) + 34px)', fontSize: '13px', opacity: 0.75, padding: '0 14px' }}>{m.status}</div>}
+      {m.status !== null && <div data-testid="status" class="bar" style={{ top: 'calc(env(safe-area-inset-top) + 38px)', fontSize: '13px', opacity: 0.75, padding: '0 14px' }}>{m.status}</div>}
 
       {m.map && (
         <div data-testid="map" class="map">

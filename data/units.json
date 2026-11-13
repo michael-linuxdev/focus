@@ -1,5 +1,5 @@
 {
-  "version": 4,
+  "version": 5,
   "preliminary": true,
   "units": [
     {
@@ -37,7 +37,7 @@
     },
     {
       "id": "leicht",
-      "hp": 28,
+      "hp": 24,
       "speedMilliPerTick": 70,
       "bounty": 0,
       "keepDamage": 1,

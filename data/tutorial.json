@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "preliminary": true,
   "defenses": [
     {
@@ -501,5 +501,6 @@
       "announcesRaid": false,
       "unlocks": []
     }
-  ]
+  ],
+  "minute10Step": "kaserne"
 }

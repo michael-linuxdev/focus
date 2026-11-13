@@ -28,6 +28,8 @@
       .node.camp .mark { background: #b3372f; border-radius: 50%; }
       .node.home .mark { background: #d9a441; }
       .node .mark.shielded { outline: 3px solid #7fd1ff; outline-offset: 4px; border-radius: 4px; }
+      .dev { pointer-events: auto; position: absolute; inset: 0; background: #151d17; overflow-y: auto; -webkit-overflow-scrolling: touch;
+             padding: calc(12px + env(safe-area-inset-top)) 14px calc(24px + env(safe-area-inset-bottom)); box-sizing: border-box; user-select: text; }
       .step { pointer-events: auto; width: 44px; height: 44px; border: 0; border-radius: 10px; background: #3d4f43; color: #f1ead6; font: 600 22px system-ui, sans-serif; }
       .sheet { pointer-events: auto; position: absolute; left: 0; right: 0; bottom: 0; background: #1a241c; border-radius: 16px 16px 0 0; box-shadow: 0 -6px 24px rgba(0,0,0,0.5);
                padding: 14px 14px calc(16px + env(safe-area-inset-bottom)); box-sizing: border-box; max-height: 70%; overflow-y: auto; }

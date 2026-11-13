@@ -256,6 +256,8 @@ export interface TutorialData {
   readonly defenses: readonly DefenseDef[];
   readonly afterDefenses: DefenseDef;
   readonly steps: readonly TutorialStepDef[];
+  /** Schritt, dessen Erreichen in der Messung als "Minute 10 erreicht" zählt. */
+  readonly minute10Step: string;
 }
 
 /** Simulierte Allianz aus Bots. PLATZHALTER: keine echten Spieler, kein Server. */
