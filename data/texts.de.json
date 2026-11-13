@@ -1,5 +1,5 @@
 {
-  "version": 13,
+  "version": 14,
   "lang": "de",
   "texts": {
     "hud.defend": "Verteidigen",
@@ -286,6 +286,27 @@
     "goal.woche_sterne": "Woche: sammle {n} Sterne",
     "goal.login": "Willkommen zurück · Tag {n}",
     "goal.loginSub": "Jeden Tag einmal",
-    "goal.loginDone": "Morgen wieder"
+    "goal.loginDone": "Morgen wieder",
+    "target.wolfsschlucht": "Lager in der Wolfsschlucht",
+    "target.weidenbruch": "Weidenbruch",
+    "target.kraehennest": "Lager am Krähennest",
+    "target.kaltenfels": "Kaltenfels",
+    "target.schwarzmoor": "Lager im Schwarzmoor",
+    "target.rabenhorst": "Rabenhorst",
+    "target.dornenpass": "Lager am Dornenpass",
+    "target.steinach": "Steinach",
+    "target.nebelgrund": "Lager im Nebelgrund",
+    "target.hohenwart": "Hohenwart",
+    "target.eisenklamm": "Lager in der Eisenklamm",
+    "target.grauwacht": "Grauwacht",
+    "world.locked": "Ab Burgfried {n}",
+    "world.loot": "Beute {p} %",
+    "attack.cityWarning": "Eine Stadt schlägt zurück: Dein Schild fällt, in {h} Stunden kommt ihr Gegenangriff.",
+    "attack.loot": "Dort liegt {p} % der Beute; sie wächst über {h} Stunden nach.",
+    "train.army": "Heer {n} von {cap}",
+    "effect.army": "Heer bis {n}, Truppen {p} % zäher",
+    "raid.revenge": "Vergeltung aus {name}",
+    "raid.revengeDue": "Gegenangriff aus {name} in {time}",
+    "building.kaserneFull": "Heer ist voll"
   }
 }

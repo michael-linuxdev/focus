@@ -1,8 +1,8 @@
 import {
-  buildingBusyUntil, defenseDef, defenseSetup, defenseStars, waveNumber, findById, keepRequirement, reduceGame, storageCapacity, validateGameAction,
+  armyCapacity, armySize, attackSetup, campStockPermille, defaultLineup, readyTroops, buildingBusyUntil, defenseDef, defenseSetup, defenseStars, waveNumber, findById, keepRequirement, reduceGame, storageCapacity, validateGameAction,
   type GameAction, type GameData, type GameState,
 } from '../../src/sim/index.ts';
-import { activeDefense, playBattle } from './bot.ts';
+import { activeDefense, playBattle, skilledAttack } from './bot.ts';
 
 /**
  * Spielt den ersten Spielmonat nach dem geführten Ablauf mit einem einfachen, sparsamen Spieler durch:
@@ -31,6 +31,8 @@ export interface MonthRun {
   readonly repeats: number;
   /** Je Burgfried-Stufe (Index): neue Wellen gewonnen/verloren, Sterne und Durchgekommene in Summe, Nachtangriffe und wie viele den Marktplatz erreichten. */
   readonly bands: readonly { won: number; lost: number; stars: number; leaked: number; bossTries: number; bossWon: number; raids: number; raidMarket: number; seconds: number }[];
+  readonly attacks: { readonly count: number; readonly cities: number; readonly depth: readonly number[] };
+  readonly revenges: number;
   readonly raids: { readonly held: number; readonly breached: number; readonly market: number };
   /** Sitzungen, in denen es außer Verteidigen nichts zu tun gab. */
   readonly idleSessions: number;
@@ -60,6 +62,32 @@ export function playMonth(start: GameState, data: GameData, options: MonthOption
   const can = (action: GameAction): boolean => validateGameAction(game, action, data) === null;
   const plotOf = (def: string): string | null => game.buildings.find((b) => b.def === def)?.plot ?? null;
 
+  const attacks = { count: 0, cities: 0, depth: [0, 0, 0, 0] };
+  let revenges = 0;
+  const attackBest = (): void => {
+    if (game.army.training) return;
+    const free = armyCapacity(game, data) - armySize(game);
+    // Mischung: ein Siebtel Rammböcke, ein Drittel Gepanzerte, der Rest Leichte.
+    if (free >= 6) {
+      const have = (u: string): number => readyTroops(game, u);
+      const cap = armyCapacity(game, data);
+      const want = have('ramme') * 7 < cap ? 'ramme' : have('gepanzert') * 3 < cap ? 'gepanzert' : 'leicht';
+      act({ type: 'TrainTroops', unit: want, count: Math.min(free, 12) });
+      return;
+    }
+    if (game.army.hospital.length > 0) return;
+    const targets = data.camps.camps.filter((c) => !c.shielded && c.ring <= game.keepLevel && campStockPermille(game, c.id, data) >= 900).sort((a, b) => b.ring - a.ring || (a.kind === 'camp' ? -1 : 1));
+    const target = targets[0];
+    if (!target) return;
+    const lineup = defaultLineup(game, data);
+    const { inputs, final } = playBattle(attackSetup(game, target.id, lineup, data), game.nextSeed, data, skilledAttack(100, data), 4000);
+    if (act({ type: 'ResolveAttack', camp: target.id, lineup, inputs })) {
+      attacks.count++;
+      attacks.depth[final.depth]!++;
+      if (target.kind === 'city') attacks.cities++;
+    }
+  };
+
   /** Alles tun, was jetzt sinnvoll geht. Liefert, ob etwas gebaut wurde. */
   const build = (): boolean => {
     let did = false;
@@ -69,6 +97,8 @@ export function playMonth(start: GameState, data: GameData, options: MonthOption
         act({ type: 'ChooseRoad', road: roads[roads.length - 1]! });
         continue;
       }
+      // Heer bis zur Grenze auffüllen und das stärkste erreichbare Ziel angreifen, dessen Beute nachgewachsen ist.
+      attackBest();
       for (const g of data.goals.goals) act({ type: 'ClaimDailyGoal', goal: g.id });
       act({ type: 'ClaimWeeklyGoal' });
       act({ type: 'ClaimLoginReward' });
@@ -85,7 +115,7 @@ export function playMonth(start: GameState, data: GameData, options: MonthOption
       if (need) order.push(need.building);
       if (nextKeep && (nextKeep.cost.wood > cap.wood || nextKeep.cost.stone > cap.stone)) order.push('speicher');
       // Erträge lohnen sich immer; alles Weitere nur, solange der Burgfried ohnehin wartet oder baut.
-      order.push('holzfaeller', 'steinbruch', 'hof');
+      order.push('holzfaeller', 'steinbruch', 'hof', 'kaserne');
       const keepWaits = game.keepDoneAt !== null || need !== null || !nextKeep;
       if (keepWaits) order.push('speicher', 'lazarett');
       let upgraded = false;
@@ -124,6 +154,7 @@ export function playMonth(start: GameState, data: GameData, options: MonthOption
       sessions++;
       act({ type: 'AdvanceTime', now: at });
       const before = game.resources;
+      if (act({ type: 'ResolveRevenge' })) { revenges++; act({ type: 'DismissRaidReport' }); }
       if (act({ type: 'ResolveNightRaid' })) {
         lost += before.wood - game.resources.wood + before.stone - game.resources.stone + Math.max(0, before.gold - game.resources.gold);
         if (game.replays.at(-1)?.result === 'breached') raids.breached++; else raids.held++;
@@ -155,5 +186,5 @@ export function playMonth(start: GameState, data: GameData, options: MonthOption
     }
     days.push({ day, keep: game.keepLevel, gold: game.resources.gold, wood: game.resources.wood, stone: game.resources.stone, defenses, lost, wave: waveNumber(game, data) });
   }
-  return { game, keepDay, days, idleSessions, sessions, fresh, repeats, raids, bands };
+  return { game, keepDay, days, idleSessions, sessions, fresh, repeats, raids, bands, attacks, revenges };
 }

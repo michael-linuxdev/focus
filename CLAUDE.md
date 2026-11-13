@@ -67,6 +67,7 @@ Verlierbare Verteidigungen und der Nachtangriff kosten Vorräte nach Durchbruchs
 aber erst ab dem Marktplatz (ein genommenes Tor allein kostet nichts). Der erste Nachtangriff kostet nichts.
 Der erste Angriff auf das Räuberlager bleibt leicht: mit der vorgeschlagenen Aufstellung soll er fast immer gelingen.
 Nach jedem Nachtangriff ist der nächste angekündigt.
+Seit M10: Wer eine Nachbarstadt angreift, verliert seinen Schild sofort; ihr Gegenangriff kommt nach einigen Stunden und wartet, solange ein Schild läuft.
 Nur Rammböcke brechen Tore (Leichte und Gepanzerte haben Belagerungswert 0).
 Eingreifen in der Verteidigung (nach dem ersten Spieltest ergänzt, steht nicht im ursprünglichen Auftrag): Ein Tipp ins
 Feld ruft einen Pfeilhagel auf den Punkt, ab der Heldin gibt es den Kampfruf. Jede Verteidigung endet mit ein bis drei
@@ -122,5 +123,6 @@ durchgekommene Räuber bis zu 30 % der ungeschützten Vorräte, bei vielen Verte
 - Bot-Allianz und Weltkarte sind Attrappen und im Code als Platzhalter zu markieren.
 - Arbeit in Meilensteinen; nach jedem anhalten und Bericht geben. M0 bis M5: die ersten 30 Minuten. M6: Testpaket.
   M7: Wachstum (Burgfried bis 8, Ausbaustufen, Lagerplatz). M8: Gegner (berechnete Wellen, Ritter, Hauptmann, Nachtangriff wächst mit).
-  M9: Tagesrhythmus (wechselnde Tagesziele, Wochenziel, Belohnung für die Rückkehr). Offen: M10 Welt, M11 Monatsbogen.
+  M9: Tagesrhythmus (wechselnde Tagesziele, Wochenziel, Belohnung für die Rückkehr). M10: Welt (Ringe je Burgfried-Stufe,
+  Beute wächst nach, Heeresgröße über die Kaserne, Städte schlagen zurück). Offen: M11 Monatsbogen.
 - Veröffentlichung: Push auf `main` baut und veröffentlicht nach `focus.micana.de` (GitHub Pages).

@@ -78,6 +78,10 @@ export interface BuildingLevelDef {
   readonly healTimePermille: number;
   /** Nötige Burgfried-Stufe. */
   readonly keepLevel: number;
+  /** Kaserne: größtes Heer (bereit, in Ausbildung und im Lazarett zusammen); sonst 0. */
+  readonly armyCap: number;
+  /** Kaserne: Faktor auf die Lebenspunkte der eigenen Truppen im Angriff; sonst 1000. */
+  readonly troopHpPermille: number;
 }
 
 export interface BuildingDef {
@@ -189,6 +193,10 @@ export interface RulesData {
   readonly cityLossMinDepth: number;
   /** Eine vom Spieler gestartete Verteidigung kostet nur Vorräte, wenn der Burgfried fällt (Nachtangriffe weiter nach Tiefe). */
   readonly defenseLossOnlyWhenBreached: boolean;
+  /** Nach einem Angriff wachsen die Vorräte eines Ziels über diese Zeit wieder auf den vollen Stand. */
+  readonly campRegenHours: number;
+  /** So lange nach einem Angriff auf eine Stadt kommt ihr Gegenangriff (frühestens, wenn kein Schild mehr schützt). */
+  readonly revengeAfterHours: number;
   /** So viele erste Nachtangriffe kosten den Spieler nichts. */
   readonly freeNightRaids: number;
 }
@@ -204,6 +212,8 @@ export interface CampDef {
   readonly kind: 'camp' | 'city';
   /** Durch einen Schild geschützt: nicht angreifbar. */
   readonly shielded: boolean;
+  /** Ab dieser Burgfried-Stufe des Spielers angreifbar. */
+  readonly ring: number;
   readonly map: { readonly x: number; readonly y: number };
   readonly roadId: string;
   readonly keepLevel: number;

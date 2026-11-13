@@ -1,7 +1,7 @@
 import { render } from 'preact';
 import { registerSW } from 'virtual:pwa-register';
 import {
-  MILLI, STATE_VERSION, activeGoals, loginReward, scaledReward, weeklyGoal, attackSetup, buildingBusyUntil, buildingLevel, canAfford, keepRequirement, storageCapacity, cityHint, createBattle, createGame, dataVersion, defaultLineup, defenseStars, defenseDef, defenseSetup, starGold, waveNumber, wavesUnlocked, findById, hashBattle,
+  MILLI, STATE_VERSION, armyCapacity, armySize, campStockPermille, activeGoals, loginReward, scaledReward, weeklyGoal, attackSetup, buildingBusyUntil, buildingLevel, canAfford, keepRequirement, storageCapacity, cityHint, createBattle, createGame, dataVersion, defaultLineup, defenseStars, defenseDef, defenseSetup, starGold, waveNumber, wavesUnlocked, findById, hashBattle,
   readyTroops, reduceGame, roadLengthMilli, roadPointMilli, stepBattle, towerActionCost, tutorialStep, unlocked, validateBattleAction, validateGameAction,
   type BattleAction, type BattleInput, type BattleState, type GameAction, type GameState, type Resources, type SavedReplay, type UnitCount,
 } from '../sim/index.ts';
@@ -788,6 +788,8 @@ function buildHud(nowMs: number): HudModel {
         lines: [
           ...(game.hero.joined ? [t('attack.withHero', { name: heroName })] : []),
           total === 0 ? t('attack.empty') : t('attack.ready', { n: free }),
+          ...(campStockPermille(game, s.camp, data) < 1000 ? [t('attack.loot', { p: Math.floor(campStockPermille(game, s.camp, data) / 10), h: data.rules.campRegenHours })] : []),
+          ...(findById(data.camps.camps, s.camp, 'Lager').kind === 'city' ? [t('attack.cityWarning', { h: data.rules.revengeAfterHours })] : []),
           // Nur Einheiten mit Belagerungswert brechen das Tor; ohne sie bleibt der Angriff davor stehen.
           ...(total > 0 && !data.troops.troops.some((troop) => used(troop.unit) > 0 && findById(data.units.units, troop.unit, 'Einheit').siege > 0) ? [t('attack.noRam')] : []),
         ],
@@ -842,6 +844,7 @@ function effectText(level: ReturnType<typeof buildingLevel>): string {
   if (level.capacity.wood > 0) parts.push(t('effect.capacity', { n: level.capacity.wood }));
   if (level.protect.wood > 0) parts.push(t('effect.protect', { n: level.protect.wood }));
   if (level.healTimePermille < 1000) parts.push(t('effect.heal', { p: level.healTimePermille / 10 }));
+  if (level.armyCap > 0) parts.push(t('effect.army', { n: level.armyCap, p: level.troopHpPermille / 10 - 100 }));
   return parts.join(', ');
 }
 
@@ -866,6 +869,11 @@ function wavePreview(): HudModel['preview'] {
 
 function shieldText(): string | null {
   const left = game.shieldUntil - game.now;
+  // Ohne Schild und mit angekündigtem Gegenangriff zeigt die Zeile, wann er kommt.
+  if (left <= 0 && game.revenge) {
+    const wait = Math.max(0, game.revenge.dueAt - game.now);
+    return t('raid.revengeDue', { name: t(`target.${game.revenge.camp}`), time: wait >= 3_600_000 ? `${Math.floor(wait / 3_600_000)} h` : `${Math.ceil(wait / 60_000)} min` });
+  }
   if (left <= 0) return null;
   const hours = Math.floor(left / 3_600_000);
   return t('hud.shield', { time: hours >= 1 ? `${hours} h` : `${Math.ceil(left / 60_000)} min` });
@@ -886,7 +894,7 @@ function cityPanel(): HudModel['panel'] {
     const lost = report.loot.gold + report.loot.wood + report.loot.stone > 0;
     if (lost) lines.push(`${t('raid.lost')}: ${report.loot.gold} ${t('res.gold')}, ${report.loot.wood} ${t('res.wood')}, ${report.loot.stone} ${t('res.stone')}`);
     return {
-      title: t('raid.title'), lines, rows: [],
+      title: report.from !== undefined ? t('raid.revenge', { name: t(`target.${report.from}`) }) : t('raid.title'), lines, rows: [],
       buttons: [
         { id: 'raid-replay', label: t('result.replay'), hint: true, onClick: () => { dispatch({ type: 'DismissRaidReport' }); startReplay(report); } },
         { id: 'raid-ok', label: t('result.ok'), quiet: true, onClick: () => void dispatch({ type: 'DismissRaidReport' }) },
@@ -905,9 +913,13 @@ function cityPanel(): HudModel['panel'] {
 
 /** ATTRAPPE: Weltkarte mit festen Zielen aus `data/camps.json`. Keine echten Spieler, keine Bewegung. */
 function worldMap(hint: ReturnType<typeof tutorialStep>['hint']): NonNullable<HudModel['map']> {
-  const nodes: MapNode[] = data.camps.camps.map((c) => ({
-    id: c.id, kind: c.kind, label: t(`target.${c.id}`), sub: c.shielded ? t('world.shielded') : t(`world.${c.kind}`), x: c.map.x, y: c.map.y,
-    shielded: c.shielded, icon: c.shielded ? 'schild' : c.kind === 'camp' ? 'angriff' : 'turm', disabled: c.shielded || !unlocked(game, 'attack', data),
+  // Gezeigt werden die Ringe um die eigene Burgfried-Stufe: der davor, der eigene und der nächste (noch gesperrt).
+  const visible = data.camps.camps.filter((c) => c.ring >= game.keepLevel - 1 && c.ring <= game.keepLevel + 1);
+  const nodes: MapNode[] = visible.map((c) => ({
+    id: c.id, kind: c.kind, label: t(`target.${c.id}`),
+    sub: c.shielded ? t('world.shielded') : c.ring > game.keepLevel ? t('world.locked', { n: c.ring }) : campStockPermille(game, c.id, data) < 1000 ? t('world.loot', { p: Math.floor(campStockPermille(game, c.id, data) / 10) }) : t(`world.${c.kind}`),
+    x: c.map.x, y: c.map.y,
+    shielded: c.shielded, icon: c.shielded ? 'schild' : c.kind === 'camp' ? 'angriff' : 'turm', disabled: c.shielded || c.ring > game.keepLevel || !unlocked(game, 'attack', data),
     hint: hint?.type === 'button' && hint.button === 'attack' && c.id === data.camps.camps[0]!.id,
     onClick: () => openAttack(c.id),
   }));
@@ -1050,8 +1062,9 @@ function citySheet(hint: ReturnType<typeof tutorialStep>['hint']): HudModel['she
   const inHospital = game.army.hospital.reduce((n, h) => n + h.count, 0);
   const status = training ? t('train.busy', { time: formatSeconds(Math.max(0, Math.ceil((training.doneAt - game.now) / 1000))) }) : t('train.status', { ready });
   return {
-    ...close, title: t('sheet.train'), note: inHospital > 0 ? `${status} · ${t('train.hospitalCount', { n: inHospital })}` : status,
-    options: data.troops.troops.map((troop) => {
+    ...close, title: t('sheet.train'),
+    note: [t('train.army', { n: armySize(game), cap: armyCapacity(game, data) }), status, ...(inHospital > 0 ? [t('train.hospitalCount', { n: inHospital })] : [])].join(' · '),
+    options: [...data.troops.troops.map((troop) => {
       const cost: Resources = { gold: troop.cost.gold * troop.batch, wood: troop.cost.wood * troop.batch, stone: troop.cost.stone * troop.batch };
       const action: GameAction = { type: 'TrainTroops', unit: troop.unit, count: troop.batch };
       return {
@@ -1059,8 +1072,23 @@ function citySheet(hint: ReturnType<typeof tutorialStep>['hint']): HudModel['she
         disabled: validateGameAction(game, action, data) !== null, hint: hint?.type === 'plot' && hint.building === 'kaserne' && troop.unit === 'leicht',
         onClick: () => void dispatch(action),
       };
-    }),
+    }), ...kaserneUpgrade()],
   };
+}
+
+/** Ausbau der Kaserne als letzte Zeile ihres Blatts (größeres Heer, zähere Truppen). */
+function kaserneUpgrade(): Btn[] {
+  const building = game.buildings.find((b) => b.def === 'kaserne');
+  const next = building && findById(data.buildings.buildings, 'kaserne', 'Gebäude').levels[building.level];
+  if (!building || !next) return [];
+  const plot = building.plot;
+  const locked = next.keepLevel > game.keepLevel;
+  return [{
+    id: 'building-upgrade', label: t('sheet.upgradeGo', { n: building.level + 1 }), quiet: true,
+    sub: locked ? t('need.keep', { n: next.keepLevel }) : `${effectText(next)} · ${formatSeconds(next.buildSeconds)}`, cost: next.cost,
+    disabled: validateGameAction(game, { type: 'UpgradeBuilding', plot }, data) !== null,
+    onClick: () => { if (dispatch({ type: 'UpgradeBuilding', plot })) { record('building_started', { building: 'kaserne', level: building.level + 1 }); sheet = null; } },
+  }];
 }
 
 // ---------- Bildschleife ----------
@@ -1142,6 +1170,11 @@ function frame(nowMs: number): void {
         record('battle_end', { kind: 'raid', result: raid.result, depth: raid.depth, ticks: raid.replay.finalTick });
         record('raid_report', { result: raid.result, depth: raid.depth, lost: raid.loot.gold + raid.loot.wood + raid.loot.stone });
       }
+    }
+    // PLATZHALTER: Der Gegenangriff einer angegriffenen Bot-Stadt, sobald er fällig ist und kein Schild schützt.
+    if (screen.kind === 'city' && game.raidReport === null && validateGameAction(game, { type: 'ResolveRevenge' }, data) === null && dispatch({ type: 'ResolveRevenge' })) {
+      const raid = game.replays[game.replays.length - 1];
+      if (raid) record('raid_report', { result: raid.result, depth: raid.depth, lost: raid.loot.gold + raid.loot.wood + raid.loot.stone, revenge: true });
     }
     if (nowMs - lastSaveMs > SAVE_EVERY_MS) save();
   }

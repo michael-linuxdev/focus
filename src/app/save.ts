@@ -66,6 +66,8 @@ export const migrations: Readonly<Record<number, Migration>> = {
     const daily = (old['daily'] ?? fresh.daily) as { counters?: Record<string, number> };
     return { ...old, version: 9, daily: { ...fresh.daily, ...daily, counters: { ...fresh.daily.counters, ...daily.counters } }, weekly: fresh.weekly, login: fresh.login };
   },
+  // 9 -> 10 (M10): Vorräte der Ziele wachsen nach, Städte schlagen zurück.
+  9: (old) => ({ ...old, version: 10, campRaids: {}, revenge: null }),
 };
 
 function num(value: unknown, fallback: number): number {

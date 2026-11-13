@@ -17,7 +17,7 @@ import { fixedDefense, scaledDefense, scaledWave, wavesUnlocked, type PlannedDef
  * Schlachten werden nicht "gemeldet", sondern nachgerechnet: `ResolveDefense` und `ResolveAttack`
  * bekommen nur die Eingaben des Spielers; Startzustand und Startwert stammen aus dem Spielzustand.
  */
-export const STATE_VERSION = 9;
+export const STATE_VERSION = 10;
 
 export interface Building {
   readonly plot: string;
@@ -62,6 +62,8 @@ export interface SavedReplay {
   readonly loot: Resources;
   /** Abschnitt, in dem die wenigsten Angreifer fielen (nur wenn die Stadt verteidigt wurde). */
   readonly weakSection: string | null;
+  /** Gegenangriff: die Stadt, die zurückschlägt; sonst nicht gesetzt. */
+  readonly from?: string;
   readonly replay: Replay;
 }
 
@@ -135,6 +137,10 @@ export interface GameState {
   readonly raidReport: number | null;
   /** Zahl der bisher berechneten Nachtangriffe. */
   readonly raidsResolved: number;
+  /** Zeitpunkt des letzten Angriffs je Ziel (ms); danach wachsen dessen Vorräte nach. */
+  readonly campRaids: Readonly<Record<string, number>>;
+  /** PLATZHALTER: Eine angegriffene Bot-Stadt schlägt zurück, frühestens zu diesem Zeitpunkt. */
+  readonly revenge: { readonly camp: string; readonly dueAt: number } | null;
 }
 
 export type Lineup = readonly (readonly UnitCount[])[];
@@ -159,6 +165,7 @@ export type GameAction =
   | { readonly type: 'ClaimLoginReward' }
   | { readonly type: 'AcknowledgeRaid' }
   | { readonly type: 'ResolveNightRaid' }
+  | { readonly type: 'ResolveRevenge' }
   | { readonly type: 'DismissRaidReport' }
   | { readonly type: 'ResolveAttack'; readonly camp: string; readonly lineup: Lineup; readonly inputs: readonly BattleInput[] };
 
@@ -171,7 +178,7 @@ export type GameActionError =
   | 'keep_max_level' | 'keep_busy' | 'road_choice_pending' | 'no_road_choice' | 'unknown_road'
   | 'no_hero' | 'unknown_section'
   | 'no_barracks' | 'unknown_troop' | 'training_busy'
-  | 'unknown_camp' | 'target_shielded' | 'invalid_lineup' | 'not_enough_troops'
+  | 'unknown_camp' | 'target_shielded' | 'target_locked' | 'army_full' | 'no_revenge' | 'revenge_not_due' | 'invalid_lineup' | 'not_enough_troops'
   | 'already_joined' | 'no_alliance' | 'nothing_to_help' | 'help_already_requested'
   | 'unknown_goal' | 'goal_not_reached' | 'goal_already_claimed' | 'goal_not_active' | 'login_already_claimed'
   | 'no_raid_announced' | 'raid_not_due' | 'nothing_to_dismiss';
@@ -215,6 +222,8 @@ export function createGame(seed: number, now: number, data: GameData): GameState
     raidAcknowledged: false,
     raidReport: null,
     raidsResolved: 0,
+    campRaids: {},
+    revenge: null,
   };
 }
 
@@ -268,6 +277,29 @@ export function hasBuilding(state: GameState, building: string): boolean {
 /** Geschützter Grundstock: die Summe aller fertigen Speicher. */
 export function protectedStock(state: GameState, data: GameData): Resources {
   return finishedBuildings(state, data).reduce((sum, b) => addResources(sum, b.protect), NO_RESOURCES);
+}
+
+/** Werte der fertigen Kaserne, sonst `null`. */
+function barracks(state: GameState, data: GameData): BuildingLevelDef | null {
+  const b = state.buildings.find((x) => x.def === 'kaserne' && x.doneAt <= state.now);
+  return b ? buildingLevel(b, data) : null;
+}
+
+/** Größtes Heer: bereit, in Ausbildung und im Lazarett zusammen. */
+export function armyCapacity(state: GameState, data: GameData): number {
+  return barracks(state, data)?.armyCap ?? 0;
+}
+
+export function armySize(state: GameState): number {
+  const ready = Object.values(state.army.ready).reduce((n, c) => n + c, 0);
+  return ready + (state.army.training?.count ?? 0) + state.army.hospital.reduce((n, h) => n + h.count, 0);
+}
+
+/** Anteil der Vorräte eines Ziels, der seit dem letzten Angriff nachgewachsen ist (Promille). */
+export function campStockPermille(state: GameState, camp: string, data: GameData): number {
+  const last = state.campRaids[camp];
+  if (last === undefined) return PERMILLE;
+  return Math.max(0, Math.min(PERMILLE, mulDiv(state.now - last, PERMILLE, data.rules.campRegenHours * HOUR_MS)));
 }
 
 export function readyTroops(state: GameState, unit: string): number {
@@ -415,6 +447,8 @@ export function attackSetup(state: GameState, campId: string, lineup: Lineup, da
     })),
     autoRelease: false,
     abilities: state.hero.joined ? data.hero.abilities.map((a) => a.id) : [],
+    // Eine ausgebaute Kaserne macht die eigenen Truppen zäher; auf Stufe 1 bleibt das Setup unverändert.
+    ...((barracks(state, data)?.troopHpPermille ?? PERMILLE) === PERMILLE ? {} : { unitHpPermille: barracks(state, data)!.troopHpPermille }),
     maxTicks: data.rules.attackMaxTicks,
   };
 }
@@ -663,6 +697,8 @@ export function validateGameAction(state: GameState, action: GameAction, data: G
       if (!troop) return 'unknown_troop';
       if (!Number.isInteger(action.count) || action.count < 1 || action.count > 100) return 'invalid_payload';
       if (state.army.training) return 'training_busy';
+      // Das Gefolge der Heldin darf über dem Platz liegen; ausgebildet wird nur bis zur Grenze.
+      if (armySize(state) + action.count > armyCapacity(state, data)) return 'army_full';
       return canAfford(state.resources, scaleResources(troop.cost, action.count)) ? null : 'not_enough_resources';
     }
     case 'OpenWorldMap':
@@ -694,12 +730,17 @@ export function validateGameAction(state: GameState, action: GameAction, data: G
     case 'ResolveNightRaid':
       if (state.raidDueAt === null) return 'no_raid_announced';
       return state.now >= state.raidDueAt ? null : 'raid_not_due';
+    case 'ResolveRevenge':
+      if (state.revenge === null) return 'no_revenge';
+      // Der Schild schützt vor Nachbarstädten: Der Gegenangriff wartet, bis er abgelaufen ist.
+      return state.now >= state.revenge.dueAt && state.now >= state.shieldUntil ? null : 'revenge_not_due';
     case 'DismissRaidReport':
       return state.raidReport === null ? 'nothing_to_dismiss' : null;
     case 'ResolveAttack': {
       const target = data.camps.camps.find((c) => c.id === action.camp);
       if (!target) return 'unknown_camp';
       if (target.shielded) return 'target_shielded';
+      if (target.ring > state.keepLevel) return 'target_locked';
       const err = lineupError(state, action.lineup, data);
       if (err) return err;
       return validInputs(action.inputs) ? null : 'invalid_payload';
@@ -772,6 +813,16 @@ function apply(state: GameState, action: GameAction, data: GameData): GameState 
         raidReport: state.nextReplayId,
       };
       return withReplay(s, 'raid', final, loss.loot, makeReplay(setup, state.nextSeed, [], final, data), data);
+    }
+    case 'ResolveRevenge': {
+      // PLATZHALTER: Die Bot-Stadt schickt denselben Angriff wie die Räuber in der Nacht; verteidigt wird ohne Eingaben.
+      const setup = raidSetup(state, data);
+      const final = runBattle(setup, state.nextSeed, [], data);
+      if (final.result === 'running') return 'battle_not_finished';
+      const loss = cityLoss(state, final, data, false, true);
+      const s: GameState = { ...state, nextSeed: nextSeed(state.nextSeed), resources: loss.resources, shieldUntil: loss.shieldUntil, revenge: null, raidReport: state.nextReplayId };
+      const reported = withReplay(s, 'raid', final, loss.loot, makeReplay(setup, state.nextSeed, [], final, data), data);
+      return { ...reported, replays: reported.replays.map((r) => (r.id === state.nextReplayId ? { ...r, from: state.revenge!.camp } : r)) };
     }
     case 'OpenWorldMap':
       return { ...state, worldSeen: true };
@@ -856,7 +907,10 @@ function apply(state: GameState, action: GameAction, data: GameData): GameState 
       const setup = attackSetup(state, action.camp, action.lineup, data);
       const final = runBattle(setup, state.nextSeed, action.inputs, data);
       if (final.result === 'running') return 'battle_not_finished';
-      const loot = computeLoot(camp.stock, camp.protected, final.depth, data.rules);
+      const full = computeLoot(camp.stock, camp.protected, final.depth, data.rules);
+      // Die Vorräte des Ziels wachsen nach dem letzten Angriff erst wieder nach.
+      const share = campStockPermille(state, camp.id, data);
+      const loot = { gold: mulDiv(full.gold, share, PERMILLE), wood: mulDiv(full.wood, share, PERMILLE), stone: mulDiv(full.stone, share, PERMILLE) };
       // Verlustgrenze: Besiegte Truppen sind nicht verloren, sie kommen ins Lazarett.
       const fallen = countFallen(final.fallen, data);
       const healPermille = finishedBuildings(state, data).reduce((min, b) => Math.min(min, b.healTimePermille), PERMILLE);
@@ -873,6 +927,9 @@ function apply(state: GameState, action: GameAction, data: GameData): GameState 
         resources: addResources(state.resources, loot),
         army: { ...state.army, ready, hospital },
         attacksDone: state.attacksDone + 1,
+        campRaids: { ...state.campRaids, [camp.id]: state.now },
+        // Wer eine Stadt angreift, verliert seinen Schild und muss mit dem Gegenangriff rechnen (bei mehreren zählt der erste).
+        ...(camp.kind === 'city' ? { shieldUntil: Math.min(state.shieldUntil, state.now), revenge: state.revenge ?? { camp: camp.id, dueAt: state.now + data.rules.revengeAfterHours * HOUR_MS } } : {}),
         lastAttack: { camp: camp.id, depth: final.depth, loot, fallen },
       };
       return withReplay(s, 'attack', final, loot, makeReplay(setup, state.nextSeed, action.inputs, final, data), data);

@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Angriffsziele auf der Weltkarte: Räuberlager (camp) und computergesteuerte Nachbarstädte (city). Attrappe: feste Vorräte, kein eigenes Verhalten. shielded: durch einen Schild geschützt, nicht angreifbar. map: Lage auf der Karte in Prozent",
+  "title": "Angriffsziele auf der Weltkarte: Räuberlager (camp) und computergesteuerte Nachbarstädte (city). Attrappe: feste Verteidigung, Vorräte wachsen nach. ring: ab dieser Burgfried-Stufe des Spielers angreifbar. shielded: durch einen Schild geschützt, nicht angreifbar. map: Lage auf der Karte in Prozent",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -32,7 +32,8 @@
           "gateHp",
           "towers",
           "stock",
-          "protected"
+          "protected",
+          "ring"
         ],
         "properties": {
           "id": {
@@ -152,6 +153,10 @@
                 "minimum": 0
               }
             }
+          },
+          "ring": {
+            "type": "integer",
+            "minimum": 1
           }
         }
       }
