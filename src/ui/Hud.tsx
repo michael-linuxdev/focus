@@ -18,6 +18,8 @@ export interface Btn {
   readonly quiet?: boolean | undefined;
   /** Kleine Karte eines Straßenverlaufs. */
   readonly road?: RoadDef | undefined;
+  /** Symbolname aus `public/sprites/icons/`. */
+  readonly icon?: string | undefined;
   readonly onClick: () => void;
 }
 
@@ -35,6 +37,7 @@ export interface MapNode {
   readonly x: number;
   readonly y: number;
   readonly shielded: boolean;
+  readonly icon: string;
   readonly disabled: boolean;
   readonly hint: boolean;
   readonly onClick: () => void;
@@ -60,13 +63,18 @@ export interface HudModel {
   readonly panel: { readonly title: string; readonly lines: readonly string[]; readonly loot?: Resources | undefined; readonly rows: readonly StepperRow[]; readonly buttons: readonly Btn[] } | null;
 }
 
-const RES_COLOR = { gold: '#e9b949', wood: '#a9743a', stone: '#9aa3ab' } as const;
+const ICON_BASE = `${import.meta.env.BASE_URL}sprites/icons/`;
+const RES_ICON = { gold: 'gold', wood: 'holz', stone: 'stein' } as const;
 
-function Res({ kind, value, big }: { kind: keyof typeof RES_COLOR; value: number | string; big?: boolean }) {
-  const size = big ? '18px' : '11px';
+/** Symbol aus `public/sprites/icons/` (erzeugt von `scripts/sprites.py`). */
+export function Icon({ name, size }: { name: string; size: number }) {
+  return <img src={`${ICON_BASE}${name}.png`} alt="" width={size} height={size} style={{ display: 'block', flex: 'none' }} draggable={false} />;
+}
+
+function Res({ kind, value, big }: { kind: keyof typeof RES_ICON; value: number | string; big?: boolean }) {
   return (
-    <span data-testid={`res-${kind}`} style={{ display: 'inline-flex', alignItems: 'center', gap: big ? '7px' : '4px', marginRight: big ? '14px' : '8px' }}>
-      <span style={{ width: size, height: size, borderRadius: kind === 'gold' ? '50%' : '3px', background: RES_COLOR[kind], display: 'inline-block' }} />
+    <span data-testid={`res-${kind}`} style={{ display: 'inline-flex', alignItems: 'center', gap: big ? '6px' : '3px', marginRight: big ? '12px' : '8px' }}>
+      <Icon name={RES_ICON[kind]} size={big ? 24 : 16} />
       {value}
     </span>
   );
@@ -101,6 +109,7 @@ function Button({ b, wide, children }: { b: Btn; wide?: boolean; children?: Comp
       style={wide ? { width: '100%', justifyContent: 'space-between', textAlign: 'left' } : { flex: 1 }}
     >
       {b.road && <MiniRoad road={b.road} />}
+      {b.icon !== undefined && <Icon name={b.icon} size={wide ? 32 : 28} />}
       <span style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: wide ? 1 : undefined }}>
         <span>{b.label}</span>
         {b.sub !== undefined && <span style={{ fontSize: '13px', fontWeight: 400, opacity: 0.8 }}>{b.sub}</span>}
@@ -132,7 +141,12 @@ export function Hud({ m }: { m: HudModel }) {
         </span>
       </div>
 
-      {m.status !== null && <div data-testid="status" class="bar" style={{ top: 'calc(env(safe-area-inset-top) + 38px)', fontSize: '13px', opacity: 0.75, padding: '0 14px' }}>{m.status}</div>}
+      {m.status !== null && (
+        <div data-testid="status" class="bar" style={{ top: 'calc(env(safe-area-inset-top) + 38px)', fontSize: '13px', opacity: 0.85, padding: '0 14px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <Icon name="schild" size={14} />
+          {m.status}
+        </div>
+      )}
 
       {m.map && (
         <div data-testid="map" class="map">
@@ -146,7 +160,7 @@ export function Hud({ m }: { m: HudModel }) {
               onClick={n.onClick}
               style={{ left: `${n.x}%`, top: `${n.y}%` }}
             >
-              <span class={`mark${n.shielded ? ' shielded' : ''}`} />
+              <span class={`mark${n.shielded ? ' shielded' : ''}`}><Icon name={n.icon} size={40} /></span>
               <span style={{ fontWeight: 600 }}>{n.label}</span>
               <span style={{ fontSize: '12px', opacity: 0.8 }}>{n.sub}</span>
             </button>

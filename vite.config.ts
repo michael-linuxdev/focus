@@ -19,7 +19,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icons/icon.svg'],
-      workbox: { globPatterns: ['**/*.{js,css,html,svg,png,webmanifest}'] },
+      workbox: { globPatterns: ['**/*.{js,css,html,svg,png,jpg,webp,webmanifest}'] },
       manifest: {
         name: game.title,
         short_name: game.shortTitle,

@@ -16,7 +16,7 @@ Stand: M5. Dieses Dokument wird mit jedem Meilenstein nachgezogen.
 
 ## Was neu geschrieben wird
 
-- Darstellung (`src/render/`, `src/ui/`): Canvas und Preact sind Platzhalter.
+- Darstellung (`src/render/`, `src/ui/`): Canvas und Preact sind Platzhalter. Die Bilder (`art/`, `public/sprites/`) sind KI-erzeugte Platzhalter für den Prototyp; ob sie in die Unity-Fassung übernommen werden, ist offen.
 - Hülle (`src/app/`): Bildschleife, Speicherung in `localStorage`, Migrationen, Service Worker.
 - Weltkarte, Allianz, Nachbarn: im Prototyp Attrappen, werden ersetzt.
 - Ereignisaufzeichnung: lokal, wird durch einen eigenen Empfänger ersetzt.

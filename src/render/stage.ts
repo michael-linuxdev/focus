@@ -3,7 +3,12 @@ import {
   type BattleTower, type Building, type CityTower, type GameData, type RoadDef, type Unit,
 } from '../sim/index.ts';
 
-/** Platzhalter-Darstellung aus einfachen Formen. Liest den Zustand, ändert ihn nie. */
+import { drawSprite, groundPattern, setPixelRatio, spriteAspect, spritesReady } from './sprites.ts';
+
+/**
+ * Darstellung des Spielfelds. Liest den Zustand, ändert ihn nie.
+ * Sind die Bilder geladen, zeichnet `drawWithSprites`; bis dahin (und als Rückfall) die einfachen Formen.
+ */
 const COLORS = {
   back: '#1d2a1f', ground: '#2c4030', grid: '#314836', road: '#b79a63',
   gate: '#7a5a3a', gateBroken: '#4a3a2a', keep: '#d8d2c0', market: '#d9a441',
@@ -122,6 +127,16 @@ export function drawStage(canvas: HTMLCanvasElement, scene: Scene, data: GameDat
   const length = roadLengthMilli(road);
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const groundEl = document.getElementById('ground') as HTMLCanvasElement | null;
+  if (spritesReady() && groundEl) {
+    // Boden und Straße liegen als eigene, ruhende Fläche unter dem Spielfeld; hier wird nur das Bewegte gezeichnet.
+    ctx.clearRect(0, 0, w, h);
+    ctx.translate(layout.ox, layout.oy);
+    setPixelRatio(dpr);
+    drawWithSprites(ctx, scene, data, layout, dpr, groundEl);
+    return layout;
+  }
+  if (groundEl) groundEl.style.display = 'none';
   ctx.fillStyle = COLORS.back;
   ctx.fillRect(0, 0, w, h);
   ctx.translate(layout.ox, layout.oy);
@@ -435,17 +450,24 @@ function bar(ctx: CanvasRenderingContext2D, cx: number, y: number, width: number
 }
 
 function label(ctx: CanvasRenderingContext2D, cx: number, cy: number, tile: number, text: string, color: string): void {
-  ctx.font = `600 ${Math.round(tile * 0.32)}px system-ui, sans-serif`;
+  ctx.font = `700 ${Math.round(tile * 0.32)}px system-ui, sans-serif`;
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = 'rgba(20,16,12,0.8)';
+  ctx.strokeText(text, cx, cy);
   ctx.fillStyle = color;
   ctx.fillText(text, cx, cy);
 }
 
 function cost(ctx: CanvasRenderingContext2D, cx: number, cy: number, tile: number, text: string): void {
-  ctx.font = `600 ${Math.round(tile * 0.3)}px system-ui, sans-serif`;
+  ctx.font = `700 ${Math.round(tile * 0.3)}px system-ui, sans-serif`;
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = 'rgba(20,16,12,0.8)';
+  ctx.strokeText(text, cx + tile * 0.1, cy + 1);
   ctx.fillStyle = COLORS.gold;
   ctx.beginPath();
   ctx.arc(cx - tile * 0.2, cy, tile * 0.1, 0, Math.PI * 2);
   ctx.fill();
+  ctx.stroke();
   ctx.fillText(text, cx + tile * 0.1, cy + 1);
 }
 
@@ -472,4 +494,352 @@ function pointer(ctx: CanvasRenderingContext2D, cx: number, cy: number, tile: nu
   ctx.fill();
   ctx.stroke();
   ctx.restore();
+}
+
+// ---------- Darstellung mit Bildern ----------
+
+/** Breite eines Turms in Kacheln, je Art (die Bilder sind unterschiedlich schlank). */
+const TOWER_WIDTH: Readonly<Record<string, number>> = { bogenturm: 0.72, katapult: 0.95, pechnase: 0.82, wachstube: 0.86 };
+/** Fahrzeuge werden breiter gezeichnet als Fußtruppen und blicken im Bild nach links. */
+const VEHICLES = new Set(['ramme', 'sturmbock']);
+
+/** Merkt sich je Einheit Leben und Blickrichtung, um Treffer aufblitzen zu lassen und Figuren zu spiegeln. Nur Darstellung. */
+const unitLook = new Map<number, { hp: number; flashUntil: number; flip: boolean }>();
+let lastTick = -1;
+
+/** Schlüssel des zuletzt gezeichneten Bodens (Straße, Größe, Lage); nur bei Änderung wird neu gezeichnet. */
+let groundKey = '';
+
+function drawWithSprites(ctx: CanvasRenderingContext2D, scene: Scene, data: GameData, layout: Layout, dpr: number, canvas: HTMLCanvasElement): void {
+  const tile = layout.tile;
+  const { timeMs } = scene;
+  const { cols, rows } = data.roads.grid;
+  const px = (milli: number): number => (milli / MILLI + 0.5) * tile;
+  const road = findById(data.roads.roads, scene.roadId, 'Straße');
+  const length = roadLengthMilli(road);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  if (scene.tick < lastTick) unitLook.clear();
+  lastTick = scene.tick;
+
+  // Boden, Straße, Marktplatz: aus dem Zwischenspeicher, neu gezeichnet nur bei anderer Straße oder Größe.
+  const fieldW = tile * cols;
+  const fieldH = tile * rows;
+  const key = `${scene.roadId}|${scene.enemyCity}|${scene.showMarket}|${Math.round(tile * 100)}|${dpr}|${Math.round(layout.ox)}|${Math.round(layout.oy)}`;
+  if (groundKey !== key) {
+    canvas.width = Math.round(fieldW * dpr);
+    canvas.height = Math.round(fieldH * dpr);
+    canvas.style.left = `${layout.ox}px`;
+    canvas.style.top = `${layout.oy}px`;
+    canvas.style.width = `${fieldW}px`;
+    canvas.style.height = `${fieldH}px`;
+    canvas.style.display = 'block';
+    const g = canvas.getContext('2d');
+    if (g) {
+      g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      g.fillStyle = groundPattern(g, scene.enemyCity ? 'lager' : 'wiese', tile * 3) ?? COLORS.ground;
+      g.fillRect(0, 0, fieldW, fieldH);
+      const path = (): void => {
+        g.beginPath();
+        road.waypoints.forEach((p, i) => {
+          const x = ((p[0] ?? 0) + 0.5) * tile;
+          const y = ((p[1] ?? 0) + 0.5) * tile;
+          if (i === 0) g.moveTo(x, y); else g.lineTo(x, y);
+        });
+      };
+      g.lineJoin = 'round';
+      g.lineCap = 'round';
+      g.strokeStyle = 'rgba(40, 30, 18, 0.55)';
+      g.lineWidth = tile * 0.74;
+      path();
+      g.stroke();
+      g.strokeStyle = groundPattern(g, 'strasse', tile * 2.5) ?? COLORS.road;
+      g.lineWidth = tile * 0.62;
+      path();
+      g.stroke();
+      if (scene.showMarket) {
+        const [mx, my] = roadPointMilli(road, marketMilli(length, data));
+        const width = tile * 1.7;
+        drawSprite(g, 'marktplatz', px(mx), px(my) + (width * spriteAspect('marktplatz')) / 2, width);
+      }
+    }
+    groundKey = key;
+  }
+
+  // Alles Aufrechte wird nach seiner Standlinie sortiert, damit Vorderes Hinteres verdeckt.
+  const things: { y: number; draw: () => void }[] = [];
+  const overlays: (() => void)[] = [];
+
+  // Torhaus
+  {
+    const [gx, gy] = roadPointMilli(road, scene.gate ? data.rules.gateMilli : 0);
+    const broken = scene.gate !== null && scene.gate.hp <= 0;
+    // Das Torhaus steht in der obersten Kachelreihe und darf nicht in die Leiste darüber ragen.
+    const width = tile * 1.3;
+    things.push({ y: px(gy) + tile * 0.1, draw: () => void drawSprite(ctx, broken ? 'torhaus_kaputt' : 'torhaus', px(gx), px(gy) + tile * 0.58, width) });
+    if (scene.gate && scene.gate.hp > 0) {
+      const gate = scene.gate;
+      overlays.push(() => bar(ctx, px(gx), px(gy) + tile * 0.56, tile, gate.hp / gate.max, COLORS.bar));
+    }
+  }
+
+  // Burgfried
+  {
+    const [kx, ky] = roadPointMilli(road, length);
+    const width = tile * (scene.keepLevel >= 2 ? 1.45 : 1.25);
+    const name = scene.keepLevel >= 2 ? 'burgfried_2' : 'burgfried_1';
+    things.push({ y: px(ky) + tile * 0.2, draw: () => void drawSprite(ctx, name, px(kx), px(ky) + tile * 0.5, width) });
+    const top = px(ky) + tile * 0.5 - width * spriteAspect(name);
+    if (scene.keep && scene.keep.hp < scene.keep.max) {
+      const keep = scene.keep;
+      overlays.push(() => bar(ctx, px(kx), top - 8, tile, keep.hp / keep.max, COLORS.bar));
+    }
+    if (scene.keepBusySeconds !== null) {
+      const seconds = scene.keepBusySeconds;
+      overlays.push(() => label(ctx, px(kx), top - 10, tile, formatSeconds(seconds), COLORS.hint));
+    }
+  }
+
+  // Bauplätze abseits der Straße
+  if (scene.buildings) {
+    const info = scene.buildings;
+    for (const plot of data.city.plots) {
+      const cx = (plot.x + 0.5) * tile;
+      const cy = (plot.y + 0.5) * tile;
+      const b = info.list.find((x) => x.plot === plot.id);
+      if (!b) {
+        if (info.showEmpty) things.push({ y: cy - tile, draw: () => { ctx.globalAlpha = 0.85; drawSprite(ctx, 'bauplatz', cx, cy + tile * 0.3, tile * 0.95); ctx.globalAlpha = 1; } });
+        continue;
+      }
+      const remaining = Math.ceil((b.doneAt - info.now) / 1000);
+      const name = remaining > 0 ? 'baustelle' : b.def;
+      const width = tile * 0.96;
+      things.push({ y: cy, draw: () => void drawSprite(ctx, name, cx, cy + tile * 0.42, width) });
+      if (remaining > 0) {
+        const top = cy + tile * 0.42 - width * spriteAspect(name);
+        overlays.push(() => {
+          label(ctx, cx, top - 6, tile, formatSeconds(remaining), COLORS.hint);
+          if (info.helpLabel !== null && b.helpRequestedAt === null) label(ctx, cx, cy + tile * 0.62, tile, info.helpLabel, COLORS.help);
+        });
+      }
+    }
+  }
+
+  // Turm-Bauplätze und Türme
+  for (const slot of data.city.towerSlots) {
+    const cx = (slot.x + 0.5) * tile;
+    const cy = (slot.y + 0.5) * tile;
+    const tower = scene.towers.find((t) => t.slot === slot.id);
+    const hinted = scene.hint !== null && scene.hint.x === slot.x && scene.hint.y === slot.y;
+    const marked = slot.keepLevel <= scene.keepLevel && (slot.section === scene.weakSection || (tower !== undefined && slot.section === scene.heroSection));
+    if (marked) {
+      // Markierung auf dem Boden: rot pulsierend für die Schwachstelle, violett für den Abschnitt der Heldin.
+      const weak = slot.section === scene.weakSection;
+      things.push({ y: cy - tile * 2, draw: () => {
+        ctx.strokeStyle = weak ? COLORS.weak : COLORS.hero;
+        ctx.lineWidth = 3;
+        ctx.globalAlpha = weak ? 0.6 + 0.4 * Math.sin(timeMs / 150) : 0.9;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy + tile * 0.12, tile * 0.5, tile * 0.3, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      } });
+    }
+    if (!tower) {
+      if (scene.buildGold === null || slot.keepLevel > scene.keepLevel) continue;
+      const dim = scene.buildGold < scene.cheapestTower || (scene.hint !== null && !hinted);
+      const price = String(hinted && scene.hint?.cost ? scene.hint.cost : scene.cheapestTower);
+      things.push({ y: cy - tile, draw: () => {
+        ctx.globalAlpha = dim ? 0.6 : 1;
+        drawSprite(ctx, 'turmplatz', cx, cy + tile * 0.36, tile * 1.02);
+        cost(ctx, cx, cy + tile * 0.02, tile, price);
+        ctx.globalAlpha = 1;
+      } });
+      continue;
+    }
+    const def = findById(data.towers.towers, tower.def, 'Turm');
+    const level = towerLevel(tower, data);
+    const name = `${tower.def}_${Math.min(tower.level, 2)}`;
+    const width = tile * (TOWER_WIDTH[tower.def] ?? 0.8) * (tower.level >= 2 ? 1.08 : 1);
+    const base = cy + tile * 0.4;
+    const height = width * spriteAspect(name);
+    const disabled = tower.disabledUntil !== undefined && scene.tick >= 0 && scene.tick < tower.disabledUntil;
+    if (hinted || scene.targeting || def.kind === 'slow') {
+      things.push({ y: cy - tile * 3, draw: () => {
+        ctx.strokeStyle = scene.targeting ? COLORS.disabled : def.kind === 'slow' && !hinted ? 'rgba(20,16,12,0.45)' : 'rgba(255,255,255,0.3)';
+        ctx.lineWidth = scene.targeting ? 2.5 : 1.5;
+        ctx.beginPath();
+        ctx.arc(cx, cy, scene.targeting ? tile * 0.6 : (level.rangeMilli / MILLI) * tile, 0, Math.PI * 2);
+        ctx.stroke();
+      } });
+    }
+    things.push({ y: cy, draw: () => {
+      ctx.globalAlpha = disabled ? 0.5 : 1;
+      drawSprite(ctx, name, cx, base, width);
+      ctx.globalAlpha = 1;
+    } });
+    if (def.kind === 'militia') {
+      // Miliz steht auf der Straße: zwei Posten, in der Schlacht mit Lebensbalken.
+      const mPos = tower.militiaPos !== undefined ? tower.militiaPos : militiaPosition(road, slot.x, slot.y, data);
+      const alive = tower.militiaHp === undefined || tower.militiaHp > 0;
+      const [mx, my] = roadPointMilli(road, mPos);
+      for (const off of [-0.2, 0.2]) {
+        things.push({ y: px(my) + 1, draw: () => {
+          ctx.globalAlpha = alive ? 1 : 0.25;
+          drawSprite(ctx, 'miliz', px(mx) + off * tile, px(my) + tile * 0.28, tile * 0.42, off < 0);
+          ctx.globalAlpha = 1;
+        } });
+      }
+      if (tower.militiaHp !== undefined && tower.militiaHp > 0 && tower.militiaHp < level.militiaHp) {
+        const share = tower.militiaHp / level.militiaHp;
+        overlays.push(() => bar(ctx, px(mx), px(my) - tile * 0.55, tile * 0.6, share, COLORS.militia));
+      }
+    }
+    overlays.push(() => {
+      if (disabled) {
+        ctx.fillStyle = COLORS.disabled;
+        ctx.beginPath();
+        ctx.arc(cx, base - height * 0.75, tile * 0.16 + Math.sin(timeMs / 80) * tile * 0.03, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      const next = def.levels[tower.level];
+      if (scene.buildGold !== null && next && scene.buildGold >= next.cost) {
+        // Ausbau möglich: Pfeil nach oben, mit Preis, wenn der Hinweis darauf zeigt
+        const ax = cx + tile * 0.34;
+        const ay = base - height + tile * 0.1;
+        ctx.fillStyle = COLORS.gold;
+        ctx.strokeStyle = COLORS.back;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(ax, ay - tile * 0.2);
+        ctx.lineTo(ax + tile * 0.17, ay);
+        ctx.lineTo(ax - tile * 0.17, ay);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        if (hinted) cost(ctx, cx - tile * 0.1, base - height - tile * 0.2, tile, String(next.cost));
+      }
+      if (tower.lastShotTick !== undefined && tower.lastShotTick >= 0 && scene.tick - tower.lastShotTick <= 3 && tower.targetX !== undefined && tower.targetY !== undefined) {
+        const age = (scene.tick - tower.lastShotTick) / 4;
+        ctx.globalAlpha = 1 - age;
+        ctx.strokeStyle = COLORS.shot;
+        ctx.lineWidth = def.splashMilli > 0 ? 4 : 2;
+        if (def.kind === 'shot') {
+          ctx.beginPath();
+          ctx.moveTo(cx, base - height * 0.7);
+          ctx.lineTo(px(tower.targetX), px(tower.targetY));
+          ctx.stroke();
+          if (def.splashMilli > 0) {
+            ctx.beginPath();
+            ctx.arc(px(tower.targetX), px(tower.targetY), (def.splashMilli / MILLI) * tile * (0.5 + age * 0.5), 0, Math.PI * 2);
+            ctx.stroke();
+          }
+        } else if (def.kind === 'slow') {
+          ctx.strokeStyle = COLORS.pitch;
+          ctx.lineWidth = 5;
+          ctx.beginPath();
+          ctx.arc(cx, cy, (level.rangeMilli / MILLI) * tile * (0.3 + age * 0.7), 0, Math.PI * 2);
+          ctx.stroke();
+        } else {
+          ctx.beginPath();
+          ctx.arc(px(tower.targetX), px(tower.targetY), tile * 0.3, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+      }
+    });
+  }
+
+  // Einheiten: ein Bild je Figur, die Bewegung kommt aus dem Code (Hüpfen im Laufschritt, Spiegeln, Aufblitzen bei Treffern).
+  const seen = new Set<number>();
+  for (const u of scene.units) {
+    seen.add(u.id);
+    const [ux, uy] = roadPointMilli(road, u.pos);
+    const [ax] = roadPointMilli(road, u.pos + 300);
+    const def = findById(data.units.units, u.def, 'Einheit');
+    const vehicle = VEHICLES.has(u.def);
+    let look = unitLook.get(u.id);
+    if (!look) {
+      look = { hp: u.hp, flashUntil: 0, flip: false };
+      unitLook.set(u.id, look);
+    }
+    if (u.hp < look.hp) look.flashUntil = timeMs + 120;
+    look.hp = u.hp;
+    // Figuren blicken im Bild nach rechts, Fahrzeuge nach links; beim Lauf nach oben oder unten bleibt die letzte Richtung.
+    if (ax !== ux) look.flip = vehicle ? ax > ux : ax < ux;
+    const state = look;
+    const x = px(ux);
+    const y = px(uy);
+    const step = timeMs / (vehicle ? 70 : 110) + u.id * 1.7;
+    const hop = vehicle ? Math.sin(step * 2) * tile * 0.012 : Math.abs(Math.sin(step)) * tile * 0.07;
+    const width = vehicle ? tile * 0.78 : (tile * 0.62) / spriteAspect(u.def);
+    const height = width * spriteAspect(u.def);
+    things.push({ y: y + 2, draw: () => {
+      // Schatten am Boden, damit das Hüpfen lesbar ist.
+      ctx.fillStyle = 'rgba(0,0,0,0.25)';
+      ctx.beginPath();
+      ctx.ellipse(x, y + tile * 0.24, width * 0.36, tile * 0.07, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.save();
+      ctx.translate(x, y + tile * 0.26 - hop);
+      if (!vehicle) ctx.rotate(Math.sin(step) * 0.06);
+      drawSprite(ctx, u.def, 0, 0, width, state.flip);
+      if (timeMs < state.flashUntil) {
+        // Treffer: dasselbe Bild noch einmal aufhellend darüber (billiger als ein Filter).
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = 0.7;
+        drawSprite(ctx, u.def, 0, 0, width, state.flip);
+      }
+      ctx.restore();
+    } });
+    overlays.push(() => {
+      if (scene.shielded && data.troops.troops.some((t) => t.unit === u.def)) {
+        ctx.strokeStyle = COLORS.hint;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(x, y - height * 0.2, tile * 0.36, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      if (u.hp < def.hp) bar(ctx, x, y + tile * 0.26 - height - 7, tile * 0.5, u.hp / def.hp, COLORS.hp);
+    });
+  }
+  for (const id of unitLook.keys()) if (!seen.has(id)) unitLook.delete(id);
+
+  things.sort((a, b) => a.y - b.y);
+  for (const thing of things) thing.draw();
+  for (const overlay of overlays) overlay();
+
+  // Effekte
+  for (const e of scene.effects) {
+    const age = (timeMs - e.start) / EFFECT_MS;
+    if (age < 0 || age >= 1) continue;
+    const cx = (e.x + 0.5) * tile;
+    const cy = (e.y + 0.5) * tile;
+    ctx.globalAlpha = 1 - age;
+    if (e.kind === 'text') {
+      ctx.font = `700 ${Math.round(tile * 1.2 * 0.32)}px system-ui, sans-serif`;
+      const half = ctx.measureText(e.text).width / 2 + 4;
+      const tx = Math.max(half, Math.min(cols * tile - half, cx));
+      const ty = cy - tile * (0.5 + age * 0.8);
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = 'rgba(20,16,12,0.8)';
+      ctx.strokeText(e.text, tx, ty);
+      ctx.fillStyle = COLORS.gold;
+      ctx.fillText(e.text, tx, ty);
+    } else if (e.kind === 'deny') {
+      ctx.strokeStyle = COLORS.deny;
+      ctx.lineWidth = 3;
+      const shake = Math.sin(age * 40) * tile * 0.08 * (1 - age);
+      ctx.strokeRect(cx - tile * 0.4 + shake, cy - tile * 0.4, tile * 0.8, tile * 0.8);
+    } else {
+      ctx.strokeStyle = COLORS.hint;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, tile * (0.4 + age * 2), 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  if (scene.hint) pointer(ctx, (scene.hint.x + 0.5) * tile, (scene.hint.y + 0.5) * tile, tile, timeMs);
 }

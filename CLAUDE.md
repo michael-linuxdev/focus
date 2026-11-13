@@ -22,6 +22,7 @@ die der Spieler selbst baut. Dieselbe Mechanik trägt Einstieg, Stadtausbau und 
 | Kennzahlen aus Exportdateien (eine je Spieler) | `npm run metrics -- a.json b.json` |
 | Leistung mit gedrosselter CPU und langsamem Netz (nach dem Bauen) | `npm run perf` |
 | Speicherstand am Ende des Ablaufs erzeugen | `node scripts/make-save.ts > stand.json` |
+| Sprites aus den Rohbildern neu erzeugen (braucht Pillow und numpy) | `python3 scripts/sprites.py` |
 
 Kein Commit mit fehlschlagenden Tests. Vor jeder Fertigmeldung: `npm test && npm run build && npm run test:e2e`.
 
@@ -94,7 +95,10 @@ Nur Rammböcke brechen Tore (Leichte und Gepanzerte haben Belagerungswert 0).
 ## Konventionen
 
 - Bezeichner englisch, Spieltexte und Dokumente deutsch. Alle Spieltexte in `data/texts.de.json`, Zugriff über `t()`.
-- Grafik nur aus eigenen geometrischen Formen. Keine fremden Grafiken, Namen oder Symbole.
+- Grafik: eigene, mit einer Bild-KI erzeugte Bilder nach den Prompts in `docs/SPRITES.md`; als Rückfall einfache
+  geometrische Formen. Keine fremden Grafiken, Namen, Wappen oder Symbole, kein Nachahmen bestehender Spiele.
+  Rohbilder liegen in `art/roh/`, `python3 scripts/sprites.py` stellt frei und erzeugt `public/sprites/` und
+  `src/render/atlas.json`. Je Figur ein Bild; Bewegung (Hüpfen, Spiegeln, Aufblitzen) kommt aus `src/render/stage.ts`.
 - Nicht im Umfang: Server, Konten, Chat, Käufe, Werbung, fremde Tracking-Dienste, Unity-Umsetzung.
 - Bot-Allianz und Weltkarte sind Attrappen und im Code als Platzhalter zu markieren.
 - Arbeit in Meilensteinen M0 bis M5; nach jedem anhalten und Bericht geben.

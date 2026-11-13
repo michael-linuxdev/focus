@@ -29,6 +29,14 @@ SHEETS = {
 }
 # Längste Kante eines gespeicherten Sprites in Pixeln (im Spiel wird weiter verkleinert).
 MAX_SIDE = 192
+OUTLINE = np.array([42.0, 36.0, 32.0], dtype=np.float32)
+GAME = ROOT / "public" / "sprites"
+
+# Zielbreite je Blatt im Bildatlas des Spiels (Pixel). Figuren werden über die Höhe bemessen.
+ATLAS_WIDTH = {"tuerme": 128, "gebaeude": 128, "stadt": 176}
+ATLAS_UNIT_HEIGHT = 80
+# Bodenflächen: Datei, sauberer Ausschnitt (links, oben, Kantenlänge) im Rohbild.
+GROUNDS = {"wiese": ("boden-wiese", 24, 24, 310), "strasse": ("boden-strasse", 0, 0, 1000), "lager": ("boden-lager", 16, 16, 300)}
 
 
 def background_distance(rgb: np.ndarray) -> np.ndarray:
@@ -39,7 +47,7 @@ def background_distance(rgb: np.ndarray) -> np.ndarray:
     key = min(medians, key=lambda m: float(((m - np.array([255.0, 0.0, 255.0])) ** 2).sum()))
     dist = np.sqrt(((rgb - key) ** 2).sum(axis=2))
     # Unter LOW gilt als Hintergrund, über HIGH als Motiv, dazwischen weiche Kante.
-    low, high = 60.0, 130.0
+    low, high = 80.0, 150.0
     return np.clip((dist - low) / (high - low), 0.0, 1.0), key
 
 
@@ -120,11 +128,16 @@ def cut(sheet: str, names: list) -> list:
                 grown |= np.roll(np.roll(own, dy, axis=0), dx, axis=1)
         a = alpha[t:b, l:r] * grown
         c = rgb[t:b, l:r].copy()
-        # Magenta-Stich entfernen: wo Rot und Blau das Grün deutlich übersteigen (typisch für den Rand), beide absenken.
-        spill = np.clip(np.minimum(c[..., 0], c[..., 2]) - c[..., 1] - 25, 0, None) * (1 - a) * 1.0
-        edge = a < 0.98
-        c[..., 0] = np.where(edge, c[..., 0] - spill, c[..., 0])
-        c[..., 2] = np.where(edge, c[..., 2] - spill, c[..., 2])
+        # Magenta-Saum entfernen: Randpixel, in denen Rot und Blau das Grün deutlich übersteigen, bekommen die
+        # dunkle Konturfarbe. Die Motive haben ohnehin dunkle Umrisse, so fällt das nicht auf.
+        transparent = a < 0.05
+        near_edge = transparent.copy()
+        for dy in range(-3, 4):
+            for dx in range(-3, 4):
+                near_edge |= np.roll(np.roll(transparent, dy, axis=0), dx, axis=1)
+        pinkish = (np.minimum(c[..., 0], c[..., 2]) - c[..., 1] > 28) & (c[..., 0] > 110)
+        fringe = near_edge & pinkish
+        c[fringe] = OUTLINE
         rgba = np.dstack([np.clip(c, 0, 255), a * 255]).astype(np.uint8)
         img = Image.fromarray(rgba, "RGBA")
         scale = MAX_SIDE / max(img.size)
@@ -134,6 +147,62 @@ def cut(sheet: str, names: list) -> list:
         written.append({"name": name, "file": f"{sheet}/{name}.png", "w": img.width, "h": img.height})
     print(f"  {sheet}: {len(written)} Sprites aus {path.name} (Hintergrund {tuple(int(v) for v in key)})")
     return written
+
+
+def build_game_assets(index: dict) -> None:
+    """Bildatlas, Symbole, Porträt und nahtlose Bodenkacheln für das Spiel nach public/sprites/."""
+    GAME.mkdir(parents=True, exist_ok=True)
+    (GAME / "icons").mkdir(exist_ok=True)
+    items = []
+    for sheet in ("tuerme", "gebaeude", "stadt", "einheiten"):
+        for entry in index.get(sheet, []):
+            img = Image.open(OUT / entry["file"])
+            if sheet == "einheiten":
+                scale = ATLAS_UNIT_HEIGHT / img.height
+            else:
+                scale = ATLAS_WIDTH[sheet] / img.width
+            size = (max(1, round(img.width * scale)), max(1, round(img.height * scale)))
+            items.append((entry["name"], img.resize(size, Image.LANCZOS)))
+    # Einfaches Regalverfahren: nach Höhe sortiert in Zeilen fester Breite.
+    items.sort(key=lambda it: -it[1].height)
+    width, x, y, row_h, placed = 1024, 0, 0, 0, {}
+    for name, img in items:
+        if x + img.width + 2 > width:
+            x, y, row_h = 0, y + row_h + 2, 0
+        placed[name] = (x, y, img)
+        x += img.width + 2
+        row_h = max(row_h, img.height)
+    atlas = Image.new("RGBA", (width, y + row_h), (0, 0, 0, 0))
+    rects = {}
+    for name, (px, py, img) in placed.items():
+        atlas.paste(img, (px, py))
+        rects[name] = {"x": px, "y": py, "w": img.width, "h": img.height}
+    # WebP statt PNG: die Rohbilder sind verrauscht, als PNG wäre der Atlas rund 1 MB groß.
+    atlas.save(GAME / "atlas.webp", quality=86, method=6)
+    (ROOT / "src" / "render" / "atlas.json").write_text(json.dumps(rects, indent=1, sort_keys=True) + "\n")
+    for entry in index.get("symbole", []):
+        img = Image.open(OUT / entry["file"])
+        side = max(img.size)
+        square = Image.new("RGBA", (side, side), (0, 0, 0, 0))
+        square.paste(img, ((side - img.width) // 2, (side - img.height) // 2))
+        square.resize((64, 64), Image.LANCZOS).save(GAME / "icons" / f"{entry['name']}.png", optimize=True)
+    for entry in index.get("heldin", []):
+        img = Image.open(OUT / entry["file"])
+        side = min(img.size)
+        img.crop(((img.width - side) // 2, 0, (img.width - side) // 2 + side, side)).resize((128, 128), Image.LANCZOS).save(GAME / "icons" / "alruna.png", optimize=True)
+    # Bodenkacheln: sauberer Ausschnitt, gespiegelt zu 2x2 zusammengesetzt. So passen alle Ränder ohne Naht.
+    for name, (file, left, top, side) in GROUNDS.items():
+        path = next((p for p in [RAW / f"{file}.png", RAW / f"{file}.jpg", RAW / f"{file}.jpeg"] if p.exists()), None)
+        if path is None:
+            continue
+        part = Image.open(path).convert("RGB").crop((left, top, left + side, top + side)).resize((128, 128), Image.LANCZOS)
+        tile = Image.new("RGB", (256, 256))
+        tile.paste(part, (0, 0))
+        tile.paste(part.transpose(Image.FLIP_LEFT_RIGHT), (128, 0))
+        tile.paste(part.transpose(Image.FLIP_TOP_BOTTOM), (0, 128))
+        tile.paste(part.transpose(Image.ROTATE_180), (128, 128))
+        tile.save(GAME / f"boden-{name}.jpg", quality=82)
+    print(f"  Spiel: atlas.webp {atlas.size[0]}x{atlas.size[1]} mit {len(rects)} Motiven, Symbole, Porträt, Böden nach public/sprites/")
 
 
 if __name__ == "__main__":
@@ -147,3 +216,4 @@ if __name__ == "__main__":
             index[sheet] = done
     if not only:
         (OUT / "index.json").write_text(json.dumps(index, indent=1) + "\n")
+        build_game_assets(index)

@@ -454,7 +454,7 @@ function buildHud(nowMs: number): HudModel {
     if (s.side === 'defense') return { ...model, resources: { ...game.resources, gold: b.gold }, sheet: towerSheet() };
     const left = Math.max(0, Math.ceil((b.setup.maxTicks - b.tick) / data.game.ticksPerSecond));
     const bottom: Btn[] = [{
-      id: 'release', label: t('attack.release', { n: Math.min(b.releasedWaves + 1, b.setup.waves.length) }),
+      id: 'release', icon: 'angriff', label: t('attack.release', { n: Math.min(b.releasedWaves + 1, b.setup.waves.length) }),
       disabled: b.releasedWaves >= b.setup.waves.length, hint: b.releasedWaves === 0, onClick: () => void battleAct({ type: 'ReleaseWave' }),
     }];
     b.setup.abilities.forEach((id, i) => {
@@ -542,7 +542,7 @@ function buildHud(nowMs: number): HudModel {
         ],
         rows,
         buttons: [
-          { id: 'attack-go', label: t('attack.go'), disabled: total === 0, hint: hint?.type === 'button' && hint.button === 'attack', onClick: () => startAttack(s.camp, s.lineup) },
+          { id: 'attack-go', label: t('attack.go'), icon: 'angriff', disabled: total === 0, hint: hint?.type === 'button' && hint.button === 'attack', onClick: () => startAttack(s.camp, s.lineup) },
           { id: 'attack-close', label: t('attack.close'), quiet: true, onClick: () => { record('action_cancelled', { what: 'attack_setup' }); if (unlocked(game, 'world', data)) screen = { kind: 'world' }; else toCity(); } },
         ],
       },
@@ -555,15 +555,15 @@ function buildHud(nowMs: number): HudModel {
   const buttonHint = (id: string): boolean => hint?.type === 'button' && hint.button === id && !game.roadChoicePending;
   const bottom: Btn[] = [];
   const second: Btn[] = [];
-  if (unlocked(game, 'defend', data)) bottom.push({ id: 'defend', label: t('hud.defend'), hint: buttonHint('defend'), onClick: startDefense });
+  if (unlocked(game, 'defend', data)) bottom.push({ id: 'defend', label: t('hud.defend'), icon: 'turm', hint: buttonHint('defend'), onClick: startDefense });
   if (unlocked(game, 'world', data)) {
-    bottom.push({ id: 'world', label: t('hud.world'), hint: buttonHint('world'), onClick: () => { dispatch({ type: 'OpenWorldMap' }); sheet = null; screen = { kind: 'world' }; } });
+    bottom.push({ id: 'world', label: t('hud.world'), icon: 'karte', hint: buttonHint('world'), onClick: () => { dispatch({ type: 'OpenWorldMap' }); sheet = null; screen = { kind: 'world' }; } });
   } else if (unlocked(game, 'attack', data)) {
-    bottom.push({ id: 'attack', label: t('hud.attack'), hint: buttonHint('attack'), onClick: () => openAttack(data.camps.camps[0]!.id) });
+    bottom.push({ id: 'attack', label: t('hud.attack'), icon: 'angriff', hint: buttonHint('attack'), onClick: () => openAttack(data.camps.camps[0]!.id) });
   }
-  if (unlocked(game, 'hero', data) && game.hero.joined) second.push({ id: 'hero', label: heroName, hint: buttonHint('hero'), onClick: () => { sheet = { kind: 'hero' }; } });
-  if (unlocked(game, 'alliance', data)) second.push({ id: 'alliance', label: t('hud.alliance'), hint: buttonHint('alliance'), onClick: () => { sheet = { kind: 'alliance' }; } });
-  if (unlocked(game, 'goals', data)) second.push({ id: 'goals', label: t('hud.goals'), hint: buttonHint('goals'), onClick: () => { sheet = { kind: 'goals' }; } });
+  if (unlocked(game, 'hero', data) && game.hero.joined) second.push({ id: 'hero', label: heroName, icon: 'alruna', hint: buttonHint('hero'), onClick: () => { sheet = { kind: 'hero' }; } });
+  if (unlocked(game, 'alliance', data)) second.push({ id: 'alliance', label: t('hud.alliance'), icon: 'allianz', hint: buttonHint('alliance'), onClick: () => { sheet = { kind: 'alliance' }; } });
+  if (unlocked(game, 'goals', data)) second.push({ id: 'goals', label: t('hud.goals'), icon: 'ziele', hint: buttonHint('goals'), onClick: () => { sheet = { kind: 'goals' }; } });
   if (unlocked(game, 'replays', data)) second.push({ id: 'replays', label: t('hud.replays'), onClick: () => { screen = { kind: 'replays' }; } });
   const weakBanner = weak ? t('raid.weakBanner', { section: t(`section.${weak.section}`) }) : null;
   const panel = cityPanel();
@@ -613,13 +613,13 @@ function cityPanel(): HudModel['panel'] {
 function worldMap(hint: ReturnType<typeof tutorialStep>['hint']): NonNullable<HudModel['map']> {
   const nodes: MapNode[] = data.camps.camps.map((c) => ({
     id: c.id, kind: c.kind, label: t(`target.${c.id}`), sub: c.shielded ? t('world.shielded') : t(`world.${c.kind}`), x: c.map.x, y: c.map.y,
-    shielded: c.shielded, disabled: c.shielded || !unlocked(game, 'attack', data),
+    shielded: c.shielded, icon: c.shielded ? 'schild' : c.kind === 'camp' ? 'angriff' : 'turm', disabled: c.shielded || !unlocked(game, 'attack', data),
     hint: hint?.type === 'button' && hint.button === 'attack' && c.id === data.camps.camps[0]!.id,
     onClick: () => openAttack(c.id),
   }));
   const shield = shieldText();
   nodes.push({
-    id: 'home', kind: 'home', label: t('world.home'), sub: shield ?? t('world.noShield'), x: 50, y: 46, shielded: shield !== null, disabled: false, hint: false, onClick: toCity,
+    id: 'home', kind: 'home', label: t('world.home'), sub: shield ?? t('world.noShield'), x: 50, y: 46, shielded: shield !== null, icon: 'alruna', disabled: false, hint: false, onClick: toCity,
   });
   return { title: t('world.title'), nodes, back: { id: 'world-back', label: t('world.back'), quiet: true, onClick: toCity } };
 }

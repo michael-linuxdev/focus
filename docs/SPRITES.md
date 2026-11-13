@@ -6,6 +6,17 @@ Stil: flache Bilderbuch-Formen. Ansicht: Draufsicht, leicht gekippt.
 Die Bilder sind eigene Erzeugnisse. Sie dürfen kein bestehendes Spiel nachahmen und keine fremden
 Figuren, Wappen, Logos oder Schriftzüge enthalten.
 
+## Stand
+
+Alle sieben Blätter sind erzeugt, freigestellt und eingebaut. Abweichungen von den Prompts unten, wie sie sich beim
+Erzeugen ergeben haben:
+
+- Türme, Gebäude und Stadt sind detaillierter und isometrisch gezeichnet (Blatt 1 war der Stil-Anker).
+- Einheiten und Symbole sind bewusst einfacher (gedrungene Figuren, flache Flächen), damit sie in 30 bis 40 Pixel
+  lesbar bleiben. Je Figur gibt es ein Bild; die Bewegung kommt aus dem Code.
+- Die Böden werden aus einem sauberen Ausschnitt gespiegelt zu einer nahtlosen Kachel zusammengesetzt.
+- Neu erzeugen: Rohbild unter demselben Namen in `art/roh/` ersetzen, dann `python3 scripts/sprites.py`.
+
 ## So gehst du vor
 
 1. Für jedes der sieben Blätter unten: **Stilblock + Blatt-Prompt** zusammen in Grok einfügen (der Stilblock steht

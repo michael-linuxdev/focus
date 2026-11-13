@@ -1,10 +1,10 @@
 {
-  "version": 6,
+  "version": 7,
   "lang": "de",
   "texts": {
     "hud.defend": "Verteidigen",
     "hud.attack": "Angreifen",
-    "hud.replays": "Wiederholungen",
+    "hud.replays": "Rückblick",
     "hud.wave": "Welle {n}",
     "banner.victory": "Sieg! +{gold}",
     "banner.defeat": "Der Burgfried ist gefallen",
