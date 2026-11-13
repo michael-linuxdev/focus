@@ -518,7 +518,7 @@ function pointer(ctx: CanvasRenderingContext2D, cx: number, cy: number, tile: nu
 
 /** Breite eines Turms in Kacheln, je Art (die Bilder sind unterschiedlich schlank). */
 const TOWER_WIDTH: Readonly<Record<string, number>> = { bogenturm: 0.72, katapult: 0.95, pechnase: 0.82, wachstube: 0.86 };
-/** Fahrzeuge werden breiter gezeichnet als Fußtruppen und blicken im Bild nach links. */
+/** Fahrzeuge werden breiter gezeichnet als Fußtruppen und rütteln statt zu hüpfen. */
 const VEHICLES = new Set(['ramme', 'sturmbock']);
 
 /** Merkt sich je Einheit Leben und Blickrichtung, um Treffer aufblitzen zu lassen und Figuren zu spiegeln. Nur Darstellung. */
@@ -802,8 +802,9 @@ function drawWithSprites(ctx: CanvasRenderingContext2D, scene: Scene, data: Game
     }
     if (u.hp < look.hp) look.flashUntil = timeMs + 120;
     look.hp = u.hp;
-    // Figuren blicken im Bild nach rechts, Fahrzeuge nach links; beim Lauf nach oben oder unten bleibt die letzte Richtung.
-    if (ax !== ux) look.flip = vehicle ? ax > ux : ax < ux;
+    // Alle Figuren und Fahrzeuge blicken im Bild nach links; beim Lauf nach rechts werden sie gespiegelt,
+    // beim Lauf nach oben oder unten bleibt die letzte Richtung.
+    if (ax !== ux) look.flip = ax > ux;
     const state = look;
     const x = px(ux);
     const y = px(uy);
