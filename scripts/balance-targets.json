@@ -1,0 +1,137 @@
+{
+  "note": "Zielwerte der Balance. Prozentwerte, sofern nicht anders gesagt. Geprüft von `npm run balance`; mit `-- --check` endet das Skript bei einem verfehlten Ziel mit Fehler.",
+  "targets": [
+    {
+      "metric": "defense.minHeld",
+      "text": "Ablauf: jede der sechs Wellen wird vom Hinweis-Folger gehalten",
+      "min": 100
+    },
+    {
+      "metric": "defense.maxLeaked",
+      "text": "Ablauf: kein Räuber kommt durch (Anzahl)",
+      "max": 0
+    },
+    {
+      "metric": "defense.maxSeconds",
+      "text": "Ablauf: keine Welle dauert länger als 90 Sekunden",
+      "max": 90
+    },
+    {
+      "metric": "raid.end.held",
+      "text": "Nachtangriff, Stadt am Ende des Ablaufs: Burgfried hält",
+      "min": 100
+    },
+    {
+      "metric": "raid.end.d2",
+      "text": "Nachtangriff, Stadt am Ende des Ablaufs: Räuber erreichen den Marktplatz",
+      "min": 15,
+      "max": 45
+    },
+    {
+      "metric": "raid.two.held",
+      "text": "Nachtangriff gegen nur zwei Bogentürme: Burgfried fällt in mehr als der Hälfte der Fälle",
+      "max": 45
+    },
+    {
+      "metric": "attack.raeuberlager_1.tutorial.plain.d3",
+      "text": "Erster Angriff (Lager am Hohlweg, Tutorial-Armee, ohne Fähigkeiten): Burgfried",
+      "min": 90
+    },
+    {
+      "metric": "attack.raeuberlager_2.tutorial.plain.d2",
+      "text": "Lager im Bruch, Tutorial-Armee: mindestens Marktplatz",
+      "min": 80
+    },
+    {
+      "metric": "attack.raeuberlager_2.tutorial.skilled.d3",
+      "text": "Lager im Bruch, Tutorial-Armee mit Fähigkeiten: Burgfried bleibt die Ausnahme",
+      "max": 40
+    },
+    {
+      "metric": "attack.raeuberlager_2.double.skilled.d3",
+      "text": "Lager im Bruch, doppelte Armee mit Fähigkeiten: Burgfried meistens",
+      "min": 60
+    },
+    {
+      "metric": "attack.falkenried.tutorial.skilled.d1",
+      "text": "Falkenried, Tutorial-Armee mit Fähigkeiten: das Tor fällt",
+      "min": 90
+    },
+    {
+      "metric": "attack.falkenried.tutorial.skilled.d3",
+      "text": "Falkenried, Tutorial-Armee: Burgfried unerreichbar",
+      "max": 0
+    },
+    {
+      "metric": "attack.falkenried.double.skilled.d2",
+      "text": "Falkenried, doppelte Armee mit Fähigkeiten: Marktplatz meistens",
+      "min": 60
+    },
+    {
+      "metric": "attack.falkenried.double.skilled.d3",
+      "text": "Falkenried, doppelte Armee mit Fähigkeiten: Burgfried gelegentlich",
+      "min": 10,
+      "max": 50
+    },
+    {
+      "metric": "attack.falkenried.double.skilled.d2",
+      "text": "Fähigkeiten lohnen sich: Falkenried, Marktplatz mit mindestens 1,5-mal so oft wie ohne",
+      "atLeast": {
+        "metric": "attack.falkenried.double.plain.d2",
+        "factor": 1.5
+      },
+      "min": 1
+    },
+    {
+      "metric": "attack.falkenried.noram.skilled.d1",
+      "text": "Ohne Rammböcke fällt kein Tor (Falkenried, 20 Truppen ohne Rammbock)",
+      "max": 0
+    },
+    {
+      "metric": "matrix.bogenturm.leicht.single",
+      "text": "Bogenturm gegen einzelne Leichte: Schadensanteil",
+      "min": 60
+    },
+    {
+      "metric": "matrix.bogenturm.gepanzert.single",
+      "text": "Bogenturm gegen Gepanzerte: schwach",
+      "max": 15
+    },
+    {
+      "metric": "matrix.katapult.leicht.dense",
+      "text": "Katapult gegen dichte Leichte: Schadensanteil",
+      "min": 85
+    },
+    {
+      "metric": "matrix.katapult.leicht.single",
+      "text": "Katapult gegen einzelne Leichte: höchstens mittel",
+      "max": 45
+    },
+    {
+      "metric": "matrix.katapult.gepanzert.single",
+      "text": "Katapult gegen einzelne Gepanzerte: schwach",
+      "max": 30
+    },
+    {
+      "metric": "matrix.bogen+pech.gepanzert.single",
+      "text": "Pechnase mit Bogenturm gegen Gepanzerte: mindestens doppelt so gut wie zwei Bogentürme",
+      "atLeast": {
+        "metric": "matrix.bogen+bogen.gepanzert.single",
+        "factor": 2
+      }
+    },
+    {
+      "metric": "matrix.wachstube.ramme.single",
+      "text": "Wachstube gegen einzelne Rammböcke: Schadensanteil",
+      "min": 40
+    },
+    {
+      "metric": "matrix.wachstube.ramme.single",
+      "text": "Wachstube gegen Rammböcke besser als Bogenturm (mindestens doppelt)",
+      "atLeast": {
+        "metric": "matrix.bogenturm.ramme.single",
+        "factor": 2
+      }
+    }
+  ]
+}

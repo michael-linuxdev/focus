@@ -534,7 +534,12 @@ function buildHud(nowMs: number): HudModel {
       ...model,
       panel: {
         title: t('attack.title', { name: t(`target.${s.camp}`) }),
-        lines: [...(game.hero.joined ? [t('attack.withHero', { name: heroName })] : []), total === 0 ? t('attack.empty') : t('attack.ready', { n: free })],
+        lines: [
+          ...(game.hero.joined ? [t('attack.withHero', { name: heroName })] : []),
+          total === 0 ? t('attack.empty') : t('attack.ready', { n: free }),
+          // Nur Einheiten mit Belagerungswert brechen das Tor; ohne sie bleibt der Angriff davor stehen.
+          ...(total > 0 && !data.troops.troops.some((troop) => used(troop.unit) > 0 && findById(data.units.units, troop.unit, 'Einheit').siege > 0) ? [t('attack.noRam')] : []),
+        ],
         rows,
         buttons: [
           { id: 'attack-go', label: t('attack.go'), disabled: total === 0, hint: hint?.type === 'button' && hint.button === 'attack', onClick: () => startAttack(s.camp, s.lineup) },

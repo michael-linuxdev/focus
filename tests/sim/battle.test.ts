@@ -67,7 +67,7 @@ describe('Wiederholungen', () => {
           "depth": 3,
           "fallen": 0,
           "gateHp": 0,
-          "hash": 3003967525,
+          "hash": 1479527355,
           "result": "breached",
           "tick": 529,
         },

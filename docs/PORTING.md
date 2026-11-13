@@ -70,6 +70,7 @@ der Verteidiger baut Türme (`BuildTower`, `UpgradeTower`), der Angreifer löst 
   aufgehaltene Einheit mit der kleinsten Kennung: `max(1, Schaden * militiaDamagePermille / 1000 - armor)`.
   Pro Einheit und Tick greift höchstens ein Hindernis: das Tor geht vor, danach die erste Wachstube in Listenreihenfolge.
 - **Brandpfeile auf Pechnase oder Wachstube:** Bremsen, Pech und Zuschlagen setzen aus; stehende Miliz hält weiter auf.
+- **Tor:** Belagerungswert 0 heißt: die Einheit steht vor dem Tor und richtet nichts aus (derzeit alles außer Rammbock, Sturmbock und Räuber).
 - **Tor:** steht bei `gateMilli`. Solange es Leben hat, bleibt jede Einheit dort stehen und zieht ihm je Tick `siege` ab.
   Fällt es mitten in einem Tick, laufen die danach bewegten Einheiten desselben Ticks schon durch.
 - **Durchbruchstiefe:** 1, sobald das Tor gefallen ist und eine Einheit dahinter steht; 2, sobald eine Einheit den Marktplatz

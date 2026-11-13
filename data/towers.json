@@ -1,5 +1,5 @@
 {
-  "version": 4,
+  "version": 5,
   "preliminary": true,
   "towers": [
     {
@@ -36,18 +36,18 @@
       "levels": [
         {
           "cost": 90,
-          "damage": 16,
+          "damage": 12,
           "rangeMilli": 3200,
-          "cooldownTicks": 40,
+          "cooldownTicks": 56,
           "slowPermille": 1000,
           "militiaHp": 0,
           "militiaRespawnTicks": 0
         },
         {
           "cost": 120,
-          "damage": 22,
+          "damage": 17,
           "rangeMilli": 3400,
-          "cooldownTicks": 36,
+          "cooldownTicks": 50,
           "slowPermille": 1000,
           "militiaHp": 0,
           "militiaRespawnTicks": 0
@@ -88,21 +88,21 @@
       "levels": [
         {
           "cost": 100,
-          "damage": 8,
+          "damage": 9,
           "rangeMilli": 1000,
           "cooldownTicks": 10,
           "slowPermille": 1000,
           "militiaHp": 400,
-          "militiaRespawnTicks": 160
+          "militiaRespawnTicks": 20
         },
         {
           "cost": 130,
-          "damage": 11,
+          "damage": 12,
           "rangeMilli": 1000,
           "cooldownTicks": 10,
           "slowPermille": 1000,
           "militiaHp": 560,
-          "militiaRespawnTicks": 130
+          "militiaRespawnTicks": 20
         }
       ]
     }

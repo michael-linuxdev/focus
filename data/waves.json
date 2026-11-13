@@ -1,5 +1,5 @@
 {
-  "version": 4,
+  "version": 5,
   "preliminary": true,
   "waves": [
     {
@@ -140,24 +140,24 @@
         },
         {
           "unit": "raeuber",
-          "count": 12,
+          "count": 16,
           "startTick": 40,
           "intervalTicks": 12,
-          "jitterTicks": 6
+          "jitterTicks": 30
         },
         {
           "unit": "schildtraeger",
           "count": 5,
           "startTick": 200,
-          "intervalTicks": 30,
-          "jitterTicks": 6
+          "intervalTicks": 24,
+          "jitterTicks": 90
         },
         {
           "unit": "raeuber",
-          "count": 10,
+          "count": 16,
           "startTick": 420,
           "intervalTicks": 6,
-          "jitterTicks": 3
+          "jitterTicks": 30
         }
       ]
     }

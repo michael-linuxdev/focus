@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "preliminary": true,
   "camps": [
     {
@@ -12,7 +12,7 @@
       },
       "roadId": "dorf_1",
       "keepLevel": 1,
-      "gateHp": 300,
+      "gateHp": 1500,
       "towers": [
         {
           "slot": "s1",
@@ -51,7 +51,7 @@
       },
       "roadId": "ostbogen",
       "keepLevel": 2,
-      "gateHp": 500,
+      "gateHp": 5000,
       "towers": [
         {
           "slot": "s1",
@@ -61,12 +61,12 @@
         {
           "slot": "s3",
           "def": "katapult",
-          "level": 1
+          "level": 2
         },
         {
           "slot": "s4",
           "def": "bogenturm",
-          "level": 1
+          "level": 2
         },
         {
           "slot": "s6",
@@ -95,7 +95,7 @@
       },
       "roadId": "westschleife",
       "keepLevel": 2,
-      "gateHp": 600,
+      "gateHp": 9000,
       "towers": [
         {
           "slot": "s1",
@@ -144,7 +144,7 @@
       },
       "roadId": "doppelkehre",
       "keepLevel": 2,
-      "gateHp": 600,
+      "gateHp": 9000,
       "towers": [
         {
           "slot": "s1",
@@ -178,7 +178,7 @@
       },
       "roadId": "ostbogen",
       "keepLevel": 2,
-      "gateHp": 600,
+      "gateHp": 9000,
       "towers": [
         {
           "slot": "s2",

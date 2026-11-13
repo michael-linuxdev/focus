@@ -1,5 +1,5 @@
 {
-  "version": 5,
+  "version": 6,
   "lang": "de",
   "texts": {
     "hud.defend": "Verteidigen",
@@ -163,6 +163,7 @@
     "dev.reset": "Spielstand zurücksetzen",
     "dev.confirm": "Wirklich? Noch einmal tippen",
     "dev.close": "Schließen",
-    "dev.install": "Installation {id} · Sitzung {n}"
+    "dev.install": "Installation {id} · Sitzung {n}",
+    "attack.noRam": "Ohne Rammbock fällt kein Tor"
   }
 }

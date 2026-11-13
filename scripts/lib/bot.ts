@@ -1,5 +1,5 @@
 import {
-  attackSetup, createBattle, defaultLineup, defenseSetup, reduceGame, stepBattle, tutorialStep, validateBattleAction,
+  attackSetup, createBattle, defaultLineup, defenseSetup, reduceGame, roadPointMilli, stepBattle, tutorialStep, validateBattleAction,
   type BattleAction, type BattleInput, type BattleSetup, type BattleState, type GameAction, type GameData, type GameState,
 } from '../../src/sim/index.ts';
 
@@ -27,6 +27,39 @@ export const simpleAttack = (gapTicks: number): Policy => (battle) => {
   if (battle.releasedWaves < battle.setup.waves.length && battle.tick >= battle.releasedWaves * gapTicks) return { type: 'ReleaseWave' };
   if (battle.tick === 30 && battle.towers[0]) return { type: 'UseAbility', ability: 'brandpfeile', slot: battle.towers[0].slot };
   if (battle.tick === 60) return { type: 'UseAbility', ability: 'schildwall', slot: null };
+  return null;
+};
+
+/**
+ * Angriff mit guter Spielweise: Wellen im Abstand auslösen, Brandpfeile sofort bei Bereitschaft auf den Turm,
+ * der der vordersten Einheit am nächsten steht, Schildwall, sobald Truppen hinter dem Tor unter Beschuss stehen.
+ */
+export const skilledAttack = (gapTicks: number, data: GameData): Policy => (battle) => {
+  if (battle.releasedWaves < battle.setup.waves.length && battle.tick >= battle.releasedWaves * gapTicks) return { type: 'ReleaseWave' };
+  const ready = (id: string): boolean => {
+    const i = battle.setup.abilities.indexOf(id);
+    return i >= 0 && battle.tick >= (battle.abilityReadyAt[i] ?? 0);
+  };
+  if (battle.units.length === 0) return null;
+  const road = data.roads.roads.find((r) => r.id === battle.setup.roadId)!;
+  const front = battle.units.reduce((a, b) => (b.pos > a.pos ? b : a));
+  if (ready('brandpfeile')) {
+    const [fx, fy] = roadPointMilli(road, front.pos);
+    let best: string | null = null;
+    let bestDist = -1;
+    for (const tower of battle.towers) {
+      if (battle.tick < tower.disabledUntil) continue;
+      const slot = data.city.towerSlots.find((sl) => sl.id === tower.slot)!;
+      const dist = (slot.x * 1000 - fx) ** 2 + (slot.y * 1000 - fy) ** 2;
+      if (bestDist < 0 || dist < bestDist) {
+        best = tower.slot;
+        bestDist = dist;
+      }
+    }
+    if (best !== null && bestDist <= 3500 * 3500) return { type: 'UseAbility', ability: 'brandpfeile', slot: best };
+  }
+  const underFire = battle.towers.some((tw) => tw.lastShotTick >= battle.tick - 10);
+  if (ready('schildwall') && underFire && battle.units.filter((u) => u.pos >= data.rules.gateMilli).length >= 2) return { type: 'UseAbility', ability: 'schildwall', slot: null };
   return null;
 };
 

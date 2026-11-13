@@ -64,6 +64,7 @@ Verlierbare Verteidigungen und der Nachtangriff kosten Vorräte nach Durchbruchs
 aber erst ab dem Marktplatz (ein genommenes Tor allein kostet nichts). Der erste Nachtangriff kostet nichts.
 Der erste Angriff auf das Räuberlager bleibt leicht: mit der vorgeschlagenen Aufstellung soll er fast immer gelingen.
 Nach jedem Nachtangriff ist der nächste angekündigt.
+Nur Rammböcke brechen Tore (Leichte und Gepanzerte haben Belagerungswert 0).
 
 ## Ordner
 
@@ -87,6 +88,8 @@ Nach jedem Nachtangriff ist der nächste angekündigt.
 - Neue Messpunkte nur über `record(...)` in `src/app/main.tsx`; neue Arten in `EventType` eintragen.
 - „Minute 10 erreicht“ heißt: Tutorial-Schritt `minute10Step` aus `data/tutorial.json` erreicht.
 - Balance-Werte nie nach Gefühl ändern: erst `npm run balance`, dann Daten ändern, dann wieder laufen lassen.
+- Zielwerte der Balance stehen in `scripts/balance-targets.json`. `npm run balance -- --check` endet mit Fehler,
+  wenn einer verfehlt wird. Nach jeder Änderung an `data/` (Türme, Einheiten, Wellen, Lager, Regeln) laufen lassen.
 
 ## Konventionen
 

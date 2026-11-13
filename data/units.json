@@ -1,5 +1,5 @@
 {
-  "version": 5,
+  "version": 6,
   "preliminary": true,
   "units": [
     {
@@ -31,7 +31,7 @@
       "bounty": 15,
       "keepDamage": 1,
       "armor": 1,
-      "siege": 10,
+      "siege": 50,
       "melee": 15,
       "militiaDamagePermille": 3000
     },
@@ -42,7 +42,7 @@
       "bounty": 0,
       "keepDamage": 1,
       "armor": 0,
-      "siege": 1,
+      "siege": 0,
       "melee": 2,
       "militiaDamagePermille": 1000
     },
@@ -53,7 +53,7 @@
       "bounty": 0,
       "keepDamage": 1,
       "armor": 3,
-      "siege": 1,
+      "siege": 0,
       "melee": 4,
       "militiaDamagePermille": 1000
     },
@@ -64,7 +64,7 @@
       "bounty": 0,
       "keepDamage": 1,
       "armor": 1,
-      "siege": 10,
+      "siege": 50,
       "melee": 15,
       "militiaDamagePermille": 3000
     }

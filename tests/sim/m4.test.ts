@@ -98,7 +98,7 @@ describe('Wachstube', () => {
         if (u && u.pos === s.towers[0]!.militiaPos && s.towers[0]!.militiaHp > 0) held++;
         if (hpAfter < 0 && s.towers[0]!.militiaHp === 0) hpAfter = u ? u.hp : 0;
       }
-      return { held, hpAfter, lost: hpAfter < 0 ? 0 : (unit === 'ramme' ? 90 : 110) - hpAfter };
+      return { held, hpAfter, lost: hpAfter < 0 ? 0 : data.units.units.find((u) => u.id === unit)!.hp - hpAfter };
     };
     const ram = run('ramme');
     const armored = run('gepanzert');

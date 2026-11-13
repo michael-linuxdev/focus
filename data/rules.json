@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "preliminary": true,
   "gateMilli": 1000,
   "marketPermille": 500,
@@ -15,7 +15,7 @@
   ],
   "maxReplays": 10,
   "productionIntervalSeconds": 10,
-  "cityGateHp": 600,
+  "cityGateHp": 3000,
   "newPlayerShieldHours": 72,
   "defeatShieldHours": 8,
   "nightRaidAfterHours": 4,
