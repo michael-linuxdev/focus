@@ -36,7 +36,7 @@ GAME = ROOT / "public" / "sprites"
 ATLAS_WIDTH = {"tuerme": 128, "gebaeude": 128, "stadt": 176}
 ATLAS_UNIT_HEIGHT = 80
 # Bodenflächen: Datei, sauberer Ausschnitt (links, oben, Kantenlänge) im Rohbild.
-GROUNDS = {"wiese": ("boden-wiese", 24, 24, 310), "strasse": ("boden-strasse", 0, 0, 1000), "lager": ("boden-lager", 16, 16, 300)}
+GROUNDS = {"wiese": ("boden-wiese", 24, 24, 310), "strasse": ("boden-strasse", 12, 12, 1000), "lager": ("boden-lager", 16, 16, 300)}
 
 
 def background_distance(rgb: np.ndarray) -> np.ndarray:
