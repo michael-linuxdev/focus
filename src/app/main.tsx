@@ -62,6 +62,8 @@ let speedFactor = 1;
 let lastSaveMs = 0;
 /** Sieggold der laufenden Verteidigung, für die Anzeige danach. */
 let victoryGold = 0;
+/** Die Heldin ist beigetreten, ihre Meldung steht noch aus. */
+let heroBannerDue = false;
 /** Nach einer Wiederholung hervorgehobener schwacher Abschnitt. */
 let weak: { section: string; until: number } | null = null;
 /** Die Oberfläche wird höchstens zehnmal pro Sekunde neu aufgebaut, nach Eingaben sofort. */
@@ -133,7 +135,10 @@ function tickClock(): void {
   const before = game;
   game = reduceGame(game, { type: 'AdvanceTime', now }, data).state;
   recordSteps(before.tutorialStep);
-  if (before.hero.joined !== game.hero.joined) showBanner(t('banner.hero', { name: heroName }), null);
+  // Der Ausbau des Burgfrieds bekommt seine eigene Meldung. Die Heldin meldet sich erst, wenn der neue
+  // Straßenverlauf gewählt ist, damit sie den Erfolg nicht überdeckt.
+  if (game.keepLevel > before.keepLevel) showBanner(t('banner.keep', { n: game.keepLevel }), null);
+  if (before.hero.joined !== game.hero.joined) heroBannerDue = true;
   // PLATZHALTER Bot-Allianz: jede angerechnete Hilfe wird als kleiner Text an der Baustelle gezeigt.
   for (const b of game.buildings) {
     const old = before.buildings.find((x) => x.plot === b.plot);
@@ -813,6 +818,10 @@ function frame(nowMs: number): void {
     const then = banner.then;
     banner = null;
     then?.();
+  }
+  if (heroBannerDue && !banner && screen.kind === 'city' && !game.roadChoicePending) {
+    heroBannerDue = false;
+    showBanner(t('banner.hero', { name: heroName }), null);
   }
   effects = effects.filter((e) => nowMs - e.start < EFFECT_KEEP_MS);
   layout = drawStage(canvas, buildScene(nowMs), data);

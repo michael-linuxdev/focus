@@ -1,5 +1,5 @@
 {
-  "version": 7,
+  "version": 8,
   "lang": "de",
   "texts": {
     "hud.defend": "Verteidigen",
@@ -164,6 +164,7 @@
     "dev.confirm": "Wirklich? Noch einmal tippen",
     "dev.close": "Schließen",
     "dev.install": "Installation {id} · Sitzung {n}",
-    "attack.noRam": "Ohne Rammbock fällt kein Tor"
+    "attack.noRam": "Ohne Rammbock fällt kein Tor",
+    "banner.keep": "Burgfried Stufe {n}"
   }
 }
