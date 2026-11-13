@@ -193,11 +193,11 @@ export function Hud({ m }: { m: HudModel }) {
       {m.bottom.length > 0 && !m.sheet && !m.panel && !m.map && (
         <div class="bar" style={{ bottom: 'env(safe-area-inset-bottom)', paddingBottom: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {m.preview && (
-            <div data-testid="preview" style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', padding: '2px 4px', flexWrap: 'wrap' }}>
-              <span style={{ opacity: 0.75 }}>{m.preview.label}</span>
+            <div data-testid="preview" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', padding: '2px 4px', height: '26px', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+              {m.preview.items.length <= 2 && <span style={{ opacity: 0.75 }}>{m.preview.label}</span>}
               {m.preview.items.map((it) => (
                 <span title={it.name} style={{ display: 'inline-flex', alignItems: 'flex-end', gap: '3px', fontWeight: 600 }}>
-                  <AtlasIcon name={it.sprite} height={Math.round(26 * it.scale)} />
+                  <AtlasIcon name={it.sprite} height={Math.round(24 * it.scale)} />
                   {it.count} {it.name}
                 </span>
               ))}

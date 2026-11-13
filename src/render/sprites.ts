@@ -13,10 +13,16 @@ export function atlasSprite(name: string): { rect: Rect; size: readonly number[]
   return rect ? { rect, size: atlasInfo.size, url: `${import.meta.env.BASE_URL}sprites/atlas.webp` } : null;
 }
 
+/** Bilder, die fertig dekodiert sind. Erst dann lassen sie sich in jedem Browser sicher in eine Zeichenfläche kopieren. */
+const decoded = new Set<HTMLImageElement>();
+
 function load(file: string): HTMLImageElement {
   const img = new Image();
-  img.decoding = 'async';
   img.src = `${import.meta.env.BASE_URL}sprites/${file}`;
+  // Safari meldet ein Bild als geladen, bevor es dekodiert ist; ein Kopieren in diesem Moment bleibt leer.
+  const done = (): void => void decoded.add(img);
+  if (typeof img.decode === 'function') img.decode().then(done, () => img.addEventListener('load', done, { once: true }));
+  else img.addEventListener('load', done, { once: true });
   return img;
 }
 
@@ -24,7 +30,7 @@ const atlas = load('atlas.webp');
 const grounds = { wiese: load('boden-wiese.jpg'), strasse: load('boden-strasse.jpg'), lager: load('boden-lager.jpg') } as const;
 export type GroundName = keyof typeof grounds;
 
-const loaded = (img: HTMLImageElement): boolean => img.complete && img.naturalWidth > 0;
+const loaded = (img: HTMLImageElement): boolean => decoded.has(img) && img.complete && img.naturalWidth > 0;
 
 export function spritesReady(): boolean {
   return loaded(atlas) && loaded(grounds.wiese) && loaded(grounds.strasse) && loaded(grounds.lager);
@@ -49,7 +55,11 @@ function scaledSprite(name: string, r: Rect, width: number, flip: boolean): HTML
   const key = `${name}:${w}:${flip ? 1 : 0}`;
   let canvas = scaled.get(key);
   if (!canvas) {
-    if (scaled.size > 240) scaled.clear();
+    if (scaled.size > 240) {
+      // Safari gibt den Speicher einer Zeichenfläche erst frei, wenn sie auf Größe 0 gesetzt wird.
+      for (const old of scaled.values()) old.width = old.height = 0;
+      scaled.clear();
+    }
     canvas = document.createElement('canvas');
     canvas.width = w;
     canvas.height = Math.max(1, Math.round((w * r.h) / r.w));
@@ -61,6 +71,17 @@ function scaledSprite(name: string, r: Rect, width: number, flip: boolean): HTML
         c.scale(-1, 1);
       }
       c.drawImage(atlas, r.x, r.y, r.w, r.h, 0, 0, w, canvas.height);
+      // Sicherung: Blieb die Kopie leer (Bild im Browser noch nicht bereit), wird sie nicht vorgehalten,
+      // sondern beim nächsten Bild neu versucht. Sonst bliebe das Motiv dauerhaft unsichtbar.
+      const mid = c.getImageData(0, Math.floor(canvas.height / 2), w, 1).data;
+      let filled = false;
+      for (let i = 3; i < mid.length; i += 4) {
+        if (mid[i] !== 0) {
+          filled = true;
+          break;
+        }
+      }
+      if (!filled) return canvas;
     }
     scaled.set(key, canvas);
   }
