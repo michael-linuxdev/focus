@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Türme: eine Zeile je Stufe (cost in Gold für Bau bzw. Ausbau auf diese Stufe, Reichweite in Tausendstel-Kacheln, Schussfolge in Ticks). splashMilli > 0: Flächenschaden um das Ziel",
+  "title": "Türme, eine Zeile je Stufe. kind shot: schießt auf ein Ziel (splashMilli > 0: Flächenschaden). kind slow: bremst alle in Reichweite auf slowPermille und trifft sie ohne Rüstungsabzug. kind militia: stellt Miliz mit militiaHp auf die Straße, die Angreifer aufhält und im Takt cooldownTicks zuschlägt",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -26,7 +26,8 @@
           "id",
           "keepLevel",
           "splashMilli",
-          "levels"
+          "levels",
+          "kind"
         ],
         "properties": {
           "id": {
@@ -51,7 +52,10 @@
                 "cost",
                 "damage",
                 "rangeMilli",
-                "cooldownTicks"
+                "cooldownTicks",
+                "slowPermille",
+                "militiaHp",
+                "militiaRespawnTicks"
               ],
               "properties": {
                 "cost": {
@@ -69,9 +73,29 @@
                 "cooldownTicks": {
                   "type": "integer",
                   "minimum": 1
+                },
+                "slowPermille": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000
+                },
+                "militiaHp": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "militiaRespawnTicks": {
+                  "type": "integer",
+                  "minimum": 0
                 }
               }
             }
+          },
+          "kind": {
+            "enum": [
+              "shot",
+              "slow",
+              "militia"
+            ]
           }
         }
       }

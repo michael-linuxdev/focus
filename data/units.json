@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "preliminary": true,
   "units": [
     {
@@ -9,7 +9,31 @@
       "bounty": 5,
       "keepDamage": 1,
       "armor": 0,
-      "siege": 0
+      "siege": 1,
+      "melee": 2,
+      "militiaDamagePermille": 1000
+    },
+    {
+      "id": "schildtraeger",
+      "hp": 70,
+      "speedMilliPerTick": 30,
+      "bounty": 10,
+      "keepDamage": 1,
+      "armor": 4,
+      "siege": 1,
+      "melee": 3,
+      "militiaDamagePermille": 1000
+    },
+    {
+      "id": "sturmbock",
+      "hp": 90,
+      "speedMilliPerTick": 24,
+      "bounty": 15,
+      "keepDamage": 1,
+      "armor": 1,
+      "siege": 10,
+      "melee": 15,
+      "militiaDamagePermille": 3000
     },
     {
       "id": "leicht",
@@ -18,7 +42,9 @@
       "bounty": 0,
       "keepDamage": 1,
       "armor": 0,
-      "siege": 1
+      "siege": 1,
+      "melee": 2,
+      "militiaDamagePermille": 1000
     },
     {
       "id": "gepanzert",
@@ -27,7 +53,9 @@
       "bounty": 0,
       "keepDamage": 1,
       "armor": 3,
-      "siege": 1
+      "siege": 1,
+      "melee": 4,
+      "militiaDamagePermille": 1000
     },
     {
       "id": "ramme",
@@ -36,7 +64,9 @@
       "bounty": 0,
       "keepDamage": 1,
       "armor": 1,
-      "siege": 10
+      "siege": 10,
+      "melee": 15,
+      "militiaDamagePermille": 3000
     }
   ]
 }

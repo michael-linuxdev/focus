@@ -1,5 +1,5 @@
 import {
-  MILLI, findById, marketMilli, roadLengthMilli, roadPointMilli, towerLevel,
+  MILLI, findById, marketMilli, militiaPosition, roadLengthMilli, roadPointMilli, towerLevel,
   type BattleTower, type Building, type CityTower, type GameData, type RoadDef, type Unit,
 } from '../sim/index.ts';
 
@@ -10,6 +10,7 @@ const COLORS = {
   robber: '#b3372f', troop: '#4f8fd6', ram: '#8a6a45',
   hpBack: '#3a1512', hp: '#e9c46a', bar: '#c2553f',
   slot: '#8fa58f', plot: '#7f93a8', tower: '#cfc8b4', roof: '#4b6a8a', roofEnemy: '#9a3d36', catapult: '#6b4f2e',
+  pitch: '#2a2420', militia: '#7fbf7f', weak: '#ff6b5e', help: '#7fd1ff',
   shot: '#f4e3a1', gold: '#e9b949', deny: '#e2574c', hint: '#ffffff', hero: '#c084fc', building: '#a7b8c9', disabled: '#ff8a3d',
 } as const;
 
@@ -75,14 +76,22 @@ export interface Scene {
   readonly tick: number;
   /** Gold des Bauenden; `null` blendet leere Bauplätze aus (Angriff, Wiederholung). */
   readonly buildGold: number | null;
+  /** Preis des günstigsten baubaren Turms, für die Beschriftung leerer Plätze. */
+  readonly cheapestTower: number;
   /** Gebäude und Uhrzeit im Stadtbau; `null` blendet die Bauplätze abseits der Straße aus. */
-  readonly buildings: { readonly list: readonly Building[]; readonly now: number; readonly showEmpty: boolean; readonly labels: Readonly<Record<string, string>> } | null;
+  readonly buildings: {
+    readonly list: readonly Building[]; readonly now: number; readonly showEmpty: boolean; readonly labels: Readonly<Record<string, string>>;
+    /** Beschriftung für Baustellen, bei denen der Spieler um Hilfe bitten kann. */
+    readonly helpLabel: string | null;
+  } | null;
   readonly gate: { readonly hp: number; readonly max: number } | null;
   readonly showMarket: boolean;
   readonly keep: { readonly hp: number; readonly max: number } | null;
   /** Restsekunden des Burgfried-Ausbaus. */
   readonly keepBusySeconds: number | null;
   readonly heroSection: string | null;
+  /** Abschnitt, der als Schwachstelle hervorgehoben wird. */
+  readonly weakSection: string | null;
   readonly enemyCity: boolean;
   /** Der Spieler wählt gerade einen Turm als Ziel. */
   readonly targeting: boolean;
@@ -162,7 +171,7 @@ export function drawStage(canvas: HTMLCanvasElement, scene: Scene, data: GameDat
   ctx.fillStyle = COLORS.back;
   for (let i = 0; i < scene.keepLevel; i++) ctx.fillRect(px(kx) - keepSize * 0.3 + i * keepSize * 0.25, px(ky) - keepSize * 0.1, keepSize * 0.15, keepSize * 0.3);
   if (scene.keep && scene.keep.hp < scene.keep.max) bar(ctx, px(kx), px(ky) + tile * 0.5, tile, scene.keep.hp / scene.keep.max, COLORS.bar);
-  if (scene.keepBusySeconds !== null) label(ctx, px(kx), px(ky) - tile * 0.75, tile, `${scene.keepBusySeconds}s`, COLORS.hint);
+  if (scene.keepBusySeconds !== null) label(ctx, px(kx), px(ky) - tile * 0.75, tile, formatSeconds(scene.keepBusySeconds), COLORS.hint);
 
   // Bauplätze abseits der Straße
   if (scene.buildings) {
@@ -189,17 +198,27 @@ export function drawStage(canvas: HTMLCanvasElement, scene: Scene, data: GameDat
       ctx.fill();
       ctx.globalAlpha = 1;
       label(ctx, cx, cy + 1, tile, (scene.buildings.labels[b.def] ?? '?').slice(0, 1), COLORS.back);
-      if (remaining > 0) label(ctx, cx, cy - tile * 0.62, tile, `${remaining}s`, COLORS.hint);
+      if (remaining > 0) {
+        label(ctx, cx, cy - tile * 0.62, tile, formatSeconds(remaining), COLORS.hint);
+        if (scene.buildings.helpLabel !== null && b.helpRequestedAt === null) label(ctx, cx, cy + tile * 0.62, tile, scene.buildings.helpLabel, COLORS.help);
+      }
     }
   }
 
   // Turm-Bauplätze und Türme
-  const cheapest = Math.min(...data.towers.towers.filter((t) => t.keepLevel <= scene.keepLevel).map((t) => t.levels[0]!.cost));
+  const cheapest = scene.cheapestTower;
   for (const slot of data.city.towerSlots) {
     const cx = (slot.x + 0.5) * tile;
     const cy = (slot.y + 0.5) * tile;
     const tower = scene.towers.find((t) => t.slot === slot.id);
     const hinted = scene.hint !== null && scene.hint.x === slot.x && scene.hint.y === slot.y;
+    if (slot.section === scene.weakSection && slot.keepLevel <= scene.keepLevel) {
+      ctx.strokeStyle = COLORS.weak;
+      ctx.lineWidth = 3;
+      ctx.globalAlpha = 0.6 + 0.4 * Math.sin(timeMs / 150);
+      ctx.strokeRect(cx - tile * 0.46, cy - tile * 0.46, tile * 0.92, tile * 0.92);
+      ctx.globalAlpha = 1;
+    }
     if (!tower) {
       if (scene.buildGold === null || slot.keepLevel > scene.keepLevel) continue;
       // Solange ein Hinweis auf einen Platz zeigt, treten die anderen zurück.
@@ -231,7 +250,29 @@ export function drawStage(canvas: HTMLCanvasElement, scene: Scene, data: GameDat
     ctx.globalAlpha = disabled ? 0.45 : 1;
     ctx.fillStyle = COLORS.tower;
     ctx.fillRect(cx - tile * 0.32, cy - tile * 0.32, tile * 0.64, tile * 0.64);
-    if (def.splashMilli > 0) {
+    if (def.kind === 'slow') {
+      // Pechnase: dunkler Kessel, schwacher Ring zeigt den Umkreis
+      ctx.fillStyle = COLORS.pitch;
+      ctx.beginPath();
+      ctx.arc(cx, cy - tile * 0.02, tile * 0.2, 0, Math.PI);
+      ctx.fill();
+      ctx.fillRect(cx - tile * 0.24, cy - tile * 0.08, tile * 0.48, tile * 0.07);
+      ctx.strokeStyle = 'rgba(42,36,32,0.55)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, (level.rangeMilli / MILLI) * tile, 0, Math.PI * 2);
+      ctx.stroke();
+    } else if (def.kind === 'militia') {
+      // Wachstube: Schild
+      ctx.fillStyle = COLORS.militia;
+      ctx.beginPath();
+      ctx.moveTo(cx - tile * 0.18, cy - tile * 0.2);
+      ctx.lineTo(cx + tile * 0.18, cy - tile * 0.2);
+      ctx.lineTo(cx + tile * 0.18, cy + tile * 0.02);
+      ctx.lineTo(cx, cy + tile * 0.2);
+      ctx.lineTo(cx - tile * 0.18, cy + tile * 0.02);
+      ctx.fill();
+    } else if (def.splashMilli > 0) {
       // Katapult: Wurfarm
       ctx.strokeStyle = COLORS.catapult;
       ctx.lineWidth = tile * 0.1;
@@ -250,6 +291,17 @@ export function drawStage(canvas: HTMLCanvasElement, scene: Scene, data: GameDat
       ctx.lineTo(cx + tile * 0.2, cy + tile * 0.12);
       ctx.lineTo(cx - tile * 0.2, cy + tile * 0.12);
       ctx.fill();
+    }
+    if (def.kind === 'militia') {
+      // Miliz auf der Straße: drei Posten, mit Lebensbalken in der Schlacht
+      const mPos = tower.militiaPos !== undefined ? tower.militiaPos : militiaPosition(road, slot.x, slot.y, data);
+      const alive = tower.militiaHp === undefined || tower.militiaHp > 0;
+      const [mx, my] = roadPointMilli(road, mPos);
+      ctx.globalAlpha = alive ? 1 : 0.25;
+      ctx.fillStyle = COLORS.militia;
+      for (const off of [-0.2, 0, 0.2]) ctx.fillRect(px(mx) + off * tile - tile * 0.07, px(my) - tile * 0.07 + Math.abs(off) * tile * 0.3, tile * 0.14, tile * 0.14);
+      ctx.globalAlpha = 1;
+      if (tower.militiaHp !== undefined && tower.militiaHp > 0 && tower.militiaHp < level.militiaHp) bar(ctx, px(mx), px(my) - tile * 0.3, tile * 0.6, tower.militiaHp / level.militiaHp, COLORS.militia);
     }
     ctx.globalAlpha = 1;
     for (let i = 0; i < tower.level; i++) {
@@ -278,10 +330,22 @@ export function drawStage(canvas: HTMLCanvasElement, scene: Scene, data: GameDat
       ctx.strokeStyle = COLORS.shot;
       ctx.lineWidth = def.splashMilli > 0 ? 4 : 2;
       ctx.globalAlpha = 1 - age;
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.lineTo(px(tower.targetX), px(tower.targetY));
-      ctx.stroke();
+      if (def.kind === 'shot') {
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(px(tower.targetX), px(tower.targetY));
+        ctx.stroke();
+      } else if (def.kind === 'slow') {
+        ctx.strokeStyle = COLORS.pitch;
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.arc(cx, cy, (level.rangeMilli / MILLI) * tile * (0.3 + age * 0.7), 0, Math.PI * 2);
+        ctx.stroke();
+      } else {
+        ctx.beginPath();
+        ctx.arc(px(tower.targetX), px(tower.targetY), tile * 0.3, 0, Math.PI * 2);
+        ctx.stroke();
+      }
       if (def.splashMilli > 0) {
         ctx.beginPath();
         ctx.arc(px(tower.targetX), px(tower.targetY), (def.splashMilli / MILLI) * tile * (0.5 + age * 0.5), 0, Math.PI * 2);
@@ -333,7 +397,10 @@ export function drawStage(canvas: HTMLCanvasElement, scene: Scene, data: GameDat
     const cy = (e.y + 0.5) * tile;
     ctx.globalAlpha = 1 - age;
     if (e.kind === 'text') {
-      label(ctx, cx, cy - tile * (0.3 + age * 0.7), tile * 1.2, e.text, COLORS.gold);
+      // Text bleibt im Spielfeld, auch wenn seine Quelle am Rand liegt.
+      ctx.font = `600 ${Math.round(tile * 1.2 * 0.32)}px system-ui, sans-serif`;
+      const half = ctx.measureText(e.text).width / 2 + 4;
+      label(ctx, Math.max(half, Math.min(cols * tile - half, cx)), cy - tile * (0.3 + age * 0.7), tile * 1.2, e.text, COLORS.gold);
     } else if (e.kind === 'deny') {
       ctx.strokeStyle = COLORS.deny;
       ctx.lineWidth = 3;
@@ -351,6 +418,12 @@ export function drawStage(canvas: HTMLCanvasElement, scene: Scene, data: GameDat
 
   if (scene.hint) pointer(ctx, (scene.hint.x + 0.5) * tile, (scene.hint.y + 0.5) * tile, tile, timeMs);
   return layout;
+}
+
+/** Restzeit: unter zwei Minuten in Sekunden, sonst Minuten:Sekunden. */
+export function formatSeconds(seconds: number): string {
+  if (seconds < 120) return `${seconds}s`;
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 }
 
 function bar(ctx: CanvasRenderingContext2D, cx: number, y: number, width: number, share: number, color: string): void {

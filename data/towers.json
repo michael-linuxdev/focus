@@ -1,9 +1,10 @@
 {
-  "version": 2,
+  "version": 3,
   "preliminary": true,
   "towers": [
     {
       "id": "bogenturm",
+      "kind": "shot",
       "keepLevel": 1,
       "splashMilli": 0,
       "levels": [
@@ -11,18 +12,25 @@
           "cost": 50,
           "damage": 6,
           "rangeMilli": 2500,
-          "cooldownTicks": 14
+          "cooldownTicks": 14,
+          "slowPermille": 1000,
+          "militiaHp": 0,
+          "militiaRespawnTicks": 0
         },
         {
           "cost": 80,
           "damage": 9,
           "rangeMilli": 2800,
-          "cooldownTicks": 12
+          "cooldownTicks": 12,
+          "slowPermille": 1000,
+          "militiaHp": 0,
+          "militiaRespawnTicks": 0
         }
       ]
     },
     {
       "id": "katapult",
+      "kind": "shot",
       "keepLevel": 2,
       "splashMilli": 1300,
       "levels": [
@@ -30,13 +38,71 @@
           "cost": 90,
           "damage": 16,
           "rangeMilli": 3200,
-          "cooldownTicks": 40
+          "cooldownTicks": 40,
+          "slowPermille": 1000,
+          "militiaHp": 0,
+          "militiaRespawnTicks": 0
         },
         {
           "cost": 120,
           "damage": 22,
           "rangeMilli": 3400,
-          "cooldownTicks": 36
+          "cooldownTicks": 36,
+          "slowPermille": 1000,
+          "militiaHp": 0,
+          "militiaRespawnTicks": 0
+        }
+      ]
+    },
+    {
+      "id": "pechnase",
+      "kind": "slow",
+      "keepLevel": 2,
+      "splashMilli": 0,
+      "levels": [
+        {
+          "cost": 80,
+          "damage": 3,
+          "rangeMilli": 2000,
+          "cooldownTicks": 20,
+          "slowPermille": 550,
+          "militiaHp": 0,
+          "militiaRespawnTicks": 0
+        },
+        {
+          "cost": 110,
+          "damage": 4,
+          "rangeMilli": 2200,
+          "cooldownTicks": 18,
+          "slowPermille": 450,
+          "militiaHp": 0,
+          "militiaRespawnTicks": 0
+        }
+      ]
+    },
+    {
+      "id": "wachstube",
+      "kind": "militia",
+      "keepLevel": 2,
+      "splashMilli": 0,
+      "levels": [
+        {
+          "cost": 100,
+          "damage": 8,
+          "rangeMilli": 1000,
+          "cooldownTicks": 16,
+          "slowPermille": 1000,
+          "militiaHp": 120,
+          "militiaRespawnTicks": 240
+        },
+        {
+          "cost": 130,
+          "damage": 11,
+          "rangeMilli": 1000,
+          "cooldownTicks": 14,
+          "slowPermille": 1000,
+          "militiaHp": 180,
+          "militiaRespawnTicks": 200
         }
       ]
     }

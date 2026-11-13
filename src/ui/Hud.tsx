@@ -26,6 +26,20 @@ export interface StepperRow {
   readonly cells: readonly { readonly id: string; readonly label: string; readonly count: number; readonly onMinus: () => void; readonly onPlus: () => void }[];
 }
 
+export interface MapNode {
+  readonly id: string;
+  readonly kind: 'home' | 'camp' | 'city';
+  readonly label: string;
+  readonly sub: string;
+  /** Lage in Prozent der Kartenfläche. */
+  readonly x: number;
+  readonly y: number;
+  readonly shielded: boolean;
+  readonly disabled: boolean;
+  readonly hint: boolean;
+  readonly onClick: () => void;
+}
+
 export interface HudModel {
   readonly resources: Resources;
   readonly showAllResources: boolean;
@@ -35,6 +49,11 @@ export interface HudModel {
   readonly depth: number | null;
   readonly banner: string | null;
   readonly bottom: readonly Btn[];
+  /** Zweite, kleinere Reihe über der Hauptleiste. */
+  readonly bottomSecondary: readonly Btn[];
+  /** Kleine Statuszeile unter den Vorräten (Schild). */
+  readonly status: string | null;
+  readonly map: { readonly title: string; readonly nodes: readonly MapNode[]; readonly back: Btn } | null;
   readonly sheet: { readonly title: string; readonly note?: string | undefined; readonly options: readonly Btn[]; readonly onClose: (() => void) | null; readonly closeLabel: string } | null;
   readonly panel: { readonly title: string; readonly lines: readonly string[]; readonly loot?: Resources | undefined; readonly rows: readonly StepperRow[]; readonly buttons: readonly Btn[] } | null;
 }
@@ -111,11 +130,37 @@ export function Hud({ m }: { m: HudModel }) {
         </span>
       </div>
 
+      {m.status !== null && <div data-testid="status" class="bar" style={{ top: 'calc(env(safe-area-inset-top) + 34px)', fontSize: '13px', opacity: 0.75, padding: '0 14px' }}>{m.status}</div>}
+
+      {m.map && (
+        <div data-testid="map" class="map">
+          <div style={{ position: 'absolute', left: '14px', top: '8px', fontSize: '15px', opacity: 0.7 }}>{m.map.title}</div>
+          {m.map.nodes.map((n) => (
+            <button
+              key={n.id}
+              data-testid={`node-${n.id}`}
+              class={`node ${n.kind}${n.hint ? ' pulse' : ''}`}
+              disabled={n.disabled}
+              onClick={n.onClick}
+              style={{ left: `${n.x}%`, top: `${n.y}%` }}
+            >
+              <span class={`mark${n.shielded ? ' shielded' : ''}`} />
+              <span style={{ fontWeight: 600 }}>{n.label}</span>
+              <span style={{ fontSize: '12px', opacity: 0.8 }}>{n.sub}</span>
+            </button>
+          ))}
+          <div class="bar" style={{ bottom: 'env(safe-area-inset-bottom)', paddingBottom: '18px', display: 'flex' }}><Button b={m.map.back} /></div>
+        </div>
+      )}
+
       {m.banner !== null && <div data-testid="banner" class="banner">{m.banner}</div>}
 
-      {m.bottom.length > 0 && !m.sheet && !m.panel && (
-        <div class="bar" style={{ bottom: 'env(safe-area-inset-bottom)', paddingBottom: '18px', display: 'flex', gap: '8px' }}>
-          {m.bottom.map((b) => <Button b={b} key={b.id} />)}
+      {m.bottom.length > 0 && !m.sheet && !m.panel && !m.map && (
+        <div class="bar" style={{ bottom: 'env(safe-area-inset-bottom)', paddingBottom: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          {m.bottomSecondary.length > 0 && (
+            <div class="small" style={{ display: 'flex', gap: '6px' }}>{m.bottomSecondary.map((b) => <Button b={b} key={b.id} />)}</div>
+          )}
+          <div style={{ display: 'flex', gap: '8px' }}>{m.bottom.map((b) => <Button b={b} key={b.id} />)}</div>
         </div>
       )}
 

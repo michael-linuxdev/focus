@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "preliminary": true,
   "waves": [
     {
@@ -77,6 +77,32 @@
       ]
     },
     {
+      "id": "dorf_w6",
+      "groups": [
+        {
+          "unit": "raeuber",
+          "count": 10,
+          "startTick": 10,
+          "intervalTicks": 14,
+          "jitterTicks": 6
+        },
+        {
+          "unit": "schildtraeger",
+          "count": 4,
+          "startTick": 120,
+          "intervalTicks": 40,
+          "jitterTicks": 6
+        },
+        {
+          "unit": "sturmbock",
+          "count": 1,
+          "startTick": 60,
+          "intervalTicks": 0,
+          "jitterTicks": 0
+        }
+      ]
+    },
+    {
       "id": "dorf_loop",
       "groups": [
         {
@@ -99,6 +125,39 @@
           "startTick": 480,
           "intervalTicks": 5,
           "jitterTicks": 2
+        }
+      ]
+    },
+    {
+      "id": "nacht",
+      "groups": [
+        {
+          "unit": "sturmbock",
+          "count": 2,
+          "startTick": 0,
+          "intervalTicks": 30,
+          "jitterTicks": 0
+        },
+        {
+          "unit": "raeuber",
+          "count": 12,
+          "startTick": 40,
+          "intervalTicks": 12,
+          "jitterTicks": 6
+        },
+        {
+          "unit": "schildtraeger",
+          "count": 5,
+          "startTick": 200,
+          "intervalTicks": 30,
+          "jitterTicks": 6
+        },
+        {
+          "unit": "raeuber",
+          "count": 10,
+          "startTick": 420,
+          "intervalTicks": 6,
+          "jitterTicks": 3
         }
       ]
     }

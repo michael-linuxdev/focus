@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "preliminary": true,
   "buildings": [
     {
@@ -69,7 +69,7 @@
         "wood": 30,
         "stone": 0
       },
-      "buildSeconds": 120,
+      "buildSeconds": 300,
       "producePerHour": {
         "gold": 600,
         "wood": 0,

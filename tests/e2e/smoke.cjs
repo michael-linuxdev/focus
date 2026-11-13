@@ -1,4 +1,4 @@
-// Spielt den gebauten Stand im Browser in Handygröße durch (Minute 0 bis 15):
+// Spielt den gebauten Stand im Browser in Handygröße durch (Minute 0 bis 30 und die Rückkehr):
 // Start ohne Menü, Verteidigung, Stadtbau mit Timern, Burgfried 2 mit Straßenwahl, Katapult, Heldin,
 // Kaserne, erster Angriff mit Fähigkeiten, Wiederholung, Speicherstand, Installierbarkeit, Offline.
 // Schlachten laufen beschleunigt, Bauzeiten per Zeitraffer (window.__mk); die Regeln bleiben dieselben.
@@ -159,7 +159,7 @@ const SHOTS = process.env.SHOTS ?? 'test-results';
       const inHospital = s.game.army.hospital.filter((h) => h.unit === unit).reduce((n, h) => n + h.count, 0);
       assert.equal((s.game.army.ready[unit] ?? 0) + inHospital, troopsBefore[unit], `keine ${unit} verloren`);
     }
-    assert.equal(s.step, 'freies_spiel');
+    assert.equal(s.step, 'weltkarte');
 
     // Wiederholung: läuft identisch ab.
     await click('result-replay');
@@ -172,6 +172,87 @@ const SHOTS = process.env.SHOTS ?? 'test-results';
     await shot('17-wiederholungen');
     assert.ok((await page.getByTestId('panel').locator('button').count()) >= 7, 'gespeicherte Schlachten sind aufgelistet');
     await click('replays-back');
+
+    // Minute 15-20: Weltkarte, Schild, Pechnase und Wachstube, erste verlierbare Welle.
+    await waitStep('weltkarte');
+    await click('world');
+    await page.getByTestId('map').waitFor();
+    await shot('18-weltkarte');
+    assert.equal(await page.getByTestId('node-eschenfurt').isDisabled(), true, 'Nachbar unter Schild ist nicht angreifbar');
+    assert.equal(await page.getByTestId('node-falkenried').isDisabled(), false);
+    assert.match(await page.getByTestId('node-home').textContent(), /Schild/);
+    await click('world-back');
+    await waitStep('pechnase');
+    assert.match(await page.getByTestId('status').textContent(), /Schild 7\d h/);
+    await tapAt('slot', 's4');
+    await shot('19-turmwahl');
+    await click('tower-pechnase');
+    await waitStep('wachstube');
+    await tapAt('slot', 's7');
+    await click('tower-wachstube');
+    await waitStep('welle_6');
+    await shot('20-stadt-vier-turmtypen');
+    await click('defend');
+    await page.evaluate(() => window.__mk.speed(2));
+    await page.waitForTimeout(3500);
+    await shot('21-welle-6');
+    await page.evaluate(() => window.__mk.speed(4));
+    await waitStep('speicher');
+
+    // Minute 20-25: längere Timer, Allianz mit Belohnung, Hilfe beim Bauen.
+    await tapAt('plot', 'p4');
+    await click('building-speicher');
+    await waitStep('allianz');
+    const goldBefore = (await state()).game.resources.gold;
+    await click('alliance');
+    await shot('22-allianz');
+    await click('alliance-join');
+    assert.equal((await state()).game.resources.gold, goldBefore + 100);
+    await click('sheet-close');
+    await waitStep('hof');
+    await tapAt('plot', 'p5');
+    await click('building-hof');
+    await waitStep('hilfe');
+    const hofBefore = (await state()).game.buildings.find((b) => b.def === 'hof').doneAt;
+    await shot('23-hilfe-bitten');
+    await tapAt('plot', 'p5');
+    await waitStep('tagesziele');
+    await page.waitForTimeout(4500); // die erste Hilfe kommt nach vier Sekunden echter Zeit
+    await shot('24-hilfe-kommt');
+    await skip(20);
+    s = await state();
+    assert.equal(s.game.buildings.find((b) => b.def === 'hof').helpsReceived, 5);
+    assert.equal(s.game.buildings.find((b) => b.def === 'hof').doneAt, hofBefore - 150000, 'fünf Hilfen verkürzen um 150 s');
+
+    // Minute 25-30: Tagesziele und Ankündigung des Nachtangriffs.
+    await click('goals');
+    await shot('25-tagesziele');
+    await click('goal-verteidigen'); // die Ankündigung erscheint danach von selbst
+    await page.getByTestId('raid-ack').waitFor();
+    await shot('26-ankuendigung');
+    await click('raid-ack');
+    await waitStep('freies_spiel');
+
+    // Rückkehr nach Abwesenheit: Nachtangriff wird berechnet, als Wiederholung gezeigt, Tipp führt zur Schwachstelle.
+    await skip(4 * 3600 + 60);
+    await page.getByTestId('raid-replay').waitFor();
+    await shot('27-nachtangriff-bericht');
+    s = await state();
+    const raid = s.game.replays[s.game.replays.length - 1];
+    assert.equal(raid.kind, 'raid');
+    assert.equal(raid.replay.inputs.length, 0);
+    await click('raid-replay');
+    await click('replay-speed');
+    await click('replay-speed');
+    await page.waitForTimeout(1500);
+    await shot('28-nachtangriff-wiederholung');
+    await page.waitForFunction(() => window.__mk.state().verdict !== null, null, { timeout: 120000 });
+    assert.equal((await state()).verdict, 'ok');
+    await click('replay-weak');
+    await page.waitForFunction(() => window.__mk.state().screen === 'city');
+    await page.waitForTimeout(400);
+    await shot('29-schwachstelle');
+    assert.match(await page.getByTestId('banner').textContent(), /Schwachstelle/);
 
     // Installierbarkeit und Offline-Betrieb, Speicherstand überlebt Neuladen.
     const manifestHref = await page.locator('link[rel=manifest]').getAttribute('href');
@@ -186,7 +267,8 @@ const SHOTS = process.env.SHOTS ?? 'test-results';
     await page.waitForFunction(() => window.__mk?.state().screen === 'city');
     s = await state();
     assert.deepEqual(s.game.towers, saved.towers);
-    assert.deepEqual(s.game.buildings.map((b) => b.def), ['holzfaeller', 'steinbruch', 'kaserne']);
+    assert.deepEqual(s.game.buildings.map((b) => b.def), ['holzfaeller', 'steinbruch', 'kaserne', 'speicher', 'hof']);
+    assert.equal(s.game.allianceJoined, true);
     assert.equal(s.game.roadId, 'westschleife');
     assert.equal(s.game.replays.length, saved.replays.length);
     assert.equal(s.step, 'freies_spiel');
@@ -208,7 +290,7 @@ const SHOTS = process.env.SHOTS ?? 'test-results';
     assert.equal(s.game.resources.gold, 120);
     assert.equal(s.game.towers.length, 2);
     assert.deepEqual(errors, []);
-    console.log('E2E ok: Minute 0 bis 15, Wiederholung identisch, Speicherstand, Update von M1, Manifest, Offline');
+    console.log('E2E ok: Minute 0 bis 30, Nachtangriff bei Rückkehr, Wiederholung identisch, Speicherstand, Update von M1, Manifest, Offline');
   } finally {
     await browser.close();
     server.kill();

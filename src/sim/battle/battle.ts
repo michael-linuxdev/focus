@@ -11,10 +11,11 @@ import { rngFromSeed, rngInt, type RngState } from '../rng.ts';
  * Reihenfolge innerhalb eines Ticks (verbindlich, auch für die C#-Fassung):
  *   1. Eingaben dieses Ticks in Listenreihenfolge anwenden (ungültige werden übergangen)
  *   2. Fällige Einheiten in Planreihenfolge aufstellen
- *   3. Einheiten in Reihenfolge ihrer Kennung bewegen; vor einem stehenden Tor halten sie an und beschädigen es
+ *   3. Einheiten in Reihenfolge ihrer Kennung bewegen (Pechnasen bremsen); vor einem stehenden Tor und vor
+ *      stehender Miliz halten sie an und beschädigen sie
  *      (Schritte 2 und 3 entfallen, solange die Welle am Haltepunkt steht; siehe `frozen`)
  *   4. Am Burgfried angekommene Einheiten entfernen, Burgfried-Schaden
- *   5. Türme in Reihenfolge der Bauplätze der Stadt: Abklingzeit oder Schuss
+ *   5. Türme in Reihenfolge der Bauplätze der Stadt: Abklingzeit oder Wirkung (Schuss, Pech, Miliz)
  *   6. Durchbruchstiefe und Ergebnis prüfen, Tick hochzählen
  */
 
@@ -82,6 +83,12 @@ export interface BattleTower extends CityTower {
   readonly lastShotTick: number;
   readonly targetX: number;
   readonly targetY: number;
+  /** Von diesem Turm besiegte Angreifer (für die Schwachstellen-Auswertung). */
+  readonly kills: number;
+  /** Wachstube: Leben der Miliz, Tick ihres Nachrückens und ihr Standort als Wegstrecke. */
+  readonly militiaHp: number;
+  readonly militiaRespawnAt: number;
+  readonly militiaPos: number;
 }
 
 /** `held`: der Verteidiger hat gehalten. `breached`: der Burgfried ist gefallen. */
@@ -149,8 +156,40 @@ function sortPending(list: readonly PendingSpawn[]): PendingSpawn[] {
   return list.map((p, i) => ({ p, i })).sort((a, b) => a.p.tick - b.p.tick || a.i - b.i).map((x) => x.p);
 }
 
-function newTower(t: CityTower): BattleTower {
-  return { slot: t.slot, def: t.def, level: t.level, cooldown: 0, disabledUntil: 0, lastShotTick: -1, targetX: 0, targetY: 0 };
+/** Abstand der Probepunkte, mit denen der Standort der Miliz auf der Straße gesucht wird. */
+const MILITIA_SEARCH_STEP = 250;
+
+/**
+ * Standort der Miliz: der Punkt der Straße, der dem Bauplatz am nächsten liegt (bei Gleichstand der frühere),
+ * gesucht in festen Schritten hinter dem Tor.
+ */
+export function militiaPosition(road: RoadDef, slotX: number, slotY: number, data: GameData): number {
+  const length = roadLengthMilli(road);
+  let best = data.rules.gateMilli + MILITIA_SEARCH_STEP;
+  let bestDist = -1;
+  for (let pos = best; pos < length; pos += MILITIA_SEARCH_STEP) {
+    const [x, y] = roadPointMilli(road, pos);
+    const dx = x - slotX * MILLI;
+    const dy = y - slotY * MILLI;
+    const dist = dx * dx + dy * dy;
+    if (bestDist < 0 || dist < bestDist) {
+      best = pos;
+      bestDist = dist;
+    }
+  }
+  return best;
+}
+
+function newTower(t: CityTower, road: RoadDef, data: GameData): BattleTower {
+  const def = findById(data.towers.towers, t.def, 'Turm');
+  const slot = findById(data.city.towerSlots, t.slot, 'Bauplatz');
+  const militia = def.kind === 'militia';
+  return {
+    slot: t.slot, def: t.def, level: t.level, cooldown: 0, disabledUntil: 0, lastShotTick: -1, targetX: 0, targetY: 0, kills: 0,
+    militiaHp: militia ? towerLevel(t, data).militiaHp : 0,
+    militiaRespawnAt: 0,
+    militiaPos: militia ? militiaPosition(road, slot.x, slot.y, data) : 0,
+  };
 }
 
 export function towerLevel(t: CityTower, data: GameData): TowerLevelDef {
@@ -204,7 +243,7 @@ export function createBattle(setup: BattleSetup, seed: number, data: GameData): 
     pending,
     units: [],
     nextUnitId: 1,
-    towers: setup.towers.map(newTower),
+    towers: setup.towers.map((t) => newTower(t, road, data)),
     gold: setup.gold,
     keepHp: setup.keepHp,
     gateHp: setup.gateHp,
@@ -246,7 +285,7 @@ export function validateBattleAction(state: BattleState, action: BattleAction, d
   }
 }
 
-function applyAction(state: BattleState, action: BattleAction, rng: RngState, data: GameData): BattleState {
+function applyAction(state: BattleState, action: BattleAction, rng: RngState, road: RoadDef, data: GameData): BattleState {
   if (validateBattleAction(state, action, data) !== null) return state;
   switch (action.type) {
     case 'ReleaseWave': {
@@ -255,7 +294,7 @@ function applyAction(state: BattleState, action: BattleAction, rng: RngState, da
     }
     case 'BuildTower': {
       const cost = towerActionCost(state.towers, state.setup.keepLevel, action, data) as number;
-      return { ...state, gold: state.gold - cost, towers: [...state.towers, newTower({ slot: action.slot, def: action.tower, level: 1 })] };
+      return { ...state, gold: state.gold - cost, towers: [...state.towers, newTower({ slot: action.slot, def: action.tower, level: 1 }, road, data)] };
     }
     case 'UpgradeTower': {
       const cost = towerActionCost(state.towers, state.setup.keepLevel, action, data) as number;
@@ -280,13 +319,6 @@ export function marketMilli(roadLength: number, data: GameData): number {
   return mulDiv(roadLength, data.rules.marketPermille, PERMILLE);
 }
 
-/** Schaden eines Treffers nach Rüstung und Schildwall, mindestens 1. */
-function damageTaken(base: number, def: UnitDef, shielded: boolean, shieldPermille: number): number {
-  let dmg = Math.max(1, base - def.armor);
-  if (shielded) dmg = Math.max(1, mulDiv(dmg, shieldPermille, PERMILLE));
-  return dmg;
-}
-
 /** Ein Zeitschritt. Ungültige Eingaben werden übergangen und ändern nichts. */
 export function stepBattle(state: BattleState, actions: readonly BattleAction[], data: GameData): BattleState {
   if (state.result !== 'running') return state;
@@ -296,13 +328,15 @@ export function stepBattle(state: BattleState, actions: readonly BattleAction[],
 
   // 1. Eingaben
   let s = state;
-  for (const action of actions) s = applyAction(s, action, rng, data);
+  for (const action of actions) s = applyAction(s, action, rng, road, data);
 
   // Haltepunkt: Solange kein Turm steht und der vorderste Angreifer dort angekommen ist,
   // steht die Welle still (keine Bewegung, Nachrücker verschieben sich um einen Tick).
   const hold = s.setup.holdMilliUntilTower;
   const frozen = hold > 0 && s.towers.length === 0 && s.units.some((u) => u.pos >= hold);
 
+  /** Arbeitskopie der Türme: Miliz nimmt schon in der Bewegungsphase Schaden. */
+  const tw = s.towers.map((t) => ({ ...t }));
   let nextUnitId = s.nextUnitId;
   let pending = s.pending;
   let keepHp = s.keepHp;
@@ -323,14 +357,37 @@ export function stepBattle(state: BattleState, actions: readonly BattleAction[],
     }
     if (due > 0) pending = pending.slice(due);
 
-    // 3. und 4. Bewegen, Tor, Ankunft
+    // 3. und 4. Bewegen, Tor, Miliz, Ankunft
     const gate = data.rules.gateMilli;
+    const slowers = tw
+      .filter((t) => findById(data.towers.towers, t.def, 'Turm').kind === 'slow' && s.tick >= t.disabledUntil)
+      .map((t) => ({ slot: findById(data.city.towerSlots, t.slot, 'Bauplatz'), level: towerLevel(t, data) }));
+    const guards = tw.filter((t) => findById(data.towers.towers, t.def, 'Turm').kind === 'militia');
     for (const u of spawned) {
       const def = unitDef(u.def);
-      let pos = u.pos + def.speedMilliPerTick;
+      let speed = def.speedMilliPerTick;
+      if (slowers.length > 0) {
+        const [ux, uy] = roadPointMilli(road, u.pos);
+        let factor = PERMILLE;
+        for (const sl of slowers) {
+          const dx = ux - sl.slot.x * MILLI;
+          const dy = uy - sl.slot.y * MILLI;
+          if (dx * dx + dy * dy <= sl.level.rangeMilli * sl.level.rangeMilli) factor = Math.min(factor, sl.level.slowPermille);
+        }
+        speed = Math.max(1, mulDiv(speed, factor, PERMILLE));
+      }
+      let pos = u.pos + speed;
       if (gateHp > 0 && pos >= gate) {
         pos = gate;
         gateHp = Math.max(0, gateHp - def.siege);
+      } else {
+        for (const g of guards) {
+          if (g.militiaHp <= 0 || u.pos > g.militiaPos || pos < g.militiaPos) continue;
+          pos = g.militiaPos;
+          g.militiaHp = Math.max(0, g.militiaHp - def.melee);
+          if (g.militiaHp === 0) g.militiaRespawnAt = s.tick + towerLevel(g, data).militiaRespawnTicks;
+          break;
+        }
       }
       if (pos >= s.roadLength) {
         leaked++;
@@ -346,65 +403,97 @@ export function stepBattle(state: BattleState, actions: readonly BattleAction[],
   let fallen = s.fallen;
   const shielded = s.tick < s.shieldUntil;
   const shieldPermille = data.hero.abilities.find((a) => a.kind === 'shield')?.damageTakenPermille ?? PERMILLE;
+  /** Trifft die Einheiten, für die `hit` gilt; liefert die Zahl der Besiegten. */
+  const strike = (base: number, ignoreArmor: boolean, militia: boolean, hit: (u: Unit) => boolean): number => {
+    let kills = 0;
+    const survivors: Unit[] = [];
+    for (const u of units) {
+      if (!hit(u)) {
+        survivors.push(u);
+        continue;
+      }
+      const ud = unitDef(u.def);
+      const raw = militia ? mulDiv(base, ud.militiaDamagePermille, PERMILLE) : base;
+      let dmg = Math.max(1, raw - (ignoreArmor ? 0 : ud.armor));
+      if (shielded) dmg = Math.max(1, mulDiv(dmg, shieldPermille, PERMILLE));
+      const hp = u.hp - dmg;
+      if (hp <= 0) {
+        gold += ud.bounty;
+        fallen = [...fallen, u.def];
+        kills++;
+      } else {
+        survivors.push({ id: u.id, def: u.def, pos: u.pos, hp });
+      }
+    }
+    units = survivors;
+    return kills;
+  };
   const towers: BattleTower[] = [];
   for (const slot of data.city.towerSlots) {
-    const tower = s.towers.find((t) => t.slot === slot.id);
+    const tower = tw.find((t) => t.slot === slot.id);
     if (!tower) continue;
     if (s.tick < tower.disabledUntil) {
       towers.push(tower);
+      continue;
+    }
+    const def = findById(data.towers.towers, tower.def, 'Turm');
+    const level = towerLevel(tower, data);
+    if (def.kind === 'militia' && tower.militiaHp <= 0) {
+      // Gefallene Miliz rückt nach der Wartezeit nach.
+      towers.push(s.tick >= tower.militiaRespawnAt ? { ...tower, militiaHp: level.militiaHp, cooldown: 0 } : tower);
       continue;
     }
     if (tower.cooldown > 0) {
       towers.push({ ...tower, cooldown: tower.cooldown - 1 });
       continue;
     }
-    const def = findById(data.towers.towers, tower.def, 'Turm');
-    const level = towerLevel(tower, data);
+    const base = slot.section === s.setup.heroSection ? mulDiv(level.damage, PERMILLE + data.hero.sectionBonusPermille, PERMILLE) : level.damage;
     const rangeSq = level.rangeMilli * level.rangeMilli;
-    // Ziel: am weitesten vorgerückte Einheit in Reichweite, bei Gleichstand die mit der kleinsten Kennung.
-    let target: Unit | null = null;
-    let tx = 0;
-    let ty = 0;
-    for (const u of units) {
-      if (target && u.pos <= target.pos) continue;
+    const inRange = (u: Unit): boolean => {
       const [ux, uy] = roadPointMilli(road, u.pos);
       const dx = ux - slot.x * MILLI;
       const dy = uy - slot.y * MILLI;
-      if (dx * dx + dy * dy <= rangeSq) {
-        target = u;
-        tx = ux;
-        ty = uy;
+      return dx * dx + dy * dy <= rangeSq;
+    };
+    let kills = 0;
+    let tx = 0;
+    let ty = 0;
+    let acted = false;
+    if (def.kind === 'slow') {
+      // Pechnase: trifft alle in Reichweite, Rüstung schützt nicht.
+      acted = units.some(inRange);
+      if (acted) kills = strike(base, true, false, inRange);
+      tx = slot.x * MILLI;
+      ty = slot.y * MILLI;
+    } else if (def.kind === 'militia') {
+      // Miliz: schlägt die vorderste aufgehaltene Einheit (kleinste Kennung).
+      const victim = units.find((u) => u.pos === tower.militiaPos);
+      if (victim) {
+        acted = true;
+        [tx, ty] = roadPointMilli(road, victim.pos);
+        kills = strike(base, false, true, (u) => u.id === victim.id);
+      }
+    } else {
+      // Ziel: am weitesten vorgerückte Einheit in Reichweite, bei Gleichstand die mit der kleinsten Kennung.
+      let target: Unit | null = null;
+      for (const u of units) {
+        if (target && u.pos <= target.pos) continue;
+        if (inRange(u)) target = u;
+      }
+      if (target) {
+        acted = true;
+        [tx, ty] = roadPointMilli(road, target.pos);
+        const targetId = target.id;
+        const splashSq = def.splashMilli * def.splashMilli;
+        kills = strike(base, false, false, (u) => {
+          if (u.id === targetId) return true;
+          if (def.splashMilli === 0) return false;
+          const [ux, uy] = roadPointMilli(road, u.pos);
+          return (ux - tx) * (ux - tx) + (uy - ty) * (uy - ty) <= splashSq;
+        });
       }
     }
-    if (!target) {
-      towers.push(tower);
-      continue;
-    }
-    const base = slot.section === s.setup.heroSection ? mulDiv(level.damage, PERMILLE + data.hero.sectionBonusPermille, PERMILLE) : level.damage;
-    const splashSq = def.splashMilli * def.splashMilli;
-    const targetId = target.id;
-    const survivors: Unit[] = [];
-    for (const u of units) {
-      let hit = u.id === targetId;
-      if (!hit && def.splashMilli > 0) {
-        const [ux, uy] = roadPointMilli(road, u.pos);
-        hit = (ux - tx) * (ux - tx) + (uy - ty) * (uy - ty) <= splashSq;
-      }
-      if (!hit) {
-        survivors.push(u);
-        continue;
-      }
-      const ud = unitDef(u.def);
-      const hp = u.hp - damageTaken(base, ud, shielded, shieldPermille);
-      if (hp <= 0) {
-        gold += ud.bounty;
-        fallen = [...fallen, u.def];
-      } else {
-        survivors.push({ id: u.id, def: u.def, pos: u.pos, hp });
-      }
-    }
-    units = survivors;
-    towers.push({ ...tower, cooldown: level.cooldownTicks - 1, lastShotTick: s.tick, targetX: tx, targetY: ty });
+    towers.push(acted ? { ...tower, cooldown: level.cooldownTicks - 1, lastShotTick: s.tick, targetX: tx, targetY: ty, kills: tower.kills + kills } : tower);
   }
 
   // 6. Durchbruchstiefe und Ergebnis
@@ -453,6 +542,9 @@ export function hashBattle(state: BattleState): number {
     add(t.level);
     add(t.cooldown);
     add(t.disabledUntil);
+    add(t.kills);
+    add(t.militiaHp);
+    add(t.militiaRespawnAt);
   }
   add(state.gold);
   add(state.keepHp);

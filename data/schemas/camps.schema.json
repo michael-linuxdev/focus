@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Computergesteuerte Räuberlager als Angriffsziele",
+  "title": "Angriffsziele auf der Weltkarte: Räuberlager (camp) und computergesteuerte Nachbarstädte (city). Attrappe: feste Vorräte, kein eigenes Verhalten. shielded: durch einen Schild geschützt, nicht angreifbar. map: Lage auf der Karte in Prozent",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -24,6 +24,9 @@
         "additionalProperties": false,
         "required": [
           "id",
+          "kind",
+          "shielded",
+          "map",
           "roadId",
           "keepLevel",
           "gateHp",
@@ -35,6 +38,35 @@
           "id": {
             "type": "string",
             "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "kind": {
+            "enum": [
+              "camp",
+              "city"
+            ]
+          },
+          "shielded": {
+            "type": "boolean"
+          },
+          "map": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "x",
+              "y"
+            ],
+            "properties": {
+              "x": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "y": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              }
+            }
           },
           "roadId": {
             "type": "string",

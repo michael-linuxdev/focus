@@ -83,6 +83,10 @@ export interface UnitDef {
   readonly armor: number;
   /** Schaden am Tor je Tick, solange die Einheit davor steht. */
   readonly siege: number;
+  /** Schaden an Miliz je Tick, solange die Einheit von ihr aufgehalten wird. */
+  readonly melee: number;
+  /** Faktor auf Treffer der Miliz (Rammböcke sind verwundbar). */
+  readonly militiaDamagePermille: number;
 }
 
 export interface TroopDef {
@@ -100,10 +104,16 @@ export interface TowerLevelDef {
   readonly damage: number;
   readonly rangeMilli: number;
   readonly cooldownTicks: number;
+  /** Pechnase: Tempo der Einheiten in Reichweite in Promille. */
+  readonly slowPermille: number;
+  /** Wachstube: Leben der Miliz und Ticks bis zum Nachrücken. */
+  readonly militiaHp: number;
+  readonly militiaRespawnTicks: number;
 }
 
 export interface TowerDef {
   readonly id: string;
+  readonly kind: 'shot' | 'slow' | 'militia';
   readonly keepLevel: number;
   /** > 0: alle Einheiten in diesem Umkreis um das Ziel werden getroffen. */
   readonly splashMilli: number;
@@ -148,6 +158,12 @@ export interface RulesData {
   readonly maxReplays: number;
   /** Gebäude schütten ihren Ertrag in diesem Takt aus. */
   readonly productionIntervalSeconds: number;
+  /** Tor der eigenen Stadt in verlierbaren Verteidigungen. */
+  readonly cityGateHp: number;
+  readonly newPlayerShieldHours: number;
+  readonly defeatShieldHours: number;
+  readonly nightRaidAfterHours: number;
+  readonly nightRaidWave: string;
 }
 
 export interface CityTowerRef {
@@ -158,6 +174,10 @@ export interface CityTowerRef {
 
 export interface CampDef {
   readonly id: string;
+  readonly kind: 'camp' | 'city';
+  /** Durch einen Schild geschützt: nicht angreifbar. */
+  readonly shielded: boolean;
+  readonly map: { readonly x: number; readonly y: number };
   readonly roadId: string;
   readonly keepLevel: number;
   readonly gateHp: number;
@@ -192,7 +212,7 @@ export type HintDef =
   | { readonly type: 'slot'; readonly slot: string; readonly tower: string }
   | { readonly type: 'plot'; readonly plot: string; readonly building: string }
   | { readonly type: 'keep' }
-  | { readonly type: 'button'; readonly button: 'defend' | 'hero' | 'attack' };
+  | { readonly type: 'button'; readonly button: 'defend' | 'hero' | 'attack' | 'world' | 'alliance' | 'goals' };
 
 export type ConditionDef =
   | { readonly type: 'defensesWon'; readonly count: number }
@@ -206,6 +226,11 @@ export type ConditionDef =
   | { readonly type: 'heroAssigned' }
   | { readonly type: 'troopsTrained'; readonly unit: string; readonly count: number }
   | { readonly type: 'attacksDone'; readonly count: number }
+  | { readonly type: 'worldSeen' }
+  | { readonly type: 'allianceJoined' }
+  | { readonly type: 'helpRequestedOrBuilt'; readonly building: string }
+  | { readonly type: 'goalClaimed' }
+  | { readonly type: 'raidAcknowledged' }
   | { readonly type: 'never' };
 
 export interface TutorialStepDef {
@@ -216,6 +241,8 @@ export interface TutorialStepDef {
   readonly freeSkip: boolean;
   /** Die Verteidigung beginnt in diesem Schritt von selbst. */
   readonly autoDefense: boolean;
+  /** Mit diesem Schritt wird der Nachtangriff angekündigt. */
+  readonly announcesRaid: boolean;
   /** Teile der Oberfläche, die ab diesem Schritt sichtbar sind. */
   readonly unlocks: readonly string[];
 }
@@ -225,6 +252,26 @@ export interface TutorialData {
   readonly defenses: readonly DefenseDef[];
   readonly afterDefenses: DefenseDef;
   readonly steps: readonly TutorialStepDef[];
+}
+
+/** Simulierte Allianz aus Bots. PLATZHALTER: keine echten Spieler, kein Server. */
+export interface AllianceData {
+  readonly version: number;
+  readonly id: string;
+  readonly members: readonly string[];
+  readonly joinReward: Resources;
+  readonly helpIntervalSeconds: number;
+  readonly helpReduceSeconds: number;
+  readonly maxHelps: number;
+}
+
+export type GoalCounter = 'defenses' | 'attacks' | 'built' | 'trained';
+
+export interface GoalDef {
+  readonly id: string;
+  readonly counter: GoalCounter;
+  readonly count: number;
+  readonly reward: Resources;
 }
 
 export interface GameData {
@@ -240,6 +287,8 @@ export interface GameData {
   readonly camps: { readonly version: number; readonly camps: readonly CampDef[] };
   readonly waves: { readonly version: number; readonly waves: readonly WaveDef[] };
   readonly tutorial: TutorialData;
+  readonly alliance: AllianceData;
+  readonly goals: { readonly version: number; readonly goals: readonly GoalDef[] };
 }
 
 /** Kennung des Datenstands für Schlachten; steht in jeder Wiederholung. */

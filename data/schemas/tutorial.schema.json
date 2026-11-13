@@ -88,7 +88,8 @@
           "done",
           "freeSkip",
           "autoDefense",
-          "unlocks"
+          "unlocks",
+          "announcesRaid"
         ],
         "properties": {
           "id": {
@@ -171,7 +172,10 @@
                     "enum": [
                       "defend",
                       "hero",
-                      "attack"
+                      "attack",
+                      "world",
+                      "alliance",
+                      "goals"
                     ]
                   }
                 }
@@ -373,6 +377,71 @@
                     "const": "never"
                   }
                 }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "type"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "worldSeen"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "type"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "allianceJoined"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "type",
+                  "building"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "helpRequestedOrBuilt"
+                  },
+                  "building": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_]*$"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "type"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "goalClaimed"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "type"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "raidAcknowledged"
+                  }
+                }
               }
             ]
           },
@@ -388,6 +457,9 @@
             "items": {
               "type": "string"
             }
+          },
+          "announcesRaid": {
+            "type": "boolean"
           }
         }
       }

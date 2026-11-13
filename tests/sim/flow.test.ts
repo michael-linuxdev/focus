@@ -4,13 +4,18 @@ import { createGame, hasBuilding, readyTroops, verifyReplay } from '../../src/si
 import { playTutorial } from './bot.ts';
 import { data } from './testdata.ts';
 
-describe('Geführter Ablauf, Minute 0 bis 15', () => {
+describe('Geführter Ablauf, Minute 0 bis 30', () => {
   it('wer den Hinweisen folgt, kommt ohne Sackgasse bis ins freie Spiel', () => {
     const run = playTutorial(createGame(11, 0, data), data, 'freies_spiel');
     if (process.env['FLOW_LOG']) writeFileSync(process.env['FLOW_LOG'], run.log.join('\n') + `\nSchlachten (Ticks): ${run.battleTicks.join(', ')}\n`);
     const g = run.game;
-    expect(g.defensesWon).toBe(5);
+    expect(g.defensesWon).toBeGreaterThanOrEqual(6);
     expect(g.attacksDone).toBe(1);
+    expect(g.worldSeen && g.allianceJoined && g.raidAcknowledged).toBe(true);
+    expect(g.goalsClaimed).toBeGreaterThanOrEqual(1);
+    expect(g.raidDueAt).toBe(g.now + data.rules.nightRaidAfterHours * 3_600_000);
+    expect(g.towers.some((t) => t.def === 'pechnase') && g.towers.some((t) => t.def === 'wachstube')).toBe(true);
+    expect(run.breached).toBe(0);
     expect(g.keepLevel).toBe(2);
     expect(g.hero).toEqual({ joined: true, section: 'nord' });
     expect(hasBuilding(g, 'holzfaeller') && hasBuilding(g, 'steinbruch') && hasBuilding(g, 'kaserne')).toBe(true);
@@ -35,7 +40,7 @@ describe('Geführter Ablauf, Minute 0 bis 15', () => {
       const before = playTutorial(createGame(seed, 0, data), data, 'erster_angriff');
       const total = (g: typeof before.game): number =>
         data.troops.troops.reduce((sum, t) => sum + readyTroops(g, t.unit) + g.army.hospital.filter((h) => h.unit === t.unit).reduce((n, h) => n + h.count, 0), 0);
-      const after = playTutorial(before.game, data, 'freies_spiel');
+      const after = playTutorial(before.game, data, 'weltkarte');
       const outcome = after.game.lastAttack!;
       expect(outcome.depth).toBeGreaterThanOrEqual(1);
       expect(outcome.loot.gold).toBeGreaterThan(0);

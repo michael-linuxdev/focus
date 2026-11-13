@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Einheiten (Geschwindigkeit in Tausendstel-Kacheln pro Tick, bounty in Gold, keepDamage in Burgfried-Leben, armor: Abzug je Treffer, siege: Schaden am Tor je Tick)",
+  "title": "Einheiten (Geschwindigkeit in Tausendstel-Kacheln pro Tick, bounty in Gold, keepDamage in Burgfried-Leben, armor: Abzug je Treffer, siege: Schaden am Tor je Tick); melee: Schaden an Miliz je Tick, militiaDamagePermille: Faktor auf Treffer der Miliz",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -29,7 +29,9 @@
           "bounty",
           "keepDamage",
           "armor",
-          "siege"
+          "siege",
+          "melee",
+          "militiaDamagePermille"
         ],
         "properties": {
           "id": {
@@ -57,6 +59,14 @@
             "minimum": 0
           },
           "siege": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "melee": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "militiaDamagePermille": {
             "type": "integer",
             "minimum": 0
           }

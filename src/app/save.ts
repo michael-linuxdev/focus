@@ -29,6 +29,25 @@ export const migrations: Readonly<Record<number, Migration>> = {
       defensesWon: num(old['wavesWon'], 0),
     };
   },
+  // 3 -> 4 (M4): Schild, Weltkarte, Allianz, Tagesziele und Nachtangriff kommen dazu; Gebäude merken sich Allianzhilfe.
+  3: (old, data) => {
+    const fresh = createGame(num(old['nextSeed'], 1), num(old['now'], 0), data);
+    const list = (value: unknown): Record<string, unknown>[] => (Array.isArray(value) ? (value as Record<string, unknown>[]) : []);
+    return {
+      ...old,
+      version: 4,
+      buildings: list(old['buildings']).map((b) => ({ ...b, helpRequestedAt: null, helpsReceived: 0 })),
+      replays: list(old['replays']).map((r) => ({ ...r, weakSection: null })),
+      shieldUntil: fresh.shieldUntil,
+      worldSeen: false,
+      allianceJoined: false,
+      daily: fresh.daily,
+      goalsClaimed: 0,
+      raidDueAt: null,
+      raidAcknowledged: false,
+      raidReport: null,
+    };
+  },
 };
 
 function num(value: unknown, fallback: number): number {

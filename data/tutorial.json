@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "preliminary": true,
   "defenses": [
     {
@@ -31,6 +31,12 @@
       "holdMilliUntilTower": 0,
       "unlosable": true,
       "victoryGold": 80
+    },
+    {
+      "wave": "dorf_w6",
+      "holdMilliUntilTower": 0,
+      "unlosable": false,
+      "victoryGold": 100
     }
   ],
   "afterDefenses": {
@@ -53,7 +59,8 @@
       },
       "freeSkip": false,
       "autoDefense": true,
-      "unlocks": []
+      "unlocks": [],
+      "announcesRaid": false
     },
     {
       "id": "zweiter_turm",
@@ -68,7 +75,8 @@
       },
       "freeSkip": false,
       "autoDefense": false,
-      "unlocks": []
+      "unlocks": [],
+      "announcesRaid": false
     },
     {
       "id": "welle_2",
@@ -84,7 +92,8 @@
       "autoDefense": false,
       "unlocks": [
         "defend"
-      ]
+      ],
+      "announcesRaid": false
     },
     {
       "id": "erster_ausbau",
@@ -99,7 +108,8 @@
       },
       "freeSkip": false,
       "autoDefense": false,
-      "unlocks": []
+      "unlocks": [],
+      "announcesRaid": false
     },
     {
       "id": "welle_3",
@@ -113,7 +123,8 @@
       },
       "freeSkip": false,
       "autoDefense": false,
-      "unlocks": []
+      "unlocks": [],
+      "announcesRaid": false
     },
     {
       "id": "holzfaeller",
@@ -131,7 +142,8 @@
       "unlocks": [
         "building:holzfaeller",
         "resources"
-      ]
+      ],
+      "announcesRaid": false
     },
     {
       "id": "timer_ueberspringen",
@@ -146,7 +158,8 @@
       },
       "freeSkip": true,
       "autoDefense": false,
-      "unlocks": []
+      "unlocks": [],
+      "announcesRaid": false
     },
     {
       "id": "steinbruch",
@@ -163,7 +176,8 @@
       "autoDefense": false,
       "unlocks": [
         "building:steinbruch"
-      ]
+      ],
+      "announcesRaid": false
     },
     {
       "id": "welle_4",
@@ -177,7 +191,8 @@
       },
       "freeSkip": false,
       "autoDefense": false,
-      "unlocks": []
+      "unlocks": [],
+      "announcesRaid": false
     },
     {
       "id": "burgfried_2",
@@ -192,7 +207,8 @@
       "autoDefense": false,
       "unlocks": [
         "keep"
-      ]
+      ],
+      "announcesRaid": false
     },
     {
       "id": "strasse_waehlen",
@@ -202,7 +218,8 @@
       },
       "freeSkip": false,
       "autoDefense": false,
-      "unlocks": []
+      "unlocks": [],
+      "announcesRaid": false
     },
     {
       "id": "katapult",
@@ -218,8 +235,11 @@
       "freeSkip": false,
       "autoDefense": false,
       "unlocks": [
-        "towerChoice"
-      ]
+        "towerChoice",
+        "tower:bogenturm",
+        "tower:katapult"
+      ],
+      "announcesRaid": false
     },
     {
       "id": "heldin",
@@ -234,7 +254,8 @@
       "autoDefense": false,
       "unlocks": [
         "hero"
-      ]
+      ],
+      "announcesRaid": false
     },
     {
       "id": "welle_5",
@@ -248,7 +269,8 @@
       },
       "freeSkip": false,
       "autoDefense": false,
-      "unlocks": []
+      "unlocks": [],
+      "announcesRaid": false
     },
     {
       "id": "kaserne",
@@ -265,7 +287,8 @@
       "autoDefense": false,
       "unlocks": [
         "building:kaserne"
-      ]
+      ],
+      "announcesRaid": false
     },
     {
       "id": "truppen",
@@ -283,7 +306,8 @@
       "autoDefense": false,
       "unlocks": [
         "train"
-      ]
+      ],
+      "announcesRaid": false
     },
     {
       "id": "erster_angriff",
@@ -299,7 +323,172 @@
       "autoDefense": false,
       "unlocks": [
         "attack"
+      ],
+      "announcesRaid": false
+    },
+    {
+      "id": "weltkarte",
+      "hint": {
+        "type": "button",
+        "button": "world"
+      },
+      "done": {
+        "type": "worldSeen"
+      },
+      "freeSkip": false,
+      "autoDefense": false,
+      "announcesRaid": false,
+      "unlocks": [
+        "world",
+        "replays"
       ]
+    },
+    {
+      "id": "pechnase",
+      "hint": {
+        "type": "slot",
+        "slot": "s4",
+        "tower": "pechnase"
+      },
+      "done": {
+        "type": "towerOfType",
+        "tower": "pechnase"
+      },
+      "freeSkip": false,
+      "autoDefense": false,
+      "announcesRaid": false,
+      "unlocks": [
+        "tower:pechnase"
+      ]
+    },
+    {
+      "id": "wachstube",
+      "hint": {
+        "type": "slot",
+        "slot": "s7",
+        "tower": "wachstube"
+      },
+      "done": {
+        "type": "towerOfType",
+        "tower": "wachstube"
+      },
+      "freeSkip": false,
+      "autoDefense": false,
+      "announcesRaid": false,
+      "unlocks": [
+        "tower:wachstube"
+      ]
+    },
+    {
+      "id": "welle_6",
+      "hint": {
+        "type": "button",
+        "button": "defend"
+      },
+      "done": {
+        "type": "defensesWon",
+        "count": 6
+      },
+      "freeSkip": false,
+      "autoDefense": false,
+      "announcesRaid": false,
+      "unlocks": []
+    },
+    {
+      "id": "speicher",
+      "hint": {
+        "type": "plot",
+        "plot": "p4",
+        "building": "speicher"
+      },
+      "done": {
+        "type": "buildingStarted",
+        "building": "speicher"
+      },
+      "freeSkip": false,
+      "autoDefense": false,
+      "announcesRaid": false,
+      "unlocks": [
+        "building:speicher",
+        "building:lazarett"
+      ]
+    },
+    {
+      "id": "allianz",
+      "hint": {
+        "type": "button",
+        "button": "alliance"
+      },
+      "done": {
+        "type": "allianceJoined"
+      },
+      "freeSkip": false,
+      "autoDefense": false,
+      "announcesRaid": false,
+      "unlocks": [
+        "alliance"
+      ]
+    },
+    {
+      "id": "hof",
+      "hint": {
+        "type": "plot",
+        "plot": "p5",
+        "building": "hof"
+      },
+      "done": {
+        "type": "buildingStarted",
+        "building": "hof"
+      },
+      "freeSkip": false,
+      "autoDefense": false,
+      "announcesRaid": false,
+      "unlocks": [
+        "building:hof"
+      ]
+    },
+    {
+      "id": "hilfe",
+      "hint": {
+        "type": "plot",
+        "plot": "p5",
+        "building": "hof"
+      },
+      "done": {
+        "type": "helpRequestedOrBuilt",
+        "building": "hof"
+      },
+      "freeSkip": false,
+      "autoDefense": false,
+      "announcesRaid": false,
+      "unlocks": []
+    },
+    {
+      "id": "tagesziele",
+      "hint": {
+        "type": "button",
+        "button": "goals"
+      },
+      "done": {
+        "type": "goalClaimed"
+      },
+      "freeSkip": false,
+      "autoDefense": false,
+      "announcesRaid": false,
+      "unlocks": [
+        "goals"
+      ]
+    },
+    {
+      "id": "ankuendigung",
+      "hint": null,
+      "done": {
+        "type": "raidAcknowledged"
+      },
+      "freeSkip": false,
+      "autoDefense": false,
+      "announcesRaid": true,
+      "unlocks": []
     },
     {
       "id": "freies_spiel",
@@ -309,12 +498,8 @@
       },
       "freeSkip": false,
       "autoDefense": false,
-      "unlocks": [
-        "replays",
-        "building:hof",
-        "building:speicher",
-        "building:lazarett"
-      ]
+      "announcesRaid": false,
+      "unlocks": []
     }
   ]
 }

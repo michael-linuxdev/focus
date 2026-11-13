@@ -18,6 +18,16 @@
       .btn:disabled { background: #56604f; color: #1d2a1f; opacity: 0.7; }
       .btn.quiet { background: #34453a; color: #f1ead6; }
       .btn.active { outline: 3px solid #fff; }
+      .small .btn { min-height: 44px; font-size: 14px; padding: 4px 8px; background: #34453a; color: #f1ead6; }
+      .map { pointer-events: auto; position: absolute; left: 0; right: 0; top: 56px; bottom: 0; background: #24362a
+             radial-gradient(circle at 30% 20%, #2f4a36 0, transparent 45%) ; overflow: hidden; }
+      .node { position: absolute; transform: translate(-50%, -50%); min-width: 96px; min-height: 64px; border: 0; background: transparent; color: #f1ead6;
+              font: 14px system-ui, sans-serif; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px; border-radius: 12px; }
+      .node:disabled { opacity: 0.6; }
+      .node .mark { width: 30px; height: 30px; background: #d8d2c0; display: block; }
+      .node.camp .mark { background: #b3372f; border-radius: 50%; }
+      .node.home .mark { background: #d9a441; }
+      .node .mark.shielded { outline: 3px solid #7fd1ff; outline-offset: 4px; border-radius: 4px; }
       .step { pointer-events: auto; width: 44px; height: 44px; border: 0; border-radius: 10px; background: #3d4f43; color: #f1ead6; font: 600 22px system-ui, sans-serif; }
       .sheet { pointer-events: auto; position: absolute; left: 0; right: 0; bottom: 0; background: #1a241c; border-radius: 16px 16px 0 0; box-shadow: 0 -6px 24px rgba(0,0,0,0.5);
                padding: 14px 14px calc(16px + env(safe-area-inset-bottom)); box-sizing: border-box; max-height: 70%; overflow-y: auto; }

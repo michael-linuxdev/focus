@@ -68,6 +68,14 @@ export function playTutorial(start: GameState, data: GameData, untilStep: string
     act({ type: 'AdvanceTime', now: game.now + Math.ceil(final.tick / data.game.ticksPerSecond) * 1000 });
   };
 
+  const attack = (): void => {
+    const lineup = defaultLineup(game, data);
+    const camp = data.camps.camps[0]!.id;
+    const { inputs, final } = playBattle(attackSetup(game, camp, lineup, data), game.nextSeed, data, simpleAttack(120));
+    battleTicks.push(final.tick);
+    if (!act({ type: 'ResolveAttack', camp, lineup, inputs })) throw new Error('ResolveAttack abgelehnt');
+  };
+
   for (let guard = 0; guard < 2000; guard++) {
     const step = tutorialStep(game, data);
     if (step.id === untilStep) return { game, waitedSeconds, battleTicks, breached, log };
@@ -78,18 +86,21 @@ export function playTutorial(start: GameState, data: GameData, untilStep: string
       if (game.roadChoicePending) {
         const roads = data.city.keepLevels.find((l) => l.level === game.keepLevel)!.roads;
         act({ type: 'ChooseRoad', road: roads[roadVariant % roads.length]! });
-      } else wait(1);
-    } else if (hint.type === 'button' && hint.button === 'defend') defend();
-    else if (hint.type === 'button' && hint.button === 'hero') act({ type: 'AssignHero', section: data.city.sections[0]!.id });
-    else if (hint.type === 'button' && hint.button === 'attack') {
-      const lineup = defaultLineup(game, data);
-      const camp = data.camps.camps[0]!.id;
-      const { inputs, final } = playBattle(attackSetup(game, camp, lineup, data), game.nextSeed, data, simpleAttack(120));
-      battleTicks.push(final.tick);
-      if (!act({ type: 'ResolveAttack', camp, lineup, inputs })) throw new Error('ResolveAttack abgelehnt');
+      } else if (!act({ type: 'AcknowledgeRaid' })) wait(1);
+    } else if (hint.type === 'button') {
+      if (hint.button === 'defend') defend();
+      else if (hint.button === 'hero') act({ type: 'AssignHero', section: data.city.sections[0]!.id });
+      else if (hint.button === 'attack') attack();
+      else if (hint.button === 'world') act({ type: 'OpenWorldMap' });
+      else if (hint.button === 'alliance') act({ type: 'JoinAlliance' });
+      else if (!data.goals.goals.some((g) => act({ type: 'ClaimDailyGoal', goal: g.id }))) defend();
     } else if (hint.type === 'slot') {
       const occupied = game.towers.some((t) => t.slot === hint.slot);
-      if (!act(occupied ? { type: 'UpgradeTower', slot: hint.slot } : { type: 'BuildTower', slot: hint.slot, tower: hint.tower })) wait(1);
+      // Fehlt das Gold für den Turm, verdient der Bot es mit einer Verteidigung.
+      if (!act(occupied ? { type: 'UpgradeTower', slot: hint.slot } : { type: 'BuildTower', slot: hint.slot, tower: hint.tower })) {
+        if (game.defensesWon >= data.tutorial.defenses.length - 1) defend();
+        else wait(1);
+      }
     } else if (hint.type === 'keep') {
       if (!act({ type: 'UpgradeKeep' })) wait(1);
     } else if (hint.type === 'plot') {
@@ -97,7 +108,7 @@ export function playTutorial(start: GameState, data: GameData, untilStep: string
       if (!building) {
         if (!act({ type: 'BuildBuilding', plot: hint.plot, building: hint.building })) wait(1);
       } else if (building.doneAt > game.now) {
-        if (!act({ type: 'SkipTimerFree', plot: hint.plot })) wait(1);
+        if (!act({ type: 'SkipTimerFree', plot: hint.plot }) && !act({ type: 'RequestHelp', plot: hint.plot })) wait(1);
       } else if (!act({ type: 'TrainTroops', unit: 'leicht', count: 6 })) wait(1);
     }
     if (game.tutorialStep !== before) log.push(`${step.id} -> ${tutorialStep(game, data).id} (Gold ${game.resources.gold}, Holz ${game.resources.wood}, Stein ${game.resources.stone}, gewartet ${waitedSeconds}s)`);

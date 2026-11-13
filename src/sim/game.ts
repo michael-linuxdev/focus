@@ -1,6 +1,6 @@
 import {
   RESOURCE_KEYS, findById,
-  type BuildingDef, type ConditionDef, type DefenseDef, type GameData, type Resources, type TutorialStepDef, type UnitCount,
+  type BuildingDef, type ConditionDef, type DefenseDef, type GameData, type GoalCounter, type Resources, type TutorialStepDef, type UnitCount,
 } from './data.ts';
 import { mulDiv, PERMILLE } from './fixed.ts';
 import { towerActionCost, type BattleInput, type BattleSetup, type BattleState, type CityTower } from './battle/battle.ts';
@@ -8,7 +8,7 @@ import { computeLoot } from './loot.ts';
 import { makeReplay, runBattle, type Replay } from './replay.ts';
 
 /**
- * Dauerhafter Spielzustand und seine Aktionen, Stand M3.
+ * Dauerhafter Spielzustand und seine Aktionen, Stand M4.
  * Jede Spielerhandlung ist eine benannte Aktion: erst `validateGameAction`, dann `reduceGame`.
  * Die Uhrzeit kommt ausschließlich über `AdvanceTime` herein; dabei werden fällige Bauzeiten,
  * Erträge, Ausbildung und Lazarett abgerechnet (`settle`).
@@ -16,7 +16,7 @@ import { makeReplay, runBattle, type Replay } from './replay.ts';
  * Schlachten werden nicht "gemeldet", sondern nachgerechnet: `ResolveDefense` und `ResolveAttack`
  * bekommen nur die Eingaben des Spielers; Startzustand und Startwert stammen aus dem Spielzustand.
  */
-export const STATE_VERSION = 3;
+export const STATE_VERSION = 4;
 
 export interface Building {
   readonly plot: string;
@@ -25,6 +25,10 @@ export interface Building {
   readonly doneAt: number;
   /** Bis hierhin ist der Ertrag ausgeschüttet (ms). */
   readonly producedUntil: number;
+  /** Zeitpunkt der Bitte um Allianzhilfe für diesen Bau (ms), sonst `null`. */
+  readonly helpRequestedAt: number | null;
+  /** Schon angerechnete Hilfen. */
+  readonly helpsReceived: number;
 }
 
 export interface TroopBatch {
@@ -43,11 +47,14 @@ export interface Army {
 
 export interface SavedReplay {
   readonly id: number;
-  readonly kind: 'defense' | 'attack';
+  readonly kind: 'defense' | 'attack' | 'raid';
   readonly at: number;
   readonly result: 'held' | 'breached';
   readonly depth: number;
+  /** Beute des Angreifers: beim Angriff Gewinn des Spielers, bei Verteidigung und Nachtangriff sein Verlust. */
   readonly loot: Resources;
+  /** Abschnitt, in dem die wenigsten Angreifer fielen (nur wenn die Stadt verteidigt wurde). */
+  readonly weakSection: string | null;
   readonly replay: Replay;
 }
 
@@ -56,6 +63,13 @@ export interface AttackOutcome {
   readonly depth: number;
   readonly loot: Resources;
   readonly fallen: readonly UnitCount[];
+}
+
+export interface DailyGoals {
+  /** Tag seit Epoche, für den die Zähler gelten. */
+  readonly day: number;
+  readonly counters: Readonly<Record<GoalCounter, number>>;
+  readonly claimed: readonly string[];
 }
 
 export interface GameState {
@@ -82,6 +96,18 @@ export interface GameState {
   readonly replays: readonly SavedReplay[];
   readonly nextReplayId: number;
   readonly lastAttack: AttackOutcome | null;
+  /** Bis zu diesem Zeitpunkt schützt ein Schild vor Nachbarstädten (nicht vor Räubern). */
+  readonly shieldUntil: number;
+  readonly worldSeen: boolean;
+  /** PLATZHALTER: Mitgliedschaft in der simulierten Bot-Allianz. */
+  readonly allianceJoined: boolean;
+  readonly daily: DailyGoals;
+  readonly goalsClaimed: number;
+  /** Angekündigter Nachtangriff: frühester Zeitpunkt, zu dem er bei der Rückkehr berechnet wird. */
+  readonly raidDueAt: number | null;
+  readonly raidAcknowledged: boolean;
+  /** Kennung der Wiederholung eines Nachtangriffs, den der Spieler noch nicht gesehen hat. */
+  readonly raidReport: number | null;
 }
 
 export type Lineup = readonly (readonly UnitCount[])[];
@@ -97,6 +123,13 @@ export type GameAction =
   | { readonly type: 'ChooseRoad'; readonly road: string }
   | { readonly type: 'AssignHero'; readonly section: string }
   | { readonly type: 'TrainTroops'; readonly unit: string; readonly count: number }
+  | { readonly type: 'OpenWorldMap' }
+  | { readonly type: 'JoinAlliance' }
+  | { readonly type: 'RequestHelp'; readonly plot: string }
+  | { readonly type: 'ClaimDailyGoal'; readonly goal: string }
+  | { readonly type: 'AcknowledgeRaid' }
+  | { readonly type: 'ResolveNightRaid' }
+  | { readonly type: 'DismissRaidReport' }
   | { readonly type: 'ResolveAttack'; readonly camp: string; readonly lineup: Lineup; readonly inputs: readonly BattleInput[] };
 
 export type GameActionError =
@@ -107,9 +140,15 @@ export type GameActionError =
   | 'keep_max_level' | 'keep_busy' | 'road_choice_pending' | 'no_road_choice' | 'unknown_road'
   | 'no_hero' | 'unknown_section'
   | 'no_barracks' | 'unknown_troop' | 'training_busy'
-  | 'unknown_camp' | 'invalid_lineup' | 'not_enough_troops';
+  | 'unknown_camp' | 'target_shielded' | 'invalid_lineup' | 'not_enough_troops'
+  | 'already_joined' | 'no_alliance' | 'nothing_to_help' | 'help_already_requested'
+  | 'unknown_goal' | 'goal_not_reached' | 'goal_already_claimed'
+  | 'no_raid_announced' | 'raid_not_due' | 'nothing_to_dismiss';
 
 const NO_RESOURCES: Resources = { gold: 0, wood: 0, stone: 0 };
+const NO_COUNTERS: Readonly<Record<GoalCounter, number>> = { defenses: 0, attacks: 0, built: 0, trained: 0 };
+const HOUR_MS = 3_600_000;
+const DAY_MS = 24 * HOUR_MS;
 
 export function createGame(seed: number, now: number, data: GameData): GameState {
   const firstRoad = data.city.keepLevels[0]?.roads[0];
@@ -133,6 +172,14 @@ export function createGame(seed: number, now: number, data: GameData): GameState
     replays: [],
     nextReplayId: 1,
     lastAttack: null,
+    shieldUntil: now + data.rules.newPlayerShieldHours * HOUR_MS,
+    worldSeen: false,
+    allianceJoined: false,
+    daily: { day: Math.floor(now / DAY_MS), counters: NO_COUNTERS, claimed: [] },
+    goalsClaimed: 0,
+    raidDueAt: null,
+    raidAcknowledged: false,
+    raidReport: null,
   };
 }
 
@@ -184,9 +231,7 @@ export function defenseDef(state: GameState, data: GameData): DefenseDef {
   return data.tutorial.defenses[state.defensesWon] ?? data.tutorial.afterDefenses;
 }
 
-/** Startzustand der nächsten Verteidigung, vollständig aus Spielzustand und Daten abgeleitet. */
-export function defenseSetup(state: GameState, data: GameData): BattleSetup {
-  const def = defenseDef(state, data);
+function cityDefense(state: GameState, def: DefenseDef, data: GameData): BattleSetup {
   return {
     playerSide: 'defender',
     roadId: state.roadId,
@@ -197,12 +242,42 @@ export function defenseSetup(state: GameState, data: GameData): BattleSetup {
     unlosable: def.unlosable,
     holdMilliUntilTower: def.holdMilliUntilTower,
     heroSection: state.hero.section,
-    gateHp: 0,
+    // Unverlierbare Tutorial-Wellen laufen ohne Tor, damit sie sofort an den Türmen ankommen.
+    gateHp: def.unlosable ? 0 : data.rules.cityGateHp,
     waves: [{ groups: findById(data.waves.waves, def.wave, 'Welle').groups }],
     autoRelease: true,
     abilities: [],
     maxTicks: 0,
   };
+}
+
+/** Startzustand der nächsten Verteidigung, vollständig aus Spielzustand und Daten abgeleitet. */
+export function defenseSetup(state: GameState, data: GameData): BattleSetup {
+  return cityDefense(state, defenseDef(state, data), data);
+}
+
+/** Startzustand des Nachtangriffs: die Stadt verteidigt sich ohne Eingaben des Spielers. */
+export function raidSetup(state: GameState, data: GameData): BattleSetup {
+  return cityDefense(state, { wave: data.rules.nightRaidWave, holdMilliUntilTower: 0, unlosable: false, victoryGold: 0 }, data);
+}
+
+/**
+ * Der schwache Abschnitt einer Verteidigung: dort fielen die wenigsten Angreifer.
+ * Gezählt werden nur Abschnitte mit bebaubaren Plätzen; bei Gleichstand gilt die Reihenfolge der Daten.
+ */
+export function weakSection(final: BattleState, data: GameData): string | null {
+  let weakest: string | null = null;
+  let fewest = -1;
+  for (const section of data.city.sections) {
+    const slots = data.city.towerSlots.filter((sl) => sl.section === section.id && sl.keepLevel <= final.setup.keepLevel);
+    if (slots.length === 0) continue;
+    const kills = final.towers.filter((t) => slots.some((sl) => sl.id === t.slot)).reduce((n, t) => n + t.kills, 0);
+    if (fewest < 0 || kills < fewest) {
+      weakest = section.id;
+      fewest = kills;
+    }
+  }
+  return weakest;
 }
 
 function lineupError(state: GameState, lineup: Lineup, data: GameData): GameActionError | null {
@@ -259,6 +334,11 @@ function conditionMet(state: GameState, cond: ConditionDef): boolean {
     case 'heroAssigned': return state.hero.section !== null;
     case 'troopsTrained': return readyTroops(state, cond.unit) >= cond.count;
     case 'attacksDone': return state.attacksDone >= cond.count;
+    case 'worldSeen': return state.worldSeen;
+    case 'allianceJoined': return state.allianceJoined;
+    case 'helpRequestedOrBuilt': return state.buildings.some((b) => b.def === cond.building && (b.helpRequestedAt !== null || b.doneAt <= state.now));
+    case 'goalClaimed': return state.goalsClaimed > 0;
+    case 'raidAcknowledged': return state.raidAcknowledged;
     case 'never': return false;
   }
 }
@@ -278,6 +358,29 @@ function settle(state: GameState, data: GameData): GameState {
     for (const r of data.hero.retinue) ready[r.unit] = (ready[r.unit] ?? 0) + r.count;
     s = { ...s, hero: { joined: true, section: null }, army: { ...s.army, ready } };
   }
+
+  // PLATZHALTER Bot-Allianz: Nach einer Bitte hilft alle `helpIntervalSeconds` ein Mitglied und verkürzt den Bau.
+  // Jede Hilfe wirkt zu ihrem eigenen Zeitpunkt, damit das Ergebnis nicht davon abhängt, wie oft abgerechnet wird.
+  const al = data.alliance;
+  s = {
+    ...s,
+    buildings: s.buildings.map((b) => {
+      if (b.helpRequestedAt === null || b.helpsReceived >= al.maxHelps) return b;
+      let doneAt = b.doneAt;
+      let helps = b.helpsReceived;
+      while (helps < al.maxHelps) {
+        const at = b.helpRequestedAt + (helps + 1) * al.helpIntervalSeconds * 1000;
+        if (at > s.now || at >= doneAt) break;
+        doneAt = Math.max(at, doneAt - al.helpReduceSeconds * 1000);
+        helps++;
+      }
+      return helps === b.helpsReceived ? b : { ...b, doneAt, producedUntil: doneAt, helpsReceived: helps };
+    }),
+  };
+
+  // Tagesziele: neuer Tag, neue Zähler.
+  const day = Math.floor(s.now / DAY_MS);
+  if (day !== s.daily.day) s = { ...s, daily: { day, counters: NO_COUNTERS, claimed: [] } };
 
   // Erträge: je Gebäude in ganzen Takten seit Fertigstellung, damit kein Rest verloren geht.
   const intervalMs = data.rules.productionIntervalSeconds * 1000;
@@ -316,9 +419,28 @@ function settle(state: GameState, data: GameData): GameState {
 }
 
 function advanceTutorial(state: GameState, data: GameData): GameState {
-  let step = state.tutorialStep;
-  while (step < data.tutorial.steps.length - 1 && conditionMet(state, data.tutorial.steps[step]!.done)) step++;
-  return step === state.tutorialStep ? state : { ...state, tutorialStep: step };
+  let s = state;
+  while (s.tutorialStep < data.tutorial.steps.length - 1 && conditionMet(s, data.tutorial.steps[s.tutorialStep]!.done)) {
+    s = { ...s, tutorialStep: s.tutorialStep + 1 };
+    // Mit der Ankündigung wird der Nachtangriff scharf.
+    if (data.tutorial.steps[s.tutorialStep]!.announcesRaid && s.raidDueAt === null) {
+      s = { ...s, raidDueAt: s.now + data.rules.nightRaidAfterHours * HOUR_MS };
+    }
+  }
+  return s;
+}
+
+function count(state: GameState, counter: GoalCounter, n: number): GameState {
+  return { ...state, daily: { ...state.daily, counters: { ...state.daily.counters, [counter]: state.daily.counters[counter] + n } } };
+}
+
+/** Verlust der Stadt nach einer Verteidigung: Beute der Angreifer innerhalb der Verlustgrenze, Schild nach einer Niederlage. */
+function cityLoss(state: GameState, final: BattleState, data: GameData): { resources: Resources; loot: Resources; shieldUntil: number } {
+  // Vorräte nach der Schlacht (Gold kann sich durch Kopfgeld und Turmbau geändert haben).
+  const stock: Resources = { ...state.resources, gold: final.gold };
+  const loot = final.setup.unlosable ? NO_RESOURCES : computeLoot(stock, protectedStock(state, data), final.depth, data.rules);
+  const shieldUntil = final.result === 'breached' ? Math.max(state.shieldUntil, state.now + data.rules.defeatShieldHours * HOUR_MS) : state.shieldUntil;
+  return { resources: addResources(stock, loot, -1), loot, shieldUntil };
 }
 
 // ---------- Aktionen ----------
@@ -381,8 +503,33 @@ export function validateGameAction(state: GameState, action: GameAction, data: G
       if (state.army.training) return 'training_busy';
       return canAfford(state.resources, scaleResources(troop.cost, action.count)) ? null : 'not_enough_resources';
     }
+    case 'OpenWorldMap':
+      return null;
+    case 'JoinAlliance':
+      return state.allianceJoined ? 'already_joined' : null;
+    case 'RequestHelp': {
+      if (!state.allianceJoined) return 'no_alliance';
+      const building = state.buildings.find((b) => b.plot === action.plot);
+      if (!building || building.doneAt <= state.now) return 'nothing_to_help';
+      return building.helpRequestedAt === null ? null : 'help_already_requested';
+    }
+    case 'ClaimDailyGoal': {
+      const goal = data.goals.goals.find((g) => g.id === action.goal);
+      if (!goal) return 'unknown_goal';
+      if (state.daily.claimed.includes(goal.id)) return 'goal_already_claimed';
+      return state.daily.counters[goal.counter] >= goal.count ? null : 'goal_not_reached';
+    }
+    case 'AcknowledgeRaid':
+      return state.raidDueAt === null ? 'no_raid_announced' : null;
+    case 'ResolveNightRaid':
+      if (state.raidDueAt === null) return 'no_raid_announced';
+      return state.now >= state.raidDueAt ? null : 'raid_not_due';
+    case 'DismissRaidReport':
+      return state.raidReport === null ? 'nothing_to_dismiss' : null;
     case 'ResolveAttack': {
-      if (!data.camps.camps.some((c) => c.id === action.camp)) return 'unknown_camp';
+      const target = data.camps.camps.find((c) => c.id === action.camp);
+      if (!target) return 'unknown_camp';
+      if (target.shielded) return 'target_shielded';
       const err = lineupError(state, action.lineup, data);
       if (err) return err;
       return validInputs(action.inputs) ? null : 'invalid_payload';
@@ -400,7 +547,8 @@ function nextSeed(seed: number): number {
 }
 
 function withReplay(state: GameState, kind: SavedReplay['kind'], final: BattleState, loot: Resources, replay: Replay, data: GameData): GameState {
-  const saved: SavedReplay = { id: state.nextReplayId, kind, at: state.now, result: final.result === 'breached' ? 'breached' : 'held', depth: final.depth, loot, replay };
+  const weak = kind === 'attack' ? null : weakSection(final, data);
+  const saved: SavedReplay = { id: state.nextReplayId, kind, at: state.now, weakSection: weak, result: final.result === 'breached' ? 'breached' : 'held', depth: final.depth, loot, replay };
   return { ...state, nextReplayId: state.nextReplayId + 1, replays: [...state.replays, saved].slice(-data.rules.maxReplays) };
 }
 
@@ -419,15 +567,52 @@ function apply(state: GameState, action: GameAction, data: GameData): GameState 
       const final = runBattle(setup, state.nextSeed, action.inputs, data);
       if (final.result === 'running') return 'battle_not_finished';
       const won = final.result === 'held';
+      const loss = cityLoss(state, final, data);
       const s: GameState = {
-        ...state,
+        ...count(state, 'defenses', won ? 1 : 0),
         nextSeed: nextSeed(state.nextSeed),
-        resources: { ...state.resources, gold: final.gold + (won ? defenseDef(state, data).victoryGold : 0) },
+        resources: { ...loss.resources, gold: loss.resources.gold + (won ? defenseDef(state, data).victoryGold : 0) },
+        shieldUntil: loss.shieldUntil,
         towers: final.towers.map((t) => ({ slot: t.slot, def: t.def, level: t.level })),
         defensesWon: state.defensesWon + (won ? 1 : 0),
       };
-      return withReplay(s, 'defense', final, NO_RESOURCES, makeReplay(setup, state.nextSeed, action.inputs, final, data), data);
+      return withReplay(s, 'defense', final, loss.loot, makeReplay(setup, state.nextSeed, action.inputs, final, data), data);
     }
+    case 'ResolveNightRaid': {
+      // Verteidigung in Abwesenheit: dieselbe Schlacht, nur ohne Eingaben. Der nächste Angriff wird gleich wieder angekündigt.
+      const setup = raidSetup(state, data);
+      const final = runBattle(setup, state.nextSeed, [], data);
+      if (final.result === 'running') return 'battle_not_finished';
+      const loss = cityLoss(state, final, data);
+      const s: GameState = {
+        ...state,
+        nextSeed: nextSeed(state.nextSeed),
+        resources: loss.resources,
+        shieldUntil: loss.shieldUntil,
+        raidDueAt: state.now + data.rules.nightRaidAfterHours * HOUR_MS,
+        raidReport: state.nextReplayId,
+      };
+      return withReplay(s, 'raid', final, loss.loot, makeReplay(setup, state.nextSeed, [], final, data), data);
+    }
+    case 'OpenWorldMap':
+      return { ...state, worldSeen: true };
+    case 'JoinAlliance':
+      return { ...state, allianceJoined: true, resources: addResources(state.resources, data.alliance.joinReward) };
+    case 'RequestHelp':
+      return settle({ ...state, buildings: state.buildings.map((b) => (b.plot === action.plot ? { ...b, helpRequestedAt: state.now } : b)) }, data);
+    case 'ClaimDailyGoal': {
+      const goal = data.goals.goals.find((g) => g.id === action.goal)!;
+      return {
+        ...state,
+        resources: addResources(state.resources, goal.reward),
+        daily: { ...state.daily, claimed: [...state.daily.claimed, goal.id] },
+        goalsClaimed: state.goalsClaimed + 1,
+      };
+    }
+    case 'AcknowledgeRaid':
+      return { ...state, raidAcknowledged: true };
+    case 'DismissRaidReport':
+      return { ...state, raidReport: null };
     case 'BuildTower': {
       const cost = towerActionCost(state.towers, state.keepLevel, action, data) as number;
       return { ...state, resources: { ...state.resources, gold: state.resources.gold - cost }, towers: [...state.towers, { slot: action.slot, def: action.tower, level: 1 }] };
@@ -444,9 +629,9 @@ function apply(state: GameState, action: GameAction, data: GameData): GameState 
       const def = findById(data.buildings.buildings, action.building, 'Gebäude');
       const doneAt = state.now + def.buildSeconds * 1000;
       return {
-        ...state,
+        ...count(state, 'built', 1),
         resources: addResources(state.resources, def.cost, -1),
-        buildings: [...state.buildings, { plot: action.plot, def: def.id, doneAt, producedUntil: doneAt }],
+        buildings: [...state.buildings, { plot: action.plot, def: def.id, doneAt, producedUntil: doneAt, helpRequestedAt: null, helpsReceived: 0 }],
       };
     }
     case 'SkipTimerFree':
@@ -462,7 +647,7 @@ function apply(state: GameState, action: GameAction, data: GameData): GameState 
     case 'TrainTroops': {
       const troop = data.troops.troops.find((t) => t.unit === action.unit)!;
       return {
-        ...state,
+        ...count(state, 'trained', action.count),
         resources: addResources(state.resources, scaleResources(troop.cost, action.count), -1),
         army: { ...state.army, training: { unit: troop.unit, count: action.count, doneAt: state.now + troop.trainSeconds * action.count * 1000 } },
       };
@@ -484,7 +669,7 @@ function apply(state: GameState, action: GameAction, data: GameData): GameState 
         hospital.push({ unit: f.unit, count: f.count, doneAt: state.now + mulDiv(troop.healSeconds * f.count * 1000, healPermille, PERMILLE) });
       }
       const s: GameState = {
-        ...state,
+        ...count(state, 'attacks', 1),
         nextSeed: nextSeed(state.nextSeed),
         resources: addResources(state.resources, loot),
         army: { ...state.army, ready, hospital },

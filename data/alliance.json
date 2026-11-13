@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "preliminary": true,
+  "placeholder": true,
+  "id": "sieben_bruecken",
+  "members": [
+    "gerwin",
+    "haduwig",
+    "tjark",
+    "isbert",
+    "wendel"
+  ],
+  "joinReward": {
+    "gold": 100,
+    "wood": 60,
+    "stone": 60
+  },
+  "helpIntervalSeconds": 4,
+  "helpReduceSeconds": 30,
+  "maxHelps": 5
+}
