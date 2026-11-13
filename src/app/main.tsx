@@ -1,7 +1,7 @@
 import { render } from 'preact';
 import { registerSW } from 'virtual:pwa-register';
 import {
-  MILLI, STATE_VERSION, attackSetup, buildingBusyUntil, buildingLevel, canAfford, keepRequirement, storageCapacity, cityHint, createBattle, createGame, dataVersion, defaultLineup, defenseStars, defenseDef, defenseSetup, starGold, waveNumber, wavesUnlocked, findById, hashBattle,
+  MILLI, STATE_VERSION, activeGoals, loginReward, scaledReward, weeklyGoal, attackSetup, buildingBusyUntil, buildingLevel, canAfford, keepRequirement, storageCapacity, cityHint, createBattle, createGame, dataVersion, defaultLineup, defenseStars, defenseDef, defenseSetup, starGold, waveNumber, wavesUnlocked, findById, hashBattle,
   readyTroops, reduceGame, roadLengthMilli, roadPointMilli, stepBattle, towerActionCost, tutorialStep, unlocked, validateBattleAction, validateGameAction,
   type BattleAction, type BattleInput, type BattleState, type GameAction, type GameState, type Resources, type SavedReplay, type UnitCount,
 } from '../sim/index.ts';
@@ -816,7 +816,7 @@ function buildHud(nowMs: number): HudModel {
   }
   if (unlocked(game, 'hero', data) && game.hero.joined) second.push({ id: 'hero', label: heroName, icon: 'alruna', hint: buttonHint('hero'), onClick: () => { sheet = { kind: 'hero' }; } });
   if (unlocked(game, 'alliance', data)) second.push({ id: 'alliance', label: t('hud.alliance'), icon: 'allianz', hint: buttonHint('alliance'), onClick: () => { sheet = { kind: 'alliance' }; } });
-  if (unlocked(game, 'goals', data)) second.push({ id: 'goals', label: t('hud.goals'), icon: 'ziele', hint: buttonHint('goals'), onClick: () => { sheet = { kind: 'goals' }; } });
+  if (unlocked(game, 'goals', data)) second.push({ id: 'goals', label: t('hud.goals'), icon: 'ziele', hint: buttonHint('goals') || (shown === null && goalsClaimable()), onClick: () => { sheet = { kind: 'goals' }; } });
   if (unlocked(game, 'replays', data)) second.push({ id: 'replays', label: t('hud.replays'), onClick: () => { screen = { kind: 'replays' }; } });
   const preview = unlocked(game, 'defend', data) ? wavePreview() : null;
   const weakBanner = weak ? t('raid.weakBanner', { section: t(`section.${weak.section}`) }) : null;
@@ -826,6 +826,13 @@ function buildHud(nowMs: number): HudModel {
   const cap = storageCapacity(game, data);
   const full = { gold: game.resources.gold >= cap.gold, wood: game.resources.wood >= cap.wood, stone: game.resources.stone >= cap.stone };
   return { ...model, corner, full, banner: model.banner ?? weakBanner, preview, bottom, bottomSecondary: second, status: unlocked(game, 'world', data) ? shieldText() : null, sheet: panel ? null : citySheet(hint), panel };
+}
+
+/** Es gibt etwas abzuholen: Rückkehr-Belohnung, ein Tagesziel oder das Wochenziel. */
+function goalsClaimable(): boolean {
+  return validateGameAction(game, { type: 'ClaimLoginReward' }, data) === null
+    || validateGameAction(game, { type: 'ClaimWeeklyGoal' }, data) === null
+    || activeGoals(game, data).some((g) => validateGameAction(game, { type: 'ClaimDailyGoal', goal: g.id }, data) === null);
 }
 
 /** Wirkung einer Gebäudestufe in einem Satz (Ertrag, Lagerplatz, Schutz, Lazarett). */
@@ -1006,15 +1013,36 @@ function citySheet(hint: ReturnType<typeof tutorialStep>['hint']): HudModel['she
   if (sheet.kind === 'goals') {
     return {
       ...close, title: t('goals.title'),
-      options: data.goals.goals.map((g) => {
-        const have = Math.min(game.daily.counters[g.counter], g.count);
-        const claimed = game.daily.claimed.includes(g.id);
-        return {
-          id: `goal-${g.id}`, label: t(`goal.${g.id}`, { n: g.count }), sub: claimed ? t('goal.claimed') : t('goal.progress', { have, n: g.count }), cost: g.reward,
-          disabled: claimed || have < g.count, hint: !claimed && have >= g.count,
-          onClick: () => { if (dispatch({ type: 'ClaimDailyGoal', goal: g.id })) record('goal_claimed', { goal: g.id }); },
-        };
-      }),
+      options: [
+        // Belohnung für die Rückkehr: einmal am Tag, reihum größer.
+        (() => {
+          const reward = loginReward(game, data);
+          const n = (game.login.claims - (reward ? 0 : 1)) % data.goals.login.length + 1;
+          return {
+            id: 'login-reward', label: t('goal.login', { n }), sub: reward ? t('goal.loginSub') : t('goal.loginDone'), cost: reward ?? undefined,
+            disabled: reward === null, hint: reward !== null,
+            onClick: () => { if (dispatch({ type: 'ClaimLoginReward' })) record('goal_claimed', { goal: 'login', n }); },
+          };
+        })(),
+        ...activeGoals(game, data).map((g) => {
+          const have = Math.min(game.daily.counters[g.counter], g.count);
+          const claimed = game.daily.claimed.includes(g.id);
+          return {
+            id: `goal-${g.id}`, label: t(`goal.${g.id}`, { n: g.count }), sub: claimed ? t('goal.claimed') : t('goal.progress', { have, n: g.count }), cost: scaledReward(g.reward, game, data),
+            disabled: claimed || have < g.count, hint: !claimed && have >= g.count,
+            onClick: () => { if (dispatch({ type: 'ClaimDailyGoal', goal: g.id })) record('goal_claimed', { goal: g.id }); },
+          };
+        }),
+        (() => {
+          const g = weeklyGoal(game, data);
+          const have = Math.min(game.weekly.counters[g.counter], g.count);
+          return {
+            id: 'goal-weekly', label: t(`goal.${g.id}`, { n: g.count }), sub: game.weekly.claimed ? t('goal.claimed') : t('goal.progress', { have, n: g.count }), cost: scaledReward(g.reward, game, data),
+            disabled: game.weekly.claimed || have < g.count, hint: !game.weekly.claimed && have >= g.count,
+            onClick: () => { if (dispatch({ type: 'ClaimWeeklyGoal' })) record('goal_claimed', { goal: g.id }); },
+          };
+        })(),
+      ],
     };
   }
   const training = game.army.training;

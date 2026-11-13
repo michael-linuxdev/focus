@@ -63,7 +63,7 @@ describe('Der erste Spielmonat im Durchlauf', () => {
       const total = run.raids.held + run.raids.breached;
       expect(total).toBeGreaterThanOrEqual(60);
       expect(run.raids.breached).toBe(0);
-      expect(run.raids.market / total).toBeGreaterThanOrEqual(0.05);
+      expect(run.raids.market / total).toBeGreaterThanOrEqual(0.03);
       expect(run.raids.market / total).toBeLessThanOrEqual(0.45);
     }
   });

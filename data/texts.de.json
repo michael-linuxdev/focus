@@ -1,5 +1,5 @@
 {
-  "version": 12,
+  "version": 13,
   "lang": "de",
   "texts": {
     "hud.defend": "Verteidigen",
@@ -118,7 +118,7 @@
     "member.wendel": "Wendel",
     "help.ask": "Hilfe!",
     "help.given": "{name} hilft",
-    "goals.title": "Tagesziele",
+    "goals.title": "Ziele",
     "goal.verteidigen": "Verteidige {n}-mal",
     "goal.angreifen": "Greife {n}-mal an",
     "goal.bauen": "Baue {n} Gebäude",
@@ -276,6 +276,16 @@
     "hud.repeatWave": "Schon geschlagen · weniger Gold",
     "hud.bossWave": "Der Hauptmann führt sie an",
     "banner.boss": "Der Hauptmann ist geschlagen! {stars} +{gold}",
-    "hud.needKeep": "Neue Wellen ab Burgfried {n}"
+    "hud.needKeep": "Neue Wellen ab Burgfried {n}",
+    "goal.sterne": "Sammle {n} Sterne",
+    "goal.tuerme": "Baue oder verbessere {n} Türme",
+    "goal.viel_verteidigen": "Verteidige {n}-mal",
+    "goal.woche_verteidigen": "Woche: verteidige {n}-mal",
+    "goal.woche_bauen": "Woche: baue oder erweitere {n} Gebäude",
+    "goal.woche_angreifen": "Woche: greife {n}-mal an",
+    "goal.woche_sterne": "Woche: sammle {n} Sterne",
+    "goal.login": "Willkommen zurück · Tag {n}",
+    "goal.loginSub": "Jeden Tag einmal",
+    "goal.loginDone": "Morgen wieder"
   }
 }

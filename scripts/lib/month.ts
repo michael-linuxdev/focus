@@ -70,6 +70,8 @@ export function playMonth(start: GameState, data: GameData, options: MonthOption
         continue;
       }
       for (const g of data.goals.goals) act({ type: 'ClaimDailyGoal', goal: g.id });
+      act({ type: 'ClaimWeeklyGoal' });
+      act({ type: 'ClaimLoginReward' });
       for (const b of game.buildings) if (buildingBusyUntil(b, game.now) !== null) act({ type: 'RequestHelp', plot: b.plot });
       if (act({ type: 'UpgradeKeep' })) { did = true; continue; }
       // Fehlende Gebäude zuerst (der Ablauf lässt das Lazarett offen).

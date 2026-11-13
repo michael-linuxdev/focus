@@ -1,6 +1,6 @@
 import {
   RESOURCE_KEYS, findById,
-  type BuildingLevelDef, type ConditionDef, type DefenseDef, type GameData, type GoalCounter, type Resources, type TutorialStepDef, type UnitCount,
+  type BuildingLevelDef, type ConditionDef, type DefenseDef, type GameData, type GoalCounter, type GoalDef, type Resources, type TutorialStepDef, type UnitCount,
 } from './data.ts';
 import { mulDiv, PERMILLE } from './fixed.ts';
 import { towerActionCost, type BattleInput, type BattleSetup, type BattleState, type CityTower } from './battle/battle.ts';
@@ -17,7 +17,7 @@ import { fixedDefense, scaledDefense, scaledWave, wavesUnlocked, type PlannedDef
  * Schlachten werden nicht "gemeldet", sondern nachgerechnet: `ResolveDefense` und `ResolveAttack`
  * bekommen nur die Eingaben des Spielers; Startzustand und Startwert stammen aus dem Spielzustand.
  */
-export const STATE_VERSION = 8;
+export const STATE_VERSION = 9;
 
 export interface Building {
   readonly plot: string;
@@ -79,6 +79,20 @@ export interface DailyGoals {
   readonly claimed: readonly string[];
 }
 
+export interface WeeklyGoal {
+  /** Woche seit Epoche (Tag / 7), für die die Zähler gelten. */
+  readonly week: number;
+  readonly counters: Readonly<Record<GoalCounter, number>>;
+  readonly claimed: boolean;
+}
+
+export interface LoginReward {
+  /** Tag der letzten abgeholten Belohnung, -1 wenn noch keine. */
+  readonly day: number;
+  /** Zahl der bisher abgeholten Belohnungen. */
+  readonly claims: number;
+}
+
 export interface GameState {
   readonly version: number;
   /** Zuletzt hineingereichte Zeit in ms seit Epoche. */
@@ -111,6 +125,8 @@ export interface GameState {
   /** PLATZHALTER: Mitgliedschaft in der simulierten Bot-Allianz. */
   readonly allianceJoined: boolean;
   readonly daily: DailyGoals;
+  readonly weekly: WeeklyGoal;
+  readonly login: LoginReward;
   readonly goalsClaimed: number;
   /** Angekündigter Nachtangriff: frühester Zeitpunkt, zu dem er bei der Rückkehr berechnet wird. */
   readonly raidDueAt: number | null;
@@ -139,6 +155,8 @@ export type GameAction =
   | { readonly type: 'JoinAlliance' }
   | { readonly type: 'RequestHelp'; readonly plot: string }
   | { readonly type: 'ClaimDailyGoal'; readonly goal: string }
+  | { readonly type: 'ClaimWeeklyGoal' }
+  | { readonly type: 'ClaimLoginReward' }
   | { readonly type: 'AcknowledgeRaid' }
   | { readonly type: 'ResolveNightRaid' }
   | { readonly type: 'DismissRaidReport' }
@@ -155,11 +173,11 @@ export type GameActionError =
   | 'no_barracks' | 'unknown_troop' | 'training_busy'
   | 'unknown_camp' | 'target_shielded' | 'invalid_lineup' | 'not_enough_troops'
   | 'already_joined' | 'no_alliance' | 'nothing_to_help' | 'help_already_requested'
-  | 'unknown_goal' | 'goal_not_reached' | 'goal_already_claimed'
+  | 'unknown_goal' | 'goal_not_reached' | 'goal_already_claimed' | 'goal_not_active' | 'login_already_claimed'
   | 'no_raid_announced' | 'raid_not_due' | 'nothing_to_dismiss';
 
 const NO_RESOURCES: Resources = { gold: 0, wood: 0, stone: 0 };
-const NO_COUNTERS: Readonly<Record<GoalCounter, number>> = { defenses: 0, attacks: 0, built: 0, trained: 0 };
+const NO_COUNTERS: Readonly<Record<GoalCounter, number>> = { defenses: 0, attacks: 0, built: 0, trained: 0, stars: 0, towers: 0 };
 const HOUR_MS = 3_600_000;
 const DAY_MS = 24 * HOUR_MS;
 
@@ -190,6 +208,8 @@ export function createGame(seed: number, now: number, data: GameData): GameState
     worldSeen: false,
     allianceJoined: false,
     daily: { day: Math.floor(now / DAY_MS), counters: NO_COUNTERS, claimed: [] },
+    weekly: { week: Math.floor(now / DAY_MS / 7), counters: NO_COUNTERS, claimed: false },
+    login: { day: -1, claims: 0 },
     goalsClaimed: 0,
     raidDueAt: null,
     raidAcknowledged: false,
@@ -462,6 +482,8 @@ function settle(state: GameState, data: GameData): GameState {
   // Tagesziele: neuer Tag, neue Zähler.
   const day = Math.floor(s.now / DAY_MS);
   if (day !== s.daily.day) s = { ...s, daily: { day, counters: NO_COUNTERS, claimed: [] } };
+  const week = Math.floor(day / 7);
+  if (week !== s.weekly.week) s = { ...s, weekly: { week, counters: NO_COUNTERS, claimed: false } };
 
   // Erträge: je Gebäude in ganzen Takten seit Fertigstellung, damit kein Rest verloren geht.
   // Sie füllen die Vorräte nur bis zum Lagerplatz; Beute und Belohnungen dürfen darüber liegen.
@@ -522,8 +544,41 @@ function advanceTutorial(state: GameState, data: GameData): GameState {
   return s;
 }
 
+/** Zählt für Tages- und Wochenziel. */
 function count(state: GameState, counter: GoalCounter, n: number): GameState {
-  return { ...state, daily: { ...state.daily, counters: { ...state.daily.counters, [counter]: state.daily.counters[counter] + n } } };
+  return {
+    ...state,
+    daily: { ...state.daily, counters: { ...state.daily.counters, [counter]: state.daily.counters[counter] + n } },
+    weekly: { ...state.weekly, counters: { ...state.weekly.counters, [counter]: state.weekly.counters[counter] + n } },
+  };
+}
+
+/** Die Tagesziele von heute: die festen, dazu die wechselnden nach Tagesnummer. */
+export function activeGoals(state: GameState, data: GameData): GoalDef[] {
+  const g = data.goals;
+  const fixed = g.goals.slice(0, g.dailyFixed);
+  const rest = g.goals.slice(g.dailyFixed);
+  const rotating = Array.from({ length: Math.min(g.dailyRotating, rest.length) }, (_, k) => rest[(state.daily.day + k) % rest.length]!);
+  return [...fixed, ...rotating];
+}
+
+/** Das Wochenziel dieser Woche. */
+export function weeklyGoal(state: GameState, data: GameData): GoalDef {
+  const list = data.goals.weekly;
+  return list[state.weekly.week % list.length]!;
+}
+
+/** Eine Belohnung, hochgerechnet auf die Burgfried-Stufe (spätere Kosten sind um Größenordnungen höher). */
+export function scaledReward(base: Resources, state: GameState, data: GameData): Resources {
+  const table = data.goals.rewardPermilleByKeepLevel;
+  const permille = table[Math.min(state.keepLevel, table.length) - 1] ?? PERMILLE;
+  return { gold: mulDiv(base.gold, permille, PERMILLE), wood: mulDiv(base.wood, permille, PERMILLE), stone: mulDiv(base.stone, permille, PERMILLE) };
+}
+
+/** Die Belohnung für die Rückkehr, die heute abgeholt werden kann, sonst `null`. */
+export function loginReward(state: GameState, data: GameData): Resources | null {
+  if (state.login.day === state.daily.day) return null;
+  return scaledReward(data.goals.login[state.login.claims % data.goals.login.length]!, state, data);
 }
 
 /** Verlust der Stadt nach einer Verteidigung: Beute der Angreifer innerhalb der Verlustgrenze, Schild nach einer Niederlage. */
@@ -623,9 +678,17 @@ export function validateGameAction(state: GameState, action: GameAction, data: G
     case 'ClaimDailyGoal': {
       const goal = data.goals.goals.find((g) => g.id === action.goal);
       if (!goal) return 'unknown_goal';
+      if (!activeGoals(state, data).some((g) => g.id === goal.id)) return 'goal_not_active';
       if (state.daily.claimed.includes(goal.id)) return 'goal_already_claimed';
       return state.daily.counters[goal.counter] >= goal.count ? null : 'goal_not_reached';
     }
+    case 'ClaimWeeklyGoal': {
+      if (state.weekly.claimed) return 'goal_already_claimed';
+      const goal = weeklyGoal(state, data);
+      return state.weekly.counters[goal.counter] >= goal.count ? null : 'goal_not_reached';
+    }
+    case 'ClaimLoginReward':
+      return loginReward(state, data) === null ? 'login_already_claimed' : null;
     case 'AcknowledgeRaid':
       return state.raidDueAt === null ? 'no_raid_announced' : null;
     case 'ResolveNightRaid':
@@ -647,6 +710,11 @@ export function validateGameAction(state: GameState, action: GameAction, data: G
 export interface ReduceResult {
   readonly state: GameState;
   readonly error: GameActionError | null;
+}
+
+/** Summe der Turmstufen: jeder Bau und jeder Ausbau zählt einen Schritt. */
+function towerSteps(towers: readonly { readonly level: number }[]): number {
+  return towers.reduce((n, t) => n + t.level, 0);
 }
 
 function nextSeed(seed: number): number {
@@ -678,7 +746,7 @@ function apply(state: GameState, action: GameAction, data: GameData): GameState 
       const def = defenseDef(state, data);
       const stars = defenseStars(final, def, data);
       const s: GameState = {
-        ...count(state, 'defenses', won ? 1 : 0),
+        ...count(count(count(state, 'defenses', won ? 1 : 0), 'stars', stars), 'towers', towerSteps(final.towers) - towerSteps(state.towers)),
         nextSeed: nextSeed(state.nextSeed),
         resources: { ...loss.resources, gold: loss.resources.gold + (won ? def.victoryGold : 0) + starGold(stars, def, data) },
         shieldUntil: loss.shieldUntil,
@@ -715,23 +783,27 @@ function apply(state: GameState, action: GameAction, data: GameData): GameState 
       const goal = data.goals.goals.find((g) => g.id === action.goal)!;
       return {
         ...state,
-        resources: addResources(state.resources, goal.reward),
+        resources: addResources(state.resources, scaledReward(goal.reward, state, data)),
         daily: { ...state.daily, claimed: [...state.daily.claimed, goal.id] },
         goalsClaimed: state.goalsClaimed + 1,
       };
     }
+    case 'ClaimWeeklyGoal':
+      return { ...state, resources: addResources(state.resources, scaledReward(weeklyGoal(state, data).reward, state, data)), weekly: { ...state.weekly, claimed: true } };
+    case 'ClaimLoginReward':
+      return { ...state, resources: addResources(state.resources, loginReward(state, data)!), login: { day: state.daily.day, claims: state.login.claims + 1 } };
     case 'AcknowledgeRaid':
       return { ...state, raidAcknowledged: true };
     case 'DismissRaidReport':
       return { ...state, raidReport: null };
     case 'BuildTower': {
       const cost = towerActionCost(state.towers, state.keepLevel, action, data) as number;
-      return { ...state, resources: { ...state.resources, gold: state.resources.gold - cost }, towers: [...state.towers, { slot: action.slot, def: action.tower, level: 1 }] };
+      return { ...count(state, 'towers', 1), resources: { ...state.resources, gold: state.resources.gold - cost }, towers: [...state.towers, { slot: action.slot, def: action.tower, level: 1 }] };
     }
     case 'UpgradeTower': {
       const cost = towerActionCost(state.towers, state.keepLevel, action, data) as number;
       return {
-        ...state,
+        ...count(state, 'towers', 1),
         resources: { ...state.resources, gold: state.resources.gold - cost },
         towers: state.towers.map((t) => (t.slot === action.slot ? { ...t, level: t.level + 1 } : t)),
       };

@@ -122,5 +122,5 @@ durchgekommene Räuber bis zu 30 % der ungeschützten Vorräte, bei vielen Verte
 - Bot-Allianz und Weltkarte sind Attrappen und im Code als Platzhalter zu markieren.
 - Arbeit in Meilensteinen; nach jedem anhalten und Bericht geben. M0 bis M5: die ersten 30 Minuten. M6: Testpaket.
   M7: Wachstum (Burgfried bis 8, Ausbaustufen, Lagerplatz). M8: Gegner (berechnete Wellen, Ritter, Hauptmann, Nachtangriff wächst mit).
-  Offen: M9 Tagesrhythmus, M10 Welt, M11 Monatsbogen.
+  M9: Tagesrhythmus (wechselnde Tagesziele, Wochenziel, Belohnung für die Rückkehr). Offen: M10 Welt, M11 Monatsbogen.
 - Veröffentlichung: Push auf `main` baut und veröffentlicht nach `focus.micana.de` (GitHub Pages).

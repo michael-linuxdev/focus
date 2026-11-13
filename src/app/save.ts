@@ -60,6 +60,12 @@ export const migrations: Readonly<Record<number, Migration>> = {
     const unlockedWaves = Math.max(0, num(old['keepLevel'], 1) - 1) * data.waves.scaling.wavesPerKeepLevel;
     return { ...old, version: 8, wavesCleared: Math.min(extra, Math.max(0, unlockedWaves - 1)) };
   },
+  // 8 -> 9 (M9): Wochenziel, Belohnung für die Rückkehr, zwei weitere Zähler.
+  8: (old, data) => {
+    const fresh = createGame(1, num(old['now'], 0), data);
+    const daily = (old['daily'] ?? fresh.daily) as { counters?: Record<string, number> };
+    return { ...old, version: 9, daily: { ...fresh.daily, ...daily, counters: { ...fresh.daily.counters, ...daily.counters } }, weekly: fresh.weekly, login: fresh.login };
+  },
 };
 
 function num(value: unknown, fallback: number): number {

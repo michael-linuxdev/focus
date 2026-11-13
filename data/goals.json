@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "preliminary": true,
   "goals": [
     {
@@ -41,6 +41,127 @@
         "wood": 0,
         "stone": 0
       }
+    },
+    {
+      "id": "sterne",
+      "counter": "stars",
+      "count": 6,
+      "reward": {
+        "gold": 60,
+        "wood": 0,
+        "stone": 0
+      }
+    },
+    {
+      "id": "tuerme",
+      "counter": "towers",
+      "count": 2,
+      "reward": {
+        "gold": 0,
+        "wood": 40,
+        "stone": 40
+      }
+    },
+    {
+      "id": "viel_verteidigen",
+      "counter": "defenses",
+      "count": 5,
+      "reward": {
+        "gold": 50,
+        "wood": 30,
+        "stone": 30
+      }
+    }
+  ],
+  "dailyFixed": 1,
+  "dailyRotating": 2,
+  "rewardPermilleByKeepLevel": [
+    1000,
+    10000,
+    40000,
+    70000,
+    100000,
+    140000,
+    180000,
+    220000
+  ],
+  "weekly": [
+    {
+      "id": "woche_verteidigen",
+      "counter": "defenses",
+      "count": 20,
+      "reward": {
+        "gold": 300,
+        "wood": 300,
+        "stone": 300
+      }
+    },
+    {
+      "id": "woche_bauen",
+      "counter": "built",
+      "count": 8,
+      "reward": {
+        "gold": 200,
+        "wood": 400,
+        "stone": 400
+      }
+    },
+    {
+      "id": "woche_angreifen",
+      "counter": "attacks",
+      "count": 5,
+      "reward": {
+        "gold": 400,
+        "wood": 250,
+        "stone": 250
+      }
+    },
+    {
+      "id": "woche_sterne",
+      "counter": "stars",
+      "count": 45,
+      "reward": {
+        "gold": 500,
+        "wood": 200,
+        "stone": 200
+      }
+    }
+  ],
+  "login": [
+    {
+      "gold": 50,
+      "wood": 0,
+      "stone": 0
+    },
+    {
+      "gold": 0,
+      "wood": 60,
+      "stone": 60
+    },
+    {
+      "gold": 80,
+      "wood": 0,
+      "stone": 0
+    },
+    {
+      "gold": 0,
+      "wood": 90,
+      "stone": 90
+    },
+    {
+      "gold": 120,
+      "wood": 0,
+      "stone": 0
+    },
+    {
+      "gold": 0,
+      "wood": 120,
+      "stone": 120
+    },
+    {
+      "gold": 300,
+      "wood": 300,
+      "stone": 300
     }
   ]
 }

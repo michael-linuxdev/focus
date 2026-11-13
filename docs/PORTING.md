@@ -154,6 +154,19 @@ der Verteidiger baut Türme (`BuildTower`, `UpgradeTower`), der Angreifer löst 
   fällt. Für den Nachtangriff gilt weiter die Durchbruchstiefe ab `cityLossMinDepth`. Die Verlustgrenze selbst ist unverändert.
 - `dataVersion` enthält jetzt auch die Version von `waves.json`.
 
+## Tagesrhythmus (M9)
+
+- **Tagesziele** (`goals.json`): Die ersten `dailyFixed` Ziele gelten jeden Tag, dazu `dailyRotating` aus dem Rest:
+  `rest[(Tagesnummer + k) % Anzahl]`. `activeGoals` liefert die Liste; ein anderes Ziel abzuholen ergibt `goal_not_active`.
+  Zähler: `defenses`, `attacks`, `built`, `trained`, `stars` (Sterne aus Verteidigungen), `towers` (jeder Bau und jeder Ausbau, in der
+  Stadt wie in der Schlacht).
+- **Wochenziel:** `weekly[Wochennummer % Anzahl]`, Woche = Tagesnummer / 7. Eigene Zähler in `GameState.weekly`, die mit denselben
+  Ereignissen hochzählen und nur beim Wochenwechsel zurückgesetzt werden. Aktion `ClaimWeeklyGoal`.
+- **Rückkehr:** `ClaimLoginReward` einmal je Tag; die Belohnung ist `login[bisherige Abholungen % Anzahl]`. Ein verpasster Tag
+  setzt nichts zurück.
+- **Belohnungen wachsen mit:** Jede Belohnung wird mit `rewardPermilleByKeepLevel[Burgfried - 1]` multipliziert (`scaledReward`).
+- Tag und Woche zählen in UTC ab Epoche; ein Server sollte die Zeitzone des Spielers oder eine feste Umschaltzeit wählen.
+
 ## Wiederholungsformat
 
 ```json

@@ -328,7 +328,7 @@ export interface AllianceData {
   readonly maxHelps: number;
 }
 
-export type GoalCounter = 'defenses' | 'attacks' | 'built' | 'trained';
+export type GoalCounter = 'defenses' | 'attacks' | 'built' | 'trained' | 'stars' | 'towers';
 
 export interface GoalDef {
   readonly id: string;
@@ -351,7 +351,19 @@ export interface GameData {
   readonly waves: { readonly version: number; readonly waves: readonly WaveDef[]; readonly scaling: WaveScalingDef };
   readonly tutorial: TutorialData;
   readonly alliance: AllianceData;
-  readonly goals: { readonly version: number; readonly goals: readonly GoalDef[] };
+  readonly goals: {
+    readonly version: number;
+    /** Tagesziele: die ersten `dailyFixed` gelten jeden Tag, dazu `dailyRotating` aus dem Rest, reihum nach Tagesnummer. */
+    readonly goals: readonly GoalDef[];
+    readonly dailyFixed: number;
+    readonly dailyRotating: number;
+    /** Faktor auf alle Belohnungen (Ziele und Rückkehr) je Burgfried-Stufe; Stufe n an Stelle n - 1. */
+    readonly rewardPermilleByKeepLevel: readonly number[];
+    /** Ein Wochenziel je Woche, reihum nach Wochennummer. */
+    readonly weekly: readonly GoalDef[];
+    /** Belohnung für die Rückkehr: einmal je Tag, reihum. */
+    readonly login: readonly Resources[];
+  };
 }
 
 /** Kennung des Datenstands für Schlachten; steht in jeder Wiederholung. */
