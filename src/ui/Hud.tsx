@@ -1,45 +1,48 @@
 import { t } from '../app/texts.ts';
 
 export interface HudProps {
-  readonly title: string;
-  readonly phase: 'ready' | 'running' | 'done';
-  readonly arrived: number;
-  readonly tick: number;
-  readonly hash: string;
-  readonly battles: number;
-  readonly offlineReady: boolean;
-  readonly onPrimary: () => void;
+  readonly gold: number;
+  readonly wave: number;
+  /** Gold-Anzeige kurz rot: eine Aktion war nicht bezahlbar. */
+  readonly goldDenied: boolean;
+  readonly canRelease: boolean;
+  readonly hintRelease: boolean;
+  readonly banner: string | null;
+  readonly onRelease: () => void;
 }
 
-const bar = { position: 'absolute', left: 0, right: 0, padding: '8px 12px', boxSizing: 'border-box' } as const;
+const bar = { position: 'absolute', left: 0, right: 0, padding: '8px 14px', boxSizing: 'border-box' } as const;
 
-/** Oberfläche des M0-Gerüsts. Löst nur Aktionen aus und hält keinen Spielzustand. */
+/** Oberfläche der Verteidigung. Löst nur Aktionen aus und hält keinen Spielzustand. */
 export function Hud(p: HudProps) {
-  const label = p.phase === 'ready' ? t('m0.releaseWave') : p.phase === 'running' ? t('m0.running') : t('m0.again');
   return (
     <>
-      <div style={{ ...bar, top: 'env(safe-area-inset-top)', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <strong data-testid="title">{p.title}</strong>
-        <small data-testid="status">
-          {t('status.battles', { n: p.battles })}
-          {p.offlineReady ? ` · ${t('status.offlineReady')}` : ''}
-        </small>
+      <div style={{ ...bar, top: 'env(safe-area-inset-top)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '20px', fontWeight: 600 }}>
+        <span data-testid="gold" style={{ display: 'flex', alignItems: 'center', gap: '8px', color: p.goldDenied ? '#e2574c' : '#f1ead6', transition: 'color 150ms' }}>
+          <span style={{ width: '18px', height: '18px', borderRadius: '50%', background: '#e9b949', display: 'inline-block' }} />
+          {p.gold}
+        </span>
+        <span data-testid="wave" style={{ opacity: 0.8, fontSize: '16px' }}>{t('hud.wave', { n: p.wave })}</span>
       </div>
-      <div style={{ ...bar, bottom: 'env(safe-area-inset-bottom)', textAlign: 'center' }}>
-        <small data-testid="debug" style={{ display: 'block', opacity: 0.7, marginBottom: '6px' }}>
-          {t('m0.arrived', { n: p.arrived })} · {t('m0.debug', { tick: p.tick, hash: p.hash })}
-        </small>
-        <button
-          data-testid="primary"
-          disabled={p.phase === 'running'}
-          onClick={p.onPrimary}
-          style={{
-            pointerEvents: 'auto', minHeight: '52px', width: '100%', maxWidth: '360px', fontSize: '18px', fontWeight: 600,
-            border: 0, borderRadius: '10px', background: p.phase === 'running' ? '#56604f' : '#d9a441', color: '#1d2a1f',
-          }}
-        >
-          {label}
-        </button>
+      {p.banner !== null && (
+        <div data-testid="banner" class="banner" style={{ position: 'absolute', left: 0, right: 0, top: '38%', textAlign: 'center', fontSize: '34px', fontWeight: 700, textShadow: '0 2px 8px #000' }}>
+          {p.banner}
+        </div>
+      )}
+      <div style={{ ...bar, bottom: 'env(safe-area-inset-bottom)', paddingBottom: '18px', textAlign: 'center' }}>
+        {p.canRelease && (
+          <button
+            data-testid="release"
+            class={p.hintRelease ? 'pulse' : ''}
+            onClick={p.onRelease}
+            style={{
+              pointerEvents: 'auto', minHeight: '56px', width: '100%', maxWidth: '360px', fontSize: '19px', fontWeight: 600,
+              border: 0, borderRadius: '12px', background: '#d9a441', color: '#1d2a1f',
+            }}
+          >
+            {t('hud.nextWave')}
+          </button>
+        )}
       </div>
     </>
   );

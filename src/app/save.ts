@@ -1,4 +1,4 @@
-import { STATE_VERSION, type GameState } from '../sim/index.ts';
+import { STATE_VERSION, createGame, type GameData, type GameState } from '../sim/index.ts';
 
 /**
  * Speicherstand lokal auf dem Gerät, mit Versionsnummer und Migrationen.
@@ -13,13 +13,22 @@ export interface KeyValueStore {
   setItem(key: string, value: string): void;
 }
 
-type Migration = (old: Record<string, unknown>) => Record<string, unknown>;
+type Migration = (old: Record<string, unknown>, data: GameData) => Record<string, unknown>;
 
 export const migrations: Readonly<Record<number, Migration>> = {
-  // 1: (old) => ({ ...old, version: 2, neuesFeld: 0 }),
+  // 1 -> 2 (M1): Der M0-Stand kannte nur Uhr und Startwert. Stadt und Gold beginnen mit den Startwerten.
+  1: (old, data) => ({
+    ...createGame(typeof old['nextSeed'] === 'number' ? old['nextSeed'] : 1, typeof old['now'] === 'number' ? old['now'] : 0, data),
+    version: 2,
+  }),
 };
 
-export function migrate(raw: unknown, targetVersion: number = STATE_VERSION, steps: Readonly<Record<number, Migration>> = migrations): GameState | null {
+export function migrate(
+  raw: unknown,
+  data: GameData,
+  targetVersion: number = STATE_VERSION,
+  steps: Readonly<Record<number, Migration>> = migrations,
+): GameState | null {
   if (typeof raw !== 'object' || raw === null) return null;
   let cur = raw as Record<string, unknown>;
   for (;;) {
@@ -28,16 +37,16 @@ export function migrate(raw: unknown, targetVersion: number = STATE_VERSION, ste
     if (v === targetVersion) return cur as unknown as GameState;
     const step = steps[v];
     if (!step) return null;
-    cur = step(cur);
+    cur = step(cur, data);
   }
 }
 
-export function loadGame(store: KeyValueStore): GameState | null {
+export function loadGame(store: KeyValueStore, data: GameData): GameState | null {
   const text = store.getItem(SAVE_KEY);
   if (text === null) return null;
   let state: GameState | null = null;
   try {
-    state = migrate(JSON.parse(text));
+    state = migrate(JSON.parse(text), data);
   } catch {
     state = null;
   }
