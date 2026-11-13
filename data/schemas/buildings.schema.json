@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Gebäude abseits der Straße (je eines pro Stadt). producePerHour: Ertrag je Stunde, protect: geschützter Grundstock, healTimePermille: Faktor auf Lazarettzeiten",
+  "title": "Gebäude abseits der Straße (je eines pro Stadt), eine Zeile je Ausbaustufe. cost: Bau (Stufe 1) bzw. Ausbau auf diese Stufe, producePerHour: Ertrag je Stunde, protect: geschützter Grundstock, capacity: zusätzlicher Lagerplatz, healTimePermille: Faktor auf Lazarettzeiten, keepLevel: nötige Burgfried-Stufe",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -24,93 +24,135 @@
         "additionalProperties": false,
         "required": [
           "id",
-          "cost",
-          "buildSeconds",
-          "producePerHour",
-          "protect",
-          "healTimePermille"
+          "levels"
         ],
         "properties": {
           "id": {
             "type": "string",
             "pattern": "^[a-z][a-z0-9_]*$"
           },
-          "cost": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "gold",
-              "wood",
-              "stone"
-            ],
-            "properties": {
-              "gold": {
-                "type": "integer",
-                "minimum": 0
-              },
-              "wood": {
-                "type": "integer",
-                "minimum": 0
-              },
-              "stone": {
-                "type": "integer",
-                "minimum": 0
+          "levels": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "cost",
+                "buildSeconds",
+                "producePerHour",
+                "protect",
+                "healTimePermille",
+                "capacity",
+                "keepLevel"
+              ],
+              "properties": {
+                "cost": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "gold",
+                    "wood",
+                    "stone"
+                  ],
+                  "properties": {
+                    "gold": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "wood": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "stone": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                },
+                "buildSeconds": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "producePerHour": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "gold",
+                    "wood",
+                    "stone"
+                  ],
+                  "properties": {
+                    "gold": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "wood": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "stone": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                },
+                "protect": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "gold",
+                    "wood",
+                    "stone"
+                  ],
+                  "properties": {
+                    "gold": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "wood": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "stone": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                },
+                "healTimePermille": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "capacity": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "gold",
+                    "wood",
+                    "stone"
+                  ],
+                  "properties": {
+                    "gold": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "wood": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "stone": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                },
+                "keepLevel": {
+                  "type": "integer",
+                  "minimum": 1
+                }
               }
             }
-          },
-          "buildSeconds": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "producePerHour": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "gold",
-              "wood",
-              "stone"
-            ],
-            "properties": {
-              "gold": {
-                "type": "integer",
-                "minimum": 0
-              },
-              "wood": {
-                "type": "integer",
-                "minimum": 0
-              },
-              "stone": {
-                "type": "integer",
-                "minimum": 0
-              }
-            }
-          },
-          "protect": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "gold",
-              "wood",
-              "stone"
-            ],
-            "properties": {
-              "gold": {
-                "type": "integer",
-                "minimum": 0
-              },
-              "wood": {
-                "type": "integer",
-                "minimum": 0
-              },
-              "stone": {
-                "type": "integer",
-                "minimum": 0
-              }
-            }
-          },
-          "healTimePermille": {
-            "type": "integer",
-            "minimum": 1
           }
         }
       }

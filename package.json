@@ -13,6 +13,7 @@
     "test:e2e": "node tests/e2e/smoke.cjs",
     "balance": "node scripts/balance.ts",
     "metrics": "node scripts/metrics.ts",
+    "month": "node scripts/month.ts",
     "perf": "node tests/e2e/perf.cjs"
   },
   "dependencies": {

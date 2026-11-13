@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Türme, eine Zeile je Stufe. kind shot: schießt auf ein Ziel (splashMilli > 0: Flächenschaden). kind slow: bremst alle in Reichweite auf slowPermille und trifft sie ohne Rüstungsabzug. kind militia: stellt Miliz mit militiaHp auf die Straße, die Angreifer aufhält und im Takt cooldownTicks zuschlägt",
+  "title": "Türme, eine Zeile je Stufe. kind shot: schießt auf ein Ziel (splashMilli > 0: Flächenschaden). kind slow: bremst alle in Reichweite auf slowPermille und trifft sie ohne Rüstungsabzug. kind militia: stellt Miliz mit militiaHp auf die Straße, die Angreifer aufhält und im Takt cooldownTicks zuschlägt. keepLevel je Stufe: nötige Burgfried-Stufe für den Ausbau",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -55,7 +55,8 @@
                 "cooldownTicks",
                 "slowPermille",
                 "militiaHp",
-                "militiaRespawnTicks"
+                "militiaRespawnTicks",
+                "keepLevel"
               ],
               "properties": {
                 "cost": {
@@ -86,6 +87,10 @@
                 "militiaRespawnTicks": {
                   "type": "integer",
                   "minimum": 0
+                },
+                "keepLevel": {
+                  "type": "integer",
+                  "minimum": 1
                 }
               }
             }

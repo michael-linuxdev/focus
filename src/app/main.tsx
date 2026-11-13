@@ -1,7 +1,7 @@
 import { render } from 'preact';
 import { registerSW } from 'virtual:pwa-register';
 import {
-  MILLI, STATE_VERSION, attackSetup, canAfford, cityHint, createBattle, createGame, dataVersion, defaultLineup, defenseStars, defenseDef, defenseSetup, findById, hashBattle,
+  MILLI, STATE_VERSION, attackSetup, buildingBusyUntil, buildingLevel, canAfford, keepRequirement, storageCapacity, cityHint, createBattle, createGame, dataVersion, defaultLineup, defenseStars, defenseDef, defenseSetup, findById, hashBattle,
   readyTroops, reduceGame, roadLengthMilli, roadPointMilli, stepBattle, towerActionCost, tutorialStep, unlocked, validateBattleAction, validateGameAction,
   type BattleAction, type BattleInput, type BattleState, type GameAction, type GameState, type Resources, type SavedReplay, type UnitCount,
 } from '../sim/index.ts';
@@ -32,7 +32,7 @@ type Screen =
   | { kind: 'replays' }
   | { kind: 'replay'; saved: SavedReplay; battle: BattleState; next: number; speed: number; verdict: 'ok' | 'mismatch' | null };
 
-type Sheet = null | { kind: 'tower'; slot: string } | { kind: 'building'; plot: string } | { kind: 'keep' } | { kind: 'hero' } | { kind: 'train' } | { kind: 'alliance' } | { kind: 'goals' };
+type Sheet = null | { kind: 'tower'; slot: string } | { kind: 'building'; plot: string } | { kind: 'upgrade'; plot: string } | { kind: 'keep' } | { kind: 'hero' } | { kind: 'train' } | { kind: 'alliance' } | { kind: 'goals' };
 
 const canvas = document.getElementById('stage') as HTMLCanvasElement;
 const uiRoot = document.getElementById('ui') as HTMLElement;
@@ -318,7 +318,7 @@ function tickClock(): void {
   for (const key of ['gold', 'wood', 'stone'] as const) {
     const gain = game.resources[key] - before.resources[key];
     if (gain <= 0) continue;
-    const source = game.buildings.find((b) => findById(data.buildings.buildings, b.def, 'Gebäude').producePerHour[key] > 0);
+    const source = game.buildings.find((b) => buildingLevel(b, data).producePerHour[key] > 0);
     const plot = source && data.city.plots.find((p) => p.id === source.plot);
     if (plot) effects.push({ kind: 'text', x: plot.x, y: plot.y, text: `+${gain}`, start: performance.now() });
   }
@@ -476,7 +476,7 @@ function onTap(clientX: number, clientY: number): void {
     const building = game.buildings.find((b) => b.plot === plot.id);
     if (!building) {
       if (buildableBuildings().length > 0) sheet = { kind: 'building', plot: plot.id };
-    } else if (building.doneAt > game.now) {
+    } else if (buildingBusyUntil(building, game.now) !== null) {
       if (dispatch({ type: 'SkipTimerFree', plot: plot.id })) effects.push({ kind: 'ring', x: plot.x, y: plot.y, text: '', start: performance.now() });
       else if (dispatch({ type: 'RequestHelp', plot: plot.id })) {
         record('help_requested', { building: building.def });
@@ -484,6 +484,8 @@ function onTap(clientX: number, clientY: number): void {
       } else deny(plot.x, plot.y);
     } else if (building.def === 'kaserne' && unlocked(game, 'train', data)) {
       sheet = { kind: 'train' };
+    } else {
+      sheet = { kind: 'upgrade', plot: plot.id };
     }
     return;
   }
@@ -640,7 +642,8 @@ function buildScene(nowMs: number): Scene {
     ...base,
     roadId: game.roadId, keepLevel: game.keepLevel, towers: game.towers, units: [], tick: -1,
     buildGold: game.resources.gold,
-    buildings: { list: game.buildings, now: game.now, showEmpty: buildableBuildings().length > 0, labels, helpLabel: game.allianceJoined ? t('help.ask') : null },
+    // Ein laufender Ausbau wird wie eine Baustelle mit Restzeit gezeigt.
+    buildings: { list: game.buildings.map((b) => (b.upgradeDoneAt !== null ? { ...b, doneAt: b.upgradeDoneAt } : b)), now: game.now, showEmpty: buildableBuildings().length > 0, labels, helpLabel: game.allianceJoined ? t('help.ask') : null },
     gate: null, showMarket: false, keep: null,
     keepBusySeconds: game.keepDoneAt === null ? null : Math.max(0, Math.ceil((game.keepDoneAt - game.now) / 1000)),
     heroSection: game.hero.section, enemyCity: false, targeting: false, shielded: false,
@@ -655,6 +658,7 @@ function buildHud(nowMs: number): HudModel {
   const hint = banner?.then ? null : tutorialStep(game, data).hint;
   const model = {
     resources: game.resources,
+    full: null as HudModel['full'],
     showAllResources: unlocked(game, 'resources', data),
     goldDenied: nowMs < goldDeniedUntil,
     topRight: t('hud.wave', { n: game.defensesWon + 1 }),
@@ -818,7 +822,19 @@ function buildHud(nowMs: number): HudModel {
   const panel = cityPanel();
   // Der Testbericht ist ab der ersten Rückkehr in die Stadt erreichbar; die erste Minute bleibt ohne Schaltflächen.
   const corner: Btn | null = unlocked(game, 'defend', data) ? { id: 'report-open', label: t('report.button'), hint: reportDue(), onClick: () => { report = { message: null }; } } : null;
-  return { ...model, corner, banner: model.banner ?? weakBanner, preview, bottom, bottomSecondary: second, status: unlocked(game, 'world', data) ? shieldText() : null, sheet: panel ? null : citySheet(hint), panel };
+  const cap = storageCapacity(game, data);
+  const full = { gold: game.resources.gold >= cap.gold, wood: game.resources.wood >= cap.wood, stone: game.resources.stone >= cap.stone };
+  return { ...model, corner, full, banner: model.banner ?? weakBanner, preview, bottom, bottomSecondary: second, status: unlocked(game, 'world', data) ? shieldText() : null, sheet: panel ? null : citySheet(hint), panel };
+}
+
+/** Wirkung einer Gebäudestufe in einem Satz (Ertrag, Lagerplatz, Schutz, Lazarett). */
+function effectText(level: ReturnType<typeof buildingLevel>): string {
+  const parts: string[] = [];
+  for (const key of ['gold', 'wood', 'stone'] as const) if (level.producePerHour[key] > 0) parts.push(t('effect.produce', { n: level.producePerHour[key], res: t(`res.${key}`) }));
+  if (level.capacity.wood > 0) parts.push(t('effect.capacity', { n: level.capacity.wood }));
+  if (level.protect.wood > 0) parts.push(t('effect.protect', { n: level.protect.wood }));
+  if (level.healTimePermille < 1000) parts.push(t('effect.heal', { p: level.healTimePermille / 10 }));
+  return parts.join(', ');
 }
 
 /** Was in der nächsten Welle kommt: Einheiten nach Art zusammengezählt, in der Reihenfolge der Daten. */
@@ -925,21 +941,42 @@ function citySheet(hint: ReturnType<typeof tutorialStep>['hint']): HudModel['she
     return {
       ...close, title: t('sheet.build'),
       options: buildableBuildings().map((b) => ({
-        id: `building-${b.id}`, label: t(`building.${b.id}`), sub: formatSeconds(b.buildSeconds), cost: b.cost,
-        disabled: !canAfford(game.resources, b.cost), hint: hint?.type === 'plot' && hint.building === b.id,
+        id: `building-${b.id}`, label: t(`building.${b.id}`), sub: formatSeconds(b.levels[0]!.buildSeconds), cost: b.levels[0]!.cost,
+        disabled: !canAfford(game.resources, b.levels[0]!.cost), hint: hint?.type === 'plot' && hint.building === b.id,
         onClick: () => { if (dispatch({ type: 'BuildBuilding', plot, building: b.id })) { record('building_started', { building: b.id }); sheet = null; } },
       })),
+    };
+  }
+  if (sheet.kind === 'upgrade') {
+    const plot = sheet.plot;
+    const building = game.buildings.find((b) => b.plot === plot);
+    if (!building) return null;
+    const name = t(`building.${building.def}`);
+    const next = findById(data.buildings.buildings, building.def, 'Gebäude').levels[building.level];
+    const now = effectText(buildingLevel(building, data));
+    if (!next) return { ...close, title: t('sheet.upgrade', { name, n: building.level }), note: [now, t('sheet.maxLevel')].filter((x) => x !== '').join(' · '), options: [] };
+    const locked = next.keepLevel > game.keepLevel;
+    const after = effectText(next);
+    return {
+      ...close, title: t('sheet.upgrade', { name, n: building.level }), note: [now, after === '' ? '' : t('effect.next', { text: after })].filter((x) => x !== '').join(' · '),
+      options: [{
+        id: 'building-upgrade', label: t('sheet.upgradeGo', { n: building.level + 1 }), sub: locked ? t('need.keep', { n: next.keepLevel }) : formatSeconds(next.buildSeconds), cost: next.cost,
+        disabled: validateGameAction(game, { type: 'UpgradeBuilding', plot }, data) !== null,
+        onClick: () => { if (dispatch({ type: 'UpgradeBuilding', plot })) { record('building_started', { building: building.def, level: building.level + 1 }); sheet = null; } },
+      }],
     };
   }
   if (sheet.kind === 'keep') {
     const next = data.city.keepLevels.find((l) => l.level === game.keepLevel + 1);
     if (!next) return null;
+    const missing = keepRequirement(game, data);
     return {
       ...close, title: t('sheet.keep'),
       options: [{
-        id: 'keep-upgrade', label: t('sheet.keepGo', { n: next.level }), sub: t('build.seconds', { n: next.buildSeconds }), cost: next.cost,
+        id: 'keep-upgrade', label: t('sheet.keepGo', { n: next.level }),
+        sub: missing ? t('need.building', { name: t(`building.${missing.building}`), n: missing.level }) : `${formatSeconds(next.buildSeconds)} ${t('build.time')}`, cost: next.cost,
         disabled: validateGameAction(game, { type: 'UpgradeKeep' }, data) !== null, hint: hint?.type === 'keep',
-        onClick: () => { if (dispatch({ type: 'UpgradeKeep' })) sheet = null; },
+        onClick: () => { if (dispatch({ type: 'UpgradeKeep' })) { record('building_started', { building: 'burgfried', level: next.level }); sheet = null; } },
       }],
     };
   }

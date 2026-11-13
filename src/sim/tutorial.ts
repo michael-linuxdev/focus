@@ -22,10 +22,10 @@ export function cityHint(state: GameState, data: GameData): HintDef | null {
       const building = state.buildings.find((b) => b.plot === hint.plot);
       if (!building) {
         if (validateGameAction(state, { type: 'BuildBuilding', plot: hint.plot, building: hint.building }, data) === null) return hint;
-        const cost = data.buildings.buildings.find((b) => b.id === hint.building)?.cost;
+        const cost = data.buildings.buildings.find((b) => b.id === hint.building)?.levels[0]?.cost;
         return cost && state.resources.gold < cost.gold ? earnGold : null;
       }
-      if (building.doneAt > state.now) return tutorialStep(state, data).freeSkip ? hint : null;
+      if (building.doneAt > state.now || building.upgradeDoneAt !== null) return tutorialStep(state, data).freeSkip ? hint : null;
       return hint;
     }
     case 'keep': {

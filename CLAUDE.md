@@ -20,6 +20,7 @@ die der Spieler selbst baut. Dieselbe Mechanik trägt Einstieg, Stadtausbau und 
 | Gebauten Stand ansehen | `npm run preview` |
 | Ablauf des Tutorial-Bots ausgeben | `FLOW_LOG=flow.txt npm test` |
 | Balance: Schlachten massenhaft durchrechnen, Siegquoten ausgeben | `npm run balance` (optional `-- 500` Startwerte) |
+| Spielmonat durchrechnen: an welchem Tag welche Burgfried-Stufe erreicht wird | `npm run month` (optional `-- eifrig`) |
 | Kennzahlen aus Exportdateien (eine je Spieler) | `npm run metrics -- a.json b.json` |
 | Leistung mit gedrosselter CPU und langsamem Netz (nach dem Bauen) | `npm run perf` |
 | Speicherstand am Ende des Ablaufs erzeugen | `node scripts/make-save.ts > stand.json` |
@@ -102,6 +103,8 @@ die ersten fünf Wellen dadurch nicht. Fehlt für den nächsten Tutorial-Schritt
 - Neue Messpunkte nur über `record(...)` in `src/app/main.tsx`; neue Arten in `EventType` eintragen.
 - „Minute 10 erreicht“ heißt: Tutorial-Schritt `minute10Step` aus `data/tutorial.json` erreicht.
 - Balance-Werte nie nach Gefühl ändern: erst `npm run balance`, dann Daten ändern, dann wieder laufen lassen.
+- Kosten und Bauzeiten des Monats ebenso: erst `npm run month`, dann Daten ändern, dann wieder laufen lassen. Die erlaubten
+  Tage je Burgfried-Stufe stehen in `tests/sim/m7.test.ts`.
 - Zielwerte der Balance stehen in `scripts/balance-targets.json`. `npm run balance -- --check` endet mit Fehler,
   wenn einer verfehlt wird. Nach jeder Änderung an `data/` (Türme, Einheiten, Wellen, Lager, Regeln) laufen lassen.
 
@@ -114,5 +117,6 @@ die ersten fünf Wellen dadurch nicht. Fehlt für den nächsten Tutorial-Schritt
   `src/render/atlas.json`. Je Figur ein Bild; Bewegung (Hüpfen, Spiegeln, Aufblitzen) kommt aus `src/render/stage.ts`.
 - Nicht im Umfang: Server, Konten, Chat, Käufe, Werbung, fremde Tracking-Dienste, Unity-Umsetzung.
 - Bot-Allianz und Weltkarte sind Attrappen und im Code als Platzhalter zu markieren.
-- Arbeit in Meilensteinen M0 bis M5; nach jedem anhalten und Bericht geben.
+- Arbeit in Meilensteinen; nach jedem anhalten und Bericht geben. M0 bis M5: die ersten 30 Minuten. M6: Testpaket.
+  M7: Wachstum (Burgfried bis 8, Ausbaustufen, Lagerplatz). Offen: M8 Gegner, M9 Tagesrhythmus, M10 Welt, M11 Monatsbogen.
 - Veröffentlichung: Push auf `main` baut und veröffentlicht nach `focus.micana.de` (GitHub Pages).

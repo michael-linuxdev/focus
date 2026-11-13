@@ -121,6 +121,22 @@ der Verteidiger baut Türme (`BuildTower`, `UpgradeTower`), der Angreifer löst 
   `unlocks` steuert nur, was die Oberfläche zeigt; die Regeln prüfen es nicht.
 - **Türme im Stadtbau** entstehen sofort (wie in der Schlacht). Bauzeiten haben Gebäude, Burgfried und Ausbildung.
 
+## Wachstum (M7)
+
+- **Gebäudestufen.** `buildings.json` hat je Gebäude eine Liste `levels` (Stufe n an Stelle n - 1): Kosten, Bauzeit, Ertrag, Schutz,
+  Lagerplatz, Lazarettfaktor, nötige Burgfried-Stufe. Ein Gebäude im Zustand trägt `level` und `upgradeDoneAt`. Während des Ausbaus
+  arbeitet es auf der alten Stufe weiter. Ist der Ausbau fällig, wird erst bis zu diesem Zeitpunkt mit der alten Stufe (und dem
+  alten Lagerplatz) abgerechnet, dann gilt die neue: `level + 1`, `doneAt = producedUntil = Zeitpunkt`. Der angebrochene Ertragstakt
+  verfällt dabei. Das Ergebnis hängt nicht davon ab, wie oft `AdvanceTime` kommt.
+- **Lagerplatz.** `storageCapacity` = `city.start.capacity` plus `capacity` aller fertigen Gebäude. Erträge füllen jeden Vorrat nur bis
+  dorthin (`min(Ertrag, Lagerplatz - Bestand)`, nie negativ). Beute, Belohnungen und Sieggold dürfen darüber liegen.
+- **Burgfried.** Stufen bis 8. `requires` nennt Gebäude und Mindeststufe (zurzeit der Speicher eine Stufe darunter), Fehlercode
+  `requirement_missing`, Auskunft über `keepRequirement`. Jede Stufe gibt einen Turm-Bauplatz frei und öffnet die Straßenwahl neu.
+- **Turmstufen.** Jede Stufe eines Turms trägt `keepLevel`; ist der Burgfried niedriger, liefert `towerActionCost` `level_locked`.
+  Dieselbe Regel gilt in der Schlacht (dort zählt `setup.keepLevel`).
+- **Messen statt schätzen.** `scripts/lib/month.ts` spielt 30 Tage mit einem sparsamen Spieler; `tests/sim/m7.test.ts` hält fest,
+  an welchen Tagen die Burgfried-Stufen frühestens und spätestens erreicht werden.
+
 ## Wiederholungsformat
 
 ```json
@@ -141,7 +157,7 @@ die eine Schlacht beeinflussen (game, roads, city, units, towers, hero, rules). 
 und alte Wiederholungen gelten nur gegen den alten Datenstand. Der Spielzustand bewahrt die letzten `maxReplays` Schlachten auf.
 Die Oberfläche spielt sie über dieselbe `stepBattle`-Funktion ab und vergleicht am Ende Tick und Prüfsumme.
 
-## Zustandsmodell (Stand M4)
+## Zustandsmodell (Stand M7)
 
 - `GameState`: `version`, `now`, `nextSeed`, `resources` (Gold, Holz, Stein), `towers[]`, `buildings[]` (Bauplatz, Gebäude,
   `doneAt`, `producedUntil`), `keepLevel`, `keepDoneAt`, `roadId`, `roadChoicePending`, `hero` (beigetreten, Abschnitt),
@@ -153,15 +169,16 @@ Die Oberfläche spielt sie über dieselbe `stepBattle`-Funktion ab und vergleich
   `militiaRespawnAt`, `militiaPos`
 - `army.ready` ist eine Zuordnung Einheit → Anzahl. Gelesen wird sie immer in der Reihenfolge von `data/troops.json`.
 
-## Aktionen (Stand M4)
+## Aktionen (Stand M7)
 
 | Aktion | Ebene | Prüfung |
 | --- | --- | --- |
 | `AdvanceTime { now }` | Spiel | Zeit läuft nicht rückwärts |
 | `BuildTower { slot, tower }`, `UpgradeTower { slot }` | Spiel und Schlacht | Bauplatz und Turm bekannt und für die Burgfried-Stufe frei, Platz frei bzw. belegt, Gold reicht (dieselbe Funktion `towerActionCost`) |
 | `BuildBuilding { plot, building }` | Spiel | Bauplatz frei, Gebäude noch nicht vorhanden, Vorräte reichen |
-| `SkipTimerFree { plot }` | Spiel | Bau läuft, und der Tutorial-Schritt erlaubt es (`freeSkip`) |
-| `UpgradeKeep` | Spiel | nächste Stufe vorhanden, kein Ausbau läuft, keine offene Straßenwahl, Vorräte reichen |
+| `UpgradeBuilding { plot }` | Spiel | Gebäude steht, kein Bau oder Ausbau läuft, nächste Stufe vorhanden und vom Burgfried freigegeben, Vorräte reichen |
+| `SkipTimerFree { plot }` | Spiel | Bau oder Ausbau läuft, und der Tutorial-Schritt erlaubt es (`freeSkip`) |
+| `UpgradeKeep` | Spiel | nächste Stufe vorhanden, kein Ausbau läuft, keine offene Straßenwahl, verlangte Gebäude (`requires`) fertig ausgebaut, Vorräte reichen |
 | `ChooseRoad { road }` | Spiel | Wahl steht an, Verlauf gehört zur Burgfried-Stufe |
 | `AssignHero { section }` | Spiel | Heldin beigetreten, Abschnitt bekannt |
 | `TrainTroops { unit, count }` | Spiel | Kaserne fertig, keine Ausbildung läuft, Vorräte reichen |
@@ -170,7 +187,7 @@ Die Oberfläche spielt sie über dieselbe `stepBattle`-Funktion ab und vergleich
 | `ResolveNightRaid` | Spiel | Angriff angekündigt und fällig; rechnet ohne Eingaben |
 | `DismissRaidReport`, `AcknowledgeRaid`, `OpenWorldMap` | Spiel | nur Merker für Oberfläche und Tutorial |
 | `JoinAlliance` | Spiel | noch nicht Mitglied (Platzhalter) |
-| `RequestHelp { plot }` | Spiel | Mitglied, Bau läuft, noch keine Bitte für diesen Bau |
+| `RequestHelp { plot }` | Spiel | Mitglied, Bau oder Ausbau läuft, noch keine Bitte für diesen Auftrag |
 | `ClaimDailyGoal { goal }` | Spiel | Ziel bekannt, Zähler erreicht, heute noch nicht abgeholt |
 | `Volley { x, y }` | Schlacht (Verteidiger) | im Startzustand freigegeben, ganzzahliger Punkt, Abklingzeit abgelaufen |
 | `Rally` | Schlacht (Verteidiger) | im Startzustand freigegeben (Heldin beigetreten), Abklingzeit abgelaufen |

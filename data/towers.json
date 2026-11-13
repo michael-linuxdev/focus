@@ -1,5 +1,5 @@
 {
-  "version": 5,
+  "version": 6,
   "preliminary": true,
   "towers": [
     {
@@ -15,7 +15,8 @@
           "cooldownTicks": 12,
           "slowPermille": 1000,
           "militiaHp": 0,
-          "militiaRespawnTicks": 0
+          "militiaRespawnTicks": 0,
+          "keepLevel": 1
         },
         {
           "cost": 80,
@@ -24,7 +25,38 @@
           "cooldownTicks": 10,
           "slowPermille": 1000,
           "militiaHp": 0,
-          "militiaRespawnTicks": 0
+          "militiaRespawnTicks": 0,
+          "keepLevel": 1
+        },
+        {
+          "cost": 2000,
+          "damage": 13,
+          "rangeMilli": 2900,
+          "cooldownTicks": 10,
+          "slowPermille": 1000,
+          "militiaHp": 0,
+          "militiaRespawnTicks": 0,
+          "keepLevel": 3
+        },
+        {
+          "cost": 12000,
+          "damage": 19,
+          "rangeMilli": 3000,
+          "cooldownTicks": 9,
+          "slowPermille": 1000,
+          "militiaHp": 0,
+          "militiaRespawnTicks": 0,
+          "keepLevel": 5
+        },
+        {
+          "cost": 60000,
+          "damage": 28,
+          "rangeMilli": 3100,
+          "cooldownTicks": 9,
+          "slowPermille": 1000,
+          "militiaHp": 0,
+          "militiaRespawnTicks": 0,
+          "keepLevel": 7
         }
       ]
     },
@@ -41,7 +73,8 @@
           "cooldownTicks": 56,
           "slowPermille": 1000,
           "militiaHp": 0,
-          "militiaRespawnTicks": 0
+          "militiaRespawnTicks": 0,
+          "keepLevel": 2
         },
         {
           "cost": 120,
@@ -50,7 +83,38 @@
           "cooldownTicks": 50,
           "slowPermille": 1000,
           "militiaHp": 0,
-          "militiaRespawnTicks": 0
+          "militiaRespawnTicks": 0,
+          "keepLevel": 2
+        },
+        {
+          "cost": 3000,
+          "damage": 25,
+          "rangeMilli": 3500,
+          "cooldownTicks": 48,
+          "slowPermille": 1000,
+          "militiaHp": 0,
+          "militiaRespawnTicks": 0,
+          "keepLevel": 3
+        },
+        {
+          "cost": 18000,
+          "damage": 36,
+          "rangeMilli": 3600,
+          "cooldownTicks": 46,
+          "slowPermille": 1000,
+          "militiaHp": 0,
+          "militiaRespawnTicks": 0,
+          "keepLevel": 5
+        },
+        {
+          "cost": 90000,
+          "damage": 52,
+          "rangeMilli": 3700,
+          "cooldownTicks": 44,
+          "slowPermille": 1000,
+          "militiaHp": 0,
+          "militiaRespawnTicks": 0,
+          "keepLevel": 7
         }
       ]
     },
@@ -67,7 +131,8 @@
           "cooldownTicks": 16,
           "slowPermille": 500,
           "militiaHp": 0,
-          "militiaRespawnTicks": 0
+          "militiaRespawnTicks": 0,
+          "keepLevel": 2
         },
         {
           "cost": 110,
@@ -76,7 +141,38 @@
           "cooldownTicks": 14,
           "slowPermille": 420,
           "militiaHp": 0,
-          "militiaRespawnTicks": 0
+          "militiaRespawnTicks": 0,
+          "keepLevel": 2
+        },
+        {
+          "cost": 2800,
+          "damage": 5,
+          "rangeMilli": 2500,
+          "cooldownTicks": 14,
+          "slowPermille": 380,
+          "militiaHp": 0,
+          "militiaRespawnTicks": 0,
+          "keepLevel": 3
+        },
+        {
+          "cost": 16000,
+          "damage": 7,
+          "rangeMilli": 2600,
+          "cooldownTicks": 13,
+          "slowPermille": 340,
+          "militiaHp": 0,
+          "militiaRespawnTicks": 0,
+          "keepLevel": 5
+        },
+        {
+          "cost": 80000,
+          "damage": 10,
+          "rangeMilli": 2700,
+          "cooldownTicks": 12,
+          "slowPermille": 300,
+          "militiaHp": 0,
+          "militiaRespawnTicks": 0,
+          "keepLevel": 7
         }
       ]
     },
@@ -93,7 +189,8 @@
           "cooldownTicks": 10,
           "slowPermille": 1000,
           "militiaHp": 400,
-          "militiaRespawnTicks": 20
+          "militiaRespawnTicks": 20,
+          "keepLevel": 2
         },
         {
           "cost": 130,
@@ -102,7 +199,38 @@
           "cooldownTicks": 10,
           "slowPermille": 1000,
           "militiaHp": 560,
-          "militiaRespawnTicks": 20
+          "militiaRespawnTicks": 20,
+          "keepLevel": 2
+        },
+        {
+          "cost": 3200,
+          "damage": 17,
+          "rangeMilli": 1000,
+          "cooldownTicks": 10,
+          "slowPermille": 1000,
+          "militiaHp": 800,
+          "militiaRespawnTicks": 20,
+          "keepLevel": 3
+        },
+        {
+          "cost": 19000,
+          "damage": 24,
+          "rangeMilli": 1000,
+          "cooldownTicks": 10,
+          "slowPermille": 1000,
+          "militiaHp": 1150,
+          "militiaRespawnTicks": 20,
+          "keepLevel": 5
+        },
+        {
+          "cost": 95000,
+          "damage": 34,
+          "rangeMilli": 1000,
+          "cooldownTicks": 10,
+          "slowPermille": 1000,
+          "militiaHp": 1650,
+          "militiaRespawnTicks": 20,
+          "keepLevel": 7
         }
       ]
     }

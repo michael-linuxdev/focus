@@ -122,7 +122,11 @@ describe('Verteidigung', () => {
     expect(validateBattleAction(s, { type: 'UpgradeTower', slot: 's1' }, data)).toBe('not_enough_gold');
     const up = stepBattle({ ...s, gold: 200 }, [{ type: 'UpgradeTower', slot: 's1' }], data);
     expect(up.gold).toBe(120);
-    expect(validateBattleAction(up, { type: 'UpgradeTower', slot: 's1' }, data)).toBe('max_level');
+    // Höhere Stufen brauchen einen höheren Burgfried; ganz oben ist Schluss.
+    expect(validateBattleAction(up, { type: 'UpgradeTower', slot: 's1' }, data)).toBe('level_locked');
+    const top = data.towers.towers[0]!.levels.length;
+    const maxed = { ...up, setup: { ...up.setup, keepLevel: 8 }, towers: up.towers.map((tw) => ({ ...tw, level: top })) };
+    expect(validateBattleAction(maxed, { type: 'UpgradeTower', slot: 's1' }, data)).toBe('max_level');
     expect(stepBattle(s, [build('s1'), { type: 'UpgradeTower', slot: 's2' }, release], data)).toEqual(stepBattle(s, [], data));
   });
 

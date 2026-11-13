@@ -397,6 +397,36 @@ const SHOTS = process.env.SHOTS ?? 'test-results';
     await click('report-close');
     assert.equal((await page.evaluate(() => window.__mk.exportData().events.at(-1))).type, 'report_sent');
 
+    // Wachstum: Gebäude haben Ausbaustufen, der Burgfried nennt, was ihm fehlt, das Lager hat eine Grenze.
+    s = await state();
+    const woodPlot = s.game.buildings.find((b) => b.def === 'holzfaeller').plot;
+    await tapAt('plot', woodPlot);
+    await page.getByTestId('sheet').waitFor();
+    await shot('32-ausbau');
+    assert.match(await page.getByTestId('sheet').textContent(), /Holzfäller · Stufe 1/);
+    assert.match(await page.getByTestId('sheet').textContent(), /1800 Holz je Stunde.*Danach: 2100 Holz je Stunde/);
+    await click('building-upgrade');
+    s = await state();
+    assert.ok(s.game.buildings.find((b) => b.plot === woodPlot).upgradeDoneAt > s.game.now, 'der Ausbau läuft');
+    await skip(125);
+    await page.waitForFunction((p) => window.__mk.state().game.buildings.find((b) => b.plot === p).level === 2, woodPlot);
+    await tapAt('keep');
+    await page.getByTestId('keep-upgrade').waitFor();
+    assert.match(await page.getByTestId('keep-upgrade').textContent(), /Braucht Speicher Stufe 2/);
+    assert.equal(await page.getByTestId('keep-upgrade').isDisabled(), true);
+    await shot('33-burgfried-braucht-speicher');
+    await click('sheet-close');
+    // Erträge laufen nur bis zum Lagerplatz: nach einem Tag steht das Holz an der Grenze, nicht darüber.
+    const stockBefore = (await state()).game.resources;
+    await skip(24 * 3600);
+    await page.waitForFunction(() => window.__mk.state().game.raidReport !== null || window.__mk.state().game.now > 0);
+    await page.waitForTimeout(300);
+    if (await page.getByTestId('raid-ok').count()) await click('raid-ok');
+    s = await state();
+    assert.ok(s.game.resources.wood <= Math.max(stockBefore.wood, 5000), `Holz bleibt an der Lagergrenze (${s.game.resources.wood})`);
+    assert.equal(await page.getByTestId('res-wood').getAttribute('data-full'), 'true');
+    await shot('34-lager-voll');
+
     // Installierbarkeit und Offline-Betrieb, Speicherstand überlebt Neuladen.
     const manifestHref = await page.locator('link[rel=manifest]').getAttribute('href');
     const manifest = await (await page.request.get(new URL(manifestHref, BASE).href)).json();

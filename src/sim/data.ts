@@ -53,24 +53,37 @@ export interface KeepLevelDef {
   readonly buildSeconds: number;
   /** Straßenverläufe, aus denen der Spieler auf dieser Stufe wählt. */
   readonly roads: readonly string[];
+  /** Gebäude, die vor dem Ausbau auf diese Stufe mindestens so weit ausgebaut sein müssen. */
+  readonly requires: readonly { readonly building: string; readonly level: number }[];
 }
 
 export interface CityData {
   readonly version: number;
-  readonly start: { readonly resources: Resources; readonly keepHp: number };
+  /** `capacity`: Lagerplatz ohne Speicher; Erträge der Gebäude füllen die Vorräte nur bis zum Lagerplatz. */
+  readonly start: { readonly resources: Resources; readonly keepHp: number; readonly capacity: Resources };
   readonly sections: readonly { readonly id: string }[];
   readonly towerSlots: readonly SlotDef[];
   readonly plots: readonly PlotDef[];
   readonly keepLevels: readonly KeepLevelDef[];
 }
 
-export interface BuildingDef {
-  readonly id: string;
+export interface BuildingLevelDef {
+  /** Bau (Stufe 1) bzw. Ausbau auf diese Stufe. */
   readonly cost: Resources;
   readonly buildSeconds: number;
   readonly producePerHour: Resources;
   readonly protect: Resources;
+  /** Zusätzlicher Lagerplatz je Vorrat. */
+  readonly capacity: Resources;
   readonly healTimePermille: number;
+  /** Nötige Burgfried-Stufe. */
+  readonly keepLevel: number;
+}
+
+export interface BuildingDef {
+  readonly id: string;
+  /** Stufe n steht an Stelle n - 1. */
+  readonly levels: readonly BuildingLevelDef[];
 }
 
 export interface UnitDef {
@@ -109,6 +122,8 @@ export interface TowerLevelDef {
   /** Wachstube: Leben der Miliz und Ticks bis zum Nachrücken. */
   readonly militiaHp: number;
   readonly militiaRespawnTicks: number;
+  /** Nötige Burgfried-Stufe für diese Stufe. */
+  readonly keepLevel: number;
 }
 
 export interface TowerDef {

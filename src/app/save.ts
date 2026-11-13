@@ -52,6 +52,8 @@ export const migrations: Readonly<Record<number, Migration>> = {
   4: (old) => ({ ...old, version: 5, raidsResolved: Array.isArray(old['replays']) && old['replays'].some((r) => (r as Record<string, unknown>)['kind'] === 'raid') ? 1 : 0 }),
   // 5 -> 6: Sterne je gespeicherter Schlacht (ältere Schlachten haben keine).
   5: (old) => ({ ...old, version: 6, replays: (Array.isArray(old['replays']) ? (old['replays'] as Record<string, unknown>[]) : []).map((r) => ({ ...r, stars: 0 })) }),
+  // 6 -> 7 (M7): Gebäude haben Ausbaustufen.
+  6: (old) => ({ ...old, version: 7, buildings: (Array.isArray(old['buildings']) ? (old['buildings'] as Record<string, unknown>[]) : []).map((b) => ({ ...b, level: 1, upgradeDoneAt: null })) }),
 };
 
 function num(value: unknown, fallback: number): number {

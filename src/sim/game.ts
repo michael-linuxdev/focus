@@ -1,6 +1,6 @@
 import {
   RESOURCE_KEYS, findById,
-  type BuildingDef, type ConditionDef, type DefenseDef, type GameData, type GoalCounter, type Resources, type TutorialStepDef, type UnitCount,
+  type BuildingLevelDef, type ConditionDef, type DefenseDef, type GameData, type GoalCounter, type Resources, type TutorialStepDef, type UnitCount,
 } from './data.ts';
 import { mulDiv, PERMILLE } from './fixed.ts';
 import { towerActionCost, type BattleInput, type BattleSetup, type BattleState, type CityTower } from './battle/battle.ts';
@@ -16,13 +16,17 @@ import { makeReplay, runBattle, type Replay } from './replay.ts';
  * Schlachten werden nicht "gemeldet", sondern nachgerechnet: `ResolveDefense` und `ResolveAttack`
  * bekommen nur die Eingaben des Spielers; Startzustand und Startwert stammen aus dem Spielzustand.
  */
-export const STATE_VERSION = 6;
+export const STATE_VERSION = 7;
 
 export interface Building {
   readonly plot: string;
   readonly def: string;
-  /** Fertig ab diesem Zeitpunkt (ms). */
+  /** Ausbaustufe, ab 1. */
+  readonly level: number;
+  /** Fertig ab diesem Zeitpunkt (ms); nach einem Ausbau der Zeitpunkt, seit dem die neue Stufe gilt. */
   readonly doneAt: number;
+  /** Ein Ausbau auf die nächste Stufe läuft bis zu diesem Zeitpunkt; das Gebäude arbeitet solange auf der alten Stufe weiter. */
+  readonly upgradeDoneAt: number | null;
   /** Bis hierhin ist der Ertrag ausgeschüttet (ms). */
   readonly producedUntil: number;
   /** Zeitpunkt der Bitte um Allianzhilfe für diesen Bau (ms), sonst `null`. */
@@ -122,6 +126,7 @@ export type GameAction =
   | { readonly type: 'BuildTower'; readonly slot: string; readonly tower: string }
   | { readonly type: 'UpgradeTower'; readonly slot: string }
   | { readonly type: 'BuildBuilding'; readonly plot: string; readonly building: string }
+  | { readonly type: 'UpgradeBuilding'; readonly plot: string }
   | { readonly type: 'SkipTimerFree'; readonly plot: string }
   | { readonly type: 'UpgradeKeep' }
   | { readonly type: 'ChooseRoad'; readonly road: string }
@@ -138,9 +143,10 @@ export type GameAction =
 
 export type GameActionError =
   | 'time_runs_backwards' | 'invalid_payload' | 'battle_not_finished'
-  | 'unknown_slot' | 'unknown_tower' | 'slot_occupied' | 'slot_empty' | 'slot_locked' | 'tower_locked' | 'max_level'
+  | 'unknown_slot' | 'unknown_tower' | 'slot_occupied' | 'slot_empty' | 'slot_locked' | 'tower_locked' | 'max_level' | 'level_locked'
   | 'not_enough_resources'
   | 'unknown_plot' | 'unknown_building' | 'plot_occupied' | 'already_built' | 'nothing_to_skip' | 'skip_not_free'
+  | 'plot_empty' | 'building_busy' | 'requirement_missing'
   | 'keep_max_level' | 'keep_busy' | 'road_choice_pending' | 'no_road_choice' | 'unknown_road'
   | 'no_hero' | 'unknown_section'
   | 'no_barracks' | 'unknown_troop' | 'training_busy'
@@ -202,9 +208,33 @@ function scaleResources(a: Resources, n: number): Resources {
   return { gold: a.gold * n, wood: a.wood * n, stone: a.stone * n };
 }
 
-/** Fertige Gebäude mit ihrer Definition, in der Reihenfolge des Zustands. */
-function finishedBuildings(state: GameState, data: GameData): BuildingDef[] {
-  return state.buildings.filter((b) => b.doneAt <= state.now).map((b) => findById(data.buildings.buildings, b.def, 'Gebäude'));
+/** Werte der aktuellen Stufe eines Gebäudes. */
+export function buildingLevel(b: Pick<Building, 'def' | 'level'>, data: GameData): BuildingLevelDef {
+  const def = findById(data.buildings.buildings, b.def, 'Gebäude');
+  const level = def.levels[Math.min(b.level, def.levels.length) - 1];
+  if (!level) throw new Error(`Gebäude ohne Stufe: ${b.def}`);
+  return level;
+}
+
+/** Ende des laufenden Baus oder Ausbaus, sonst `null`. */
+export function buildingBusyUntil(b: Building, now: number): number | null {
+  return b.doneAt > now ? b.doneAt : b.upgradeDoneAt;
+}
+
+/** Fertige Gebäude mit den Werten ihrer Stufe, in der Reihenfolge des Zustands. */
+function finishedBuildings(state: GameState, data: GameData): BuildingLevelDef[] {
+  return state.buildings.filter((b) => b.doneAt <= state.now).map((b) => buildingLevel(b, data));
+}
+
+/** Lagerplatz je Vorrat: Grundwert der Stadt plus alle fertigen Gebäude. Erträge füllen nur bis hierhin. */
+export function storageCapacity(state: GameState, data: GameData): Resources {
+  return finishedBuildings(state, data).reduce((sum, b) => addResources(sum, b.capacity), data.city.start.capacity);
+}
+
+/** Was dem Ausbau des Burgfrieds auf die nächste Stufe noch fehlt (Gebäude und Stufe), sonst `null`. */
+export function keepRequirement(state: GameState, data: GameData): { readonly building: string; readonly level: number } | null {
+  const next = data.city.keepLevels.find((l) => l.level === state.keepLevel + 1);
+  return next?.requires.find((r) => !state.buildings.some((b) => b.def === r.building && b.doneAt <= state.now && b.level >= r.level)) ?? null;
 }
 
 export function hasBuilding(state: GameState, building: string): boolean {
@@ -383,7 +413,9 @@ function settle(state: GameState, data: GameData): GameState {
     ...s,
     buildings: s.buildings.map((b) => {
       if (b.helpRequestedAt === null || b.helpsReceived >= al.maxHelps) return b;
-      let doneAt = b.doneAt;
+      // Die Hilfe gilt dem laufenden Auftrag: dem Ausbau, sonst dem Bau.
+      const upgrading = b.upgradeDoneAt !== null;
+      let doneAt = b.upgradeDoneAt ?? b.doneAt;
       let helps = b.helpsReceived;
       while (helps < al.maxHelps) {
         const at = b.helpRequestedAt + (helps + 1) * al.helpIntervalSeconds * 1000;
@@ -391,7 +423,8 @@ function settle(state: GameState, data: GameData): GameState {
         doneAt = Math.max(at, doneAt - al.helpReduceSeconds * 1000);
         helps++;
       }
-      return helps === b.helpsReceived ? b : { ...b, doneAt, producedUntil: doneAt, helpsReceived: helps };
+      if (helps === b.helpsReceived) return b;
+      return upgrading ? { ...b, upgradeDoneAt: doneAt, helpsReceived: helps } : { ...b, doneAt, producedUntil: doneAt, helpsReceived: helps };
     }),
   };
 
@@ -400,22 +433,33 @@ function settle(state: GameState, data: GameData): GameState {
   if (day !== s.daily.day) s = { ...s, daily: { day, counters: NO_COUNTERS, claimed: [] } };
 
   // Erträge: je Gebäude in ganzen Takten seit Fertigstellung, damit kein Rest verloren geht.
+  // Sie füllen die Vorräte nur bis zum Lagerplatz; Beute und Belohnungen dürfen darüber liegen.
   const intervalMs = data.rules.productionIntervalSeconds * 1000;
   let resources = s.resources;
-  const buildings = s.buildings.map((b) => {
-    if (b.doneAt > s.now) return b;
-    const def = findById(data.buildings.buildings, b.def, 'Gebäude');
+  const produce = (b: Building, until: number, cap: Resources): Building => {
+    const level = buildingLevel(b, data);
     const before = Math.floor((b.producedUntil - b.doneAt) / intervalMs);
-    const after = Math.floor((s.now - b.doneAt) / intervalMs);
+    const after = Math.floor((until - b.doneAt) / intervalMs);
     if (after <= before) return b;
-    const gain = { gold: 0, wood: 0, stone: 0 };
+    const next = { ...resources };
     for (const k of RESOURCE_KEYS) {
-      const perInterval = def.producePerHour[k] * data.rules.productionIntervalSeconds;
-      gain[k] = mulDiv(after, perInterval, 3600) - mulDiv(before, perInterval, 3600);
+      const perInterval = level.producePerHour[k] * data.rules.productionIntervalSeconds;
+      const gain = mulDiv(after, perInterval, 3600) - mulDiv(before, perInterval, 3600);
+      next[k] += Math.max(0, Math.min(gain, cap[k] - next[k]));
     }
-    resources = addResources(resources, gain);
+    resources = next;
     return { ...b, producedUntil: b.doneAt + after * intervalMs };
+  };
+  // Fertige Ausbauten: bis zu ihrem Zeitpunkt gilt die alte Stufe (und der alte Lagerplatz), danach die neue.
+  const capBefore = storageCapacity(s, data);
+  const upgraded = s.buildings.map((b) => {
+    if (b.upgradeDoneAt === null || b.upgradeDoneAt > s.now) return b;
+    const at = b.upgradeDoneAt;
+    return { ...produce(b, at, capBefore), level: b.level + 1, doneAt: at, producedUntil: at, upgradeDoneAt: null, helpRequestedAt: null, helpsReceived: 0 };
   });
+  s = { ...s, buildings: upgraded };
+  const cap = storageCapacity(s, data);
+  const buildings = s.buildings.map((b) => (b.doneAt > s.now ? b : produce(b, s.now, cap)));
   s = { ...s, resources, buildings };
 
   // Ausbildung und Lazarett
@@ -492,11 +536,21 @@ export function validateGameAction(state: GameState, action: GameAction, data: G
       if (!def) return 'unknown_building';
       if (state.buildings.some((b) => b.plot === action.plot)) return 'plot_occupied';
       if (state.buildings.some((b) => b.def === action.building)) return 'already_built';
-      return canAfford(state.resources, def.cost) ? null : 'not_enough_resources';
+      return canAfford(state.resources, def.levels[0]!.cost) ? null : 'not_enough_resources';
+    }
+    case 'UpgradeBuilding': {
+      if (!data.city.plots.some((p) => p.id === action.plot)) return 'unknown_plot';
+      const building = state.buildings.find((b) => b.plot === action.plot);
+      if (!building) return 'plot_empty';
+      if (buildingBusyUntil(building, state.now) !== null) return 'building_busy';
+      const next = findById(data.buildings.buildings, building.def, 'Gebäude').levels[building.level];
+      if (!next) return 'max_level';
+      if (next.keepLevel > state.keepLevel) return 'level_locked';
+      return canAfford(state.resources, next.cost) ? null : 'not_enough_resources';
     }
     case 'SkipTimerFree': {
       const building = state.buildings.find((b) => b.plot === action.plot);
-      if (!building || building.doneAt <= state.now) return 'nothing_to_skip';
+      if (!building || buildingBusyUntil(building, state.now) === null) return 'nothing_to_skip';
       return tutorialStep(state, data).freeSkip ? null : 'skip_not_free';
     }
     case 'UpgradeKeep': {
@@ -504,6 +558,7 @@ export function validateGameAction(state: GameState, action: GameAction, data: G
       if (!next) return 'keep_max_level';
       if (state.keepDoneAt !== null) return 'keep_busy';
       if (state.roadChoicePending) return 'road_choice_pending';
+      if (keepRequirement(state, data) !== null) return 'requirement_missing';
       return canAfford(state.resources, next.cost) ? null : 'not_enough_resources';
     }
     case 'ChooseRoad': {
@@ -529,7 +584,7 @@ export function validateGameAction(state: GameState, action: GameAction, data: G
     case 'RequestHelp': {
       if (!state.allianceJoined) return 'no_alliance';
       const building = state.buildings.find((b) => b.plot === action.plot);
-      if (!building || building.doneAt <= state.now) return 'nothing_to_help';
+      if (!building || buildingBusyUntil(building, state.now) === null) return 'nothing_to_help';
       return building.helpRequestedAt === null ? null : 'help_already_requested';
     }
     case 'ClaimDailyGoal': {
@@ -649,15 +704,31 @@ function apply(state: GameState, action: GameAction, data: GameData): GameState 
     }
     case 'BuildBuilding': {
       const def = findById(data.buildings.buildings, action.building, 'Gebäude');
-      const doneAt = state.now + def.buildSeconds * 1000;
+      const first = def.levels[0]!;
+      const doneAt = state.now + first.buildSeconds * 1000;
       return {
         ...count(state, 'built', 1),
-        resources: addResources(state.resources, def.cost, -1),
-        buildings: [...state.buildings, { plot: action.plot, def: def.id, doneAt, producedUntil: doneAt, helpRequestedAt: null, helpsReceived: 0 }],
+        resources: addResources(state.resources, first.cost, -1),
+        buildings: [...state.buildings, { plot: action.plot, def: def.id, level: 1, doneAt, producedUntil: doneAt, upgradeDoneAt: null, helpRequestedAt: null, helpsReceived: 0 }],
       };
     }
+    case 'UpgradeBuilding': {
+      const building = state.buildings.find((b) => b.plot === action.plot)!;
+      const next = findById(data.buildings.buildings, building.def, 'Gebäude').levels[building.level]!;
+      return settle({
+        ...count(state, 'built', 1),
+        resources: addResources(state.resources, next.cost, -1),
+        buildings: state.buildings.map((b) => (b.plot === action.plot ? { ...b, upgradeDoneAt: state.now + next.buildSeconds * 1000, helpRequestedAt: null, helpsReceived: 0 } : b)),
+      }, data);
+    }
     case 'SkipTimerFree':
-      return { ...state, buildings: state.buildings.map((b) => (b.plot === action.plot ? { ...b, doneAt: state.now, producedUntil: state.now } : b)) };
+      return settle({
+        ...state,
+        buildings: state.buildings.map((b) => {
+          if (b.plot !== action.plot) return b;
+          return b.doneAt > state.now ? { ...b, doneAt: state.now, producedUntil: state.now } : { ...b, upgradeDoneAt: state.now };
+        }),
+      }, data);
     case 'UpgradeKeep': {
       const next = data.city.keepLevels.find((l) => l.level === state.keepLevel + 1)!;
       return settle({ ...state, resources: addResources(state.resources, next.cost, -1), keepDoneAt: state.now + next.buildSeconds * 1000 }, data);

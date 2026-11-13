@@ -99,7 +99,8 @@ describe('Stadtbau', () => {
   });
 
   it('Erträge hängen nur von der verstrichenen Zeit ab, nicht davon, wie oft abgerechnet wird', () => {
-    let a = act(rich(start()), { type: 'BuildBuilding', plot: 'p1', building: 'holzfaeller' });
+    const empty = (g: GameState): GameState => ({ ...g, resources: { ...g.resources, wood: 0 } });
+    let a = empty(act(rich(start()), { type: 'BuildBuilding', plot: 'p1', building: 'holzfaeller' }));
     let b = a;
     const wood0 = a.resources.wood;
     a = act(a, at(a, 3600 + 10));
@@ -107,7 +108,7 @@ describe('Stadtbau', () => {
     expect(a.resources.wood - wood0).toBe(1800);
     expect(b.resources).toEqual(a.resources);
     // Krumme Schritte: nichts geht verloren, nichts entsteht doppelt.
-    let c = act(rich(start()), { type: 'BuildBuilding', plot: 'p1', building: 'holzfaeller' });
+    let c = empty(act(rich(start()), { type: 'BuildBuilding', plot: 'p1', building: 'holzfaeller' }));
     const rng = rngFromSeed(3);
     while (c.now < 3_610_000) c = act(c, { type: 'AdvanceTime', now: Math.min(3_610_000, c.now + 1 + rngInt(rng, 70_000)) });
     expect(c.resources).toEqual(a.resources);
@@ -132,7 +133,7 @@ describe('Stadtbau', () => {
     g = act(g, { type: 'ChooseRoad', road: 'westschleife' }, { type: 'BuildTower', slot: 's6', tower: 'bogenturm' }, { type: 'BuildTower', slot: 's3', tower: 'katapult' }, { type: 'AssignHero', section: 'mitte' });
     expect(g.roadId).toBe('westschleife');
     expect(defenseSetup(g, data).heroSection).toBe('mitte');
-    expect(err(g, { type: 'UpgradeKeep' })).toBe('keep_max_level');
+    expect(err(g, { type: 'UpgradeKeep' })).toBe('requirement_missing'); // Stufe 3 braucht den Speicher
     expect(err(g, { type: 'AssignHero', section: 'west' })).toBe('unknown_section');
   });
 

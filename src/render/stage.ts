@@ -335,7 +335,7 @@ export function drawStage(canvas: HTMLCanvasElement, scene: Scene, data: GameDat
       ctx.fill();
     }
     const next = def.levels[tower.level];
-    if (scene.buildGold !== null && next && scene.buildGold >= next.cost) {
+    if (scene.buildGold !== null && next && next.keepLevel <= scene.keepLevel && scene.buildGold >= next.cost) {
       // Ausbau möglich: Pfeil nach oben, mit Preis, wenn der Hinweis darauf zeigt
       ctx.fillStyle = COLORS.gold;
       ctx.beginPath();
@@ -443,7 +443,10 @@ export function drawStage(canvas: HTMLCanvasElement, scene: Scene, data: GameDat
 /** Restzeit: unter zwei Minuten in Sekunden, sonst Minuten:Sekunden. */
 export function formatSeconds(seconds: number): string {
   if (seconds < 120) return `${seconds}s`;
-  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+  // Lange Bauzeiten in Stunden und Minuten.
+  const minutes = Math.floor(seconds / 60);
+  return minutes % 60 === 0 ? `${minutes / 60} h` : `${Math.floor(minutes / 60)} h ${minutes % 60} min`;
 }
 
 function bar(ctx: CanvasRenderingContext2D, cx: number, y: number, width: number, share: number, color: string): void {
@@ -677,6 +680,9 @@ function drawWithSprites(ctx: CanvasRenderingContext2D, scene: Scene, data: Game
           label(ctx, cx, top - 6, tile, formatSeconds(remaining), COLORS.hint);
           if (info.helpLabel !== null && b.helpRequestedAt === null) label(ctx, cx, cy + tile * 0.62, tile, info.helpLabel, COLORS.help);
         });
+      } else if (b.level > 1) {
+        // Ausbaustufe als kleine Zahl am Gebäude
+        overlays.push(() => label(ctx, cx + tile * 0.36, cy + tile * 0.4, tile * 0.85, String(b.level), COLORS.gold));
       }
     }
   }
@@ -787,7 +793,7 @@ function drawWithSprites(ctx: CanvasRenderingContext2D, scene: Scene, data: Game
         ctx.fill();
       }
       const next = def.levels[tower.level];
-      if (scene.buildGold !== null && next && scene.buildGold >= next.cost) {
+      if (scene.buildGold !== null && next && next.keepLevel <= scene.keepLevel && scene.buildGold >= next.cost) {
         // Ausbau möglich: Pfeil nach oben, mit Preis, wenn der Hinweis darauf zeigt
         const ax = cx + tile * 0.34;
         const ay = base - height + tile * 0.1;

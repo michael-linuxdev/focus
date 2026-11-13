@@ -1,5 +1,5 @@
 {
-  "version": 10,
+  "version": 11,
   "lang": "de",
   "texts": {
     "hud.defend": "Verteidigen",
@@ -255,6 +255,21 @@
     "report.shareText": "Testbericht {title}",
     "report.install": "Als App installieren",
     "report.footer": "Installation {id} · {n} Ereignisse",
-    "report.close": "Schließen"
+    "report.close": "Schließen",
+    "road.schlangenweg": "Schlangenweg",
+    "road.grosse_runde": "Große Runde",
+    "sheet.upgrade": "{name} · Stufe {n}",
+    "sheet.upgradeGo": "Ausbau auf Stufe {n}",
+    "sheet.maxLevel": "Höchste Stufe erreicht",
+    "need.keep": "Braucht Burgfried Stufe {n}",
+    "need.building": "Braucht {name} Stufe {n}",
+    "effect.produce": "{n} {res} je Stunde",
+    "effect.capacity": "Lagerplatz {n} je Vorrat",
+    "effect.protect": "{n} je Vorrat vor Plünderung geschützt",
+    "effect.heal": "Lazarettzeit {p} %",
+    "effect.next": "Danach: {text}",
+    "build.time": "Bauzeit",
+    "hud.full": "Lager voll",
+    "build.level": "St. {n}"
   }
 }

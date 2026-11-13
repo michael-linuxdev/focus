@@ -143,6 +143,7 @@ export type ActionError =
   | 'not_your_side'
   | 'no_wave_left'
   | 'unknown_slot'
+  | 'level_locked'
   | 'unknown_tower'
   | 'slot_occupied'
   | 'slot_empty'
@@ -217,7 +218,7 @@ export function towerLevel(t: CityTower, data: GameData): TowerLevelDef {
   return level;
 }
 
-export type TowerActionError = 'unknown_slot' | 'unknown_tower' | 'slot_occupied' | 'slot_empty' | 'slot_locked' | 'tower_locked' | 'max_level';
+export type TowerActionError = 'unknown_slot' | 'unknown_tower' | 'slot_occupied' | 'slot_empty' | 'slot_locked' | 'tower_locked' | 'max_level' | 'level_locked';
 
 /**
  * Goldkosten für Bau oder Ausbau eines Turms, oder der Grund, warum es nicht geht.
@@ -242,7 +243,8 @@ export function towerActionCost(
   }
   if (!tower) return 'slot_empty';
   const next = findById(data.towers.towers, tower.def, 'Turm').levels[tower.level];
-  return next ? next.cost : 'max_level';
+  if (!next) return 'max_level';
+  return next.keepLevel > keepLevel ? 'level_locked' : next.cost;
 }
 
 export function createBattle(setup: BattleSetup, seed: number, data: GameData): BattleState {

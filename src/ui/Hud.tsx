@@ -46,6 +46,8 @@ export interface MapNode {
 
 export interface HudModel {
   readonly resources: Resources;
+  /** Vorräte, deren Lager voll ist (Erträge laufen dort nicht weiter); `null` außerhalb der Stadt. */
+  readonly full: { readonly gold: boolean; readonly wood: boolean; readonly stone: boolean } | null;
   readonly showAllResources: boolean;
   readonly goldDenied: boolean;
   readonly topRight: string;
@@ -92,21 +94,28 @@ function AtlasIcon({ name, height }: { name: string; height: number }) {
   );
 }
 
-function Res({ kind, value, big }: { kind: keyof typeof RES_ICON; value: number | string; big?: boolean }) {
+function Res({ kind, value, big, full }: { kind: keyof typeof RES_ICON; value: number | string; big?: boolean; full?: boolean | undefined }) {
   return (
-    <span data-testid={`res-${kind}`} style={{ display: 'inline-flex', alignItems: 'center', gap: big ? '6px' : '3px', marginRight: big ? '12px' : '8px' }}>
+    <span data-testid={`res-${kind}`} data-full={full ? 'true' : undefined} style={{ display: 'inline-flex', alignItems: 'center', gap: big ? '6px' : '3px', marginRight: big ? '12px' : '8px', color: full ? '#e9b949' : undefined }}>
       <Icon name={RES_ICON[kind]} size={big ? 24 : 16} />
       {value}
     </span>
   );
 }
 
+/** Große Mengen kurz: 12 500 wird 12,5k, damit drei Vorräte in die Kopfzeile passen. */
+export function compact(n: number): string {
+  if (n < 10_000) return String(n);
+  if (n < 1_000_000) return `${String(Math.floor(n / 100) / 10).replace('.', ',')}k`;
+  return `${String(Math.floor(n / 10_000) / 100).replace('.', ',')} Mio`;
+}
+
 function Cost({ cost }: { cost: Resources }) {
   return (
     <span style={{ fontSize: '14px', fontWeight: 500, whiteSpace: 'nowrap' }}>
-      {cost.gold > 0 && <Res kind="gold" value={cost.gold} />}
-      {cost.wood > 0 && <Res kind="wood" value={cost.wood} />}
-      {cost.stone > 0 && <Res kind="stone" value={cost.stone} />}
+      {cost.gold > 0 && <Res kind="gold" value={compact(cost.gold)} />}
+      {cost.wood > 0 && <Res kind="wood" value={compact(cost.wood)} />}
+      {cost.stone > 0 && <Res kind="stone" value={compact(cost.stone)} />}
     </span>
   );
 }
@@ -146,9 +155,9 @@ export function Hud({ m }: { m: HudModel }) {
     <>
       <div class="bar" style={{ top: 'env(safe-area-inset-top)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '19px', fontWeight: 600 }}>
         <span style={{ color: m.goldDenied ? '#e2574c' : '#f1ead6', transition: 'color 150ms' }}>
-          <Res kind="gold" value={m.resources.gold} big />
-          {m.showAllResources && <Res kind="wood" value={m.resources.wood} big />}
-          {m.showAllResources && <Res kind="stone" value={m.resources.stone} big />}
+          <Res kind="gold" value={m.showAllResources ? compact(m.resources.gold) : m.resources.gold} big />
+          {m.showAllResources && <Res kind="wood" value={compact(m.resources.wood)} big full={m.full?.wood} />}
+          {m.showAllResources && <Res kind="stone" value={compact(m.resources.stone)} big full={m.full?.stone} />}
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '15px', opacity: 0.85 }}>
           {m.depth !== null && (

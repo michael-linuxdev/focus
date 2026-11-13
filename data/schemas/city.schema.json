@@ -25,7 +25,8 @@
       "additionalProperties": false,
       "required": [
         "resources",
-        "keepHp"
+        "keepHp",
+        "capacity"
       ],
       "properties": {
         "resources": {
@@ -54,6 +55,29 @@
         "keepHp": {
           "type": "integer",
           "minimum": 1
+        },
+        "capacity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "gold",
+            "wood",
+            "stone"
+          ],
+          "properties": {
+            "gold": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "wood": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "stone": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
         }
       }
     },
@@ -148,7 +172,8 @@
           "level",
           "cost",
           "buildSeconds",
-          "roads"
+          "roads",
+          "requires"
         ],
         "properties": {
           "level": {
@@ -188,6 +213,27 @@
             "items": {
               "type": "string",
               "pattern": "^[a-z][a-z0-9_]*$"
+            }
+          },
+          "requires": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "building",
+                "level"
+              ],
+              "properties": {
+                "building": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*$"
+                },
+                "level": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
             }
           }
         }
