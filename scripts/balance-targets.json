@@ -2,19 +2,45 @@
   "note": "Zielwerte der Balance. Prozentwerte, sofern nicht anders gesagt. Geprüft von `npm run balance`; mit `-- --check` endet das Skript bei einem verfehlten Ziel mit Fehler.",
   "targets": [
     {
-      "metric": "defense.minHeld",
-      "text": "Ablauf: jede der sechs Wellen wird vom Hinweis-Folger gehalten",
+      "metric": "defense.passive.minHeld",
+      "text": "Ablauf: auch wer nur zuschaut, verliert keine der sechs Wellen",
       "min": 100
     },
     {
-      "metric": "defense.maxLeaked",
-      "text": "Ablauf: kein Räuber kommt durch (Anzahl)",
+      "metric": "defense.passive.w1.leaked",
+      "text": "Welle 1: mit dem ersten Turm kommt niemand durch, auch ohne Eingreifen (Anzahl)",
       "max": 0
     },
     {
-      "metric": "defense.maxSeconds",
-      "text": "Ablauf: keine Welle dauert länger als 90 Sekunden",
-      "max": 90
+      "metric": "defense.passive.leakedFrom2",
+      "text": "Ab Welle 2, zuschauen: im Schnitt kommen Räuber durch (Anzahl je Welle)",
+      "min": 1,
+      "max": 4
+    },
+    {
+      "metric": "defense.passive.stars3From2",
+      "text": "Ab Welle 2, zuschauen: drei Sterne sind die Ausnahme",
+      "max": 20
+    },
+    {
+      "metric": "defense.active.leakedFrom2",
+      "text": "Ab Welle 2, eingreifen: fast niemand kommt durch (Anzahl je Welle)",
+      "max": 0.6
+    },
+    {
+      "metric": "defense.active.stars3From2",
+      "text": "Ab Welle 2, eingreifen: drei Sterne meistens",
+      "min": 60
+    },
+    {
+      "metric": "defense.active.maxSeconds",
+      "text": "Tempo: wer eingreift, braucht für keine Welle im Schnitt länger als 40 Sekunden",
+      "max": 40
+    },
+    {
+      "metric": "defense.passive.maxSeconds",
+      "text": "Tempo: auch beim Zuschauen dauert keine Welle im Schnitt länger als 55 Sekunden",
+      "max": 55
     },
     {
       "metric": "raid.end.held",

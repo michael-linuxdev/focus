@@ -1,5 +1,5 @@
 import {
-  attackSetup, createBattle, defaultLineup, defenseSetup, reduceGame, roadPointMilli, stepBattle, tutorialStep, validateBattleAction,
+  attackSetup, cityHint, createBattle, defaultLineup, defenseSetup, reduceGame, roadPointMilli, stepBattle, tutorialStep, validateBattleAction,
   type BattleAction, type BattleInput, type BattleSetup, type BattleState, type GameAction, type GameData, type GameState,
 } from '../../src/sim/index.ts';
 
@@ -21,6 +21,32 @@ export function playBattle(setup: BattleSetup, seed: number, data: GameData, pol
 /** Verteidigung: baut den ersten Turm, falls keiner steht (ohne den geht Welle 1 nicht weiter), sonst nichts. */
 export const firstTowerOnly = (data: GameData): Policy => (battle) =>
   battle.towers.length === 0 ? { type: 'BuildTower', slot: data.city.towerSlots[0]!.id, tower: data.towers.towers[0]!.id } : null;
+
+/**
+ * Verteidigung mit Eingreifen: erster Turm wie oben, Kampfruf sobald mehrere Angreifer da sind,
+ * Pfeilhagel sofort bei Bereitschaft auf die dichteste Gruppe.
+ */
+export const activeDefense = (data: GameData): Policy => (battle) => {
+  if (battle.towers.length === 0) return { type: 'BuildTower', slot: data.city.towerSlots[0]!.id, tower: data.towers.towers[0]!.id };
+  if (battle.units.length === 0) return null;
+  if (battle.setup.rally === true && battle.tick >= battle.rallyReadyAt && battle.units.length >= 3) return { type: 'Rally' };
+  if (battle.setup.volley === true && battle.tick >= battle.volleyReadyAt) {
+    const road = data.roads.roads.find((r) => r.id === battle.setup.roadId)!;
+    const points = battle.units.map((u) => roadPointMilli(road, u.pos));
+    const radiusSq = data.rules.volley.radiusMilli ** 2;
+    let best = points[0]!;
+    let bestCount = 0;
+    for (const p of points) {
+      const count = points.filter((q) => (q[0] - p[0]) ** 2 + (q[1] - p[1]) ** 2 <= radiusSq).length;
+      if (count > bestCount) {
+        best = p;
+        bestCount = count;
+      }
+    }
+    return { type: 'Volley', x: best[0], y: best[1] };
+  }
+  return null;
+};
 
 /** Angriff: Wellen im Abstand auslösen, Brandpfeile auf den ersten Turm, Schildwall kurz danach. */
 export const simpleAttack = (gapTicks: number): Policy => (battle) => {
@@ -77,7 +103,7 @@ export interface TutorialRun {
  * Spielt den geführten Ablauf, indem er genau den Hinweisen folgt.
  * `untilStep`: Kennung des Schritts, bei dessen Erreichen er aufhört.
  */
-export function playTutorial(start: GameState, data: GameData, untilStep: string, roadVariant = 0): TutorialRun {
+export function playTutorial(start: GameState, data: GameData, untilStep: string, roadVariant = 0, active = false): TutorialRun {
   let game = start;
   let waitedSeconds = 0;
   let breached = 0;
@@ -94,7 +120,7 @@ export function playTutorial(start: GameState, data: GameData, untilStep: string
     act({ type: 'AdvanceTime', now: game.now + seconds * 1000 });
   };
   const defend = (): void => {
-    const { inputs, final } = playBattle(defenseSetup(game, data), game.nextSeed, data, firstTowerOnly(data));
+    const { inputs, final } = playBattle(defenseSetup(game, data), game.nextSeed, data, active ? activeDefense(data) : firstTowerOnly(data));
     battleTicks.push(final.tick);
     if (final.result === 'breached') breached++;
     if (!act({ type: 'ResolveDefense', inputs })) throw new Error('ResolveDefense abgelehnt');
@@ -114,7 +140,10 @@ export function playTutorial(start: GameState, data: GameData, untilStep: string
     if (step.id === untilStep) return { game, waitedSeconds, battleTicks, breached, log };
     const before = game.tutorialStep;
     const hint = step.hint;
+    // Fehlt für den Hinweis nur Gold, schickt das Spiel den Spieler in die Verteidigung; der Bot folgt dem.
+    const shown = cityHint(game, data);
     if (step.autoDefense) defend();
+    else if (hint && hint.type !== 'button' && shown?.type === 'button' && shown.button === 'defend') defend();
     else if (!hint) {
       if (game.roadChoicePending) {
         const roads = data.city.keepLevels.find((l) => l.level === game.keepLevel)!.roads;
@@ -130,10 +159,7 @@ export function playTutorial(start: GameState, data: GameData, untilStep: string
     } else if (hint.type === 'slot') {
       const occupied = game.towers.some((t) => t.slot === hint.slot);
       // Fehlt das Gold für den Turm, verdient der Bot es mit einer Verteidigung.
-      if (!act(occupied ? { type: 'UpgradeTower', slot: hint.slot } : { type: 'BuildTower', slot: hint.slot, tower: hint.tower })) {
-        if (game.defensesWon >= data.tutorial.defenses.length - 1) defend();
-        else wait(1);
-      }
+      if (!act(occupied ? { type: 'UpgradeTower', slot: hint.slot } : { type: 'BuildTower', slot: hint.slot, tower: hint.tower })) wait(1);
     } else if (hint.type === 'keep') {
       if (!act({ type: 'UpgradeKeep' })) wait(1);
     } else if (hint.type === 'plot') {

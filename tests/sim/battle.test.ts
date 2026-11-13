@@ -67,17 +67,17 @@ describe('Wiederholungen', () => {
           "depth": 3,
           "fallen": 0,
           "gateHp": 0,
-          "hash": 1479527355,
+          "hash": 943784507,
           "result": "breached",
           "tick": 529,
         },
         "defense": {
-          "gold": 50,
-          "hash": 185966099,
-          "killed": 10,
-          "leaked": 0,
+          "gold": 49,
+          "hash": 3055775279,
+          "killed": 11,
+          "leaked": 3,
           "result": "held",
-          "tick": 397,
+          "tick": 716,
         },
       }
     `);
@@ -128,8 +128,10 @@ describe('Verteidigung', () => {
 
   it('Gold am Ende = Start - Baukosten + Kopfgeld je besiegtem Angreifer', () => {
     const final = runBattle(defense, 7, defenseInputs, data);
-    expect(final.gold).toBe(100 - 50 - 50 + killedCount(final) * 5);
-    expect(killedCount(final) + final.leaked).toBe(10);
+    const bounty = final.fallen.reduce((sum, id) => sum + data.units.units.find((u) => u.id === id)!.bounty, 0);
+    expect(final.gold).toBe(100 - 50 - 50 + bounty);
+    const total = wave('dorf_w2').groups.reduce((n, g) => n + g.count, 0);
+    expect(killedCount(final) + final.leaked).toBe(total);
   });
 
   it('ohne Türme fällt der Burgfried, wenn die Schlacht verlierbar ist', () => {
@@ -139,7 +141,7 @@ describe('Verteidigung', () => {
   });
 
   it('das Katapult trifft dichte Gruppen, die Heldin verstärkt ihren Abschnitt', () => {
-    const dense: BattleSetup = { ...defense, keepLevel: 2, waves: [wave('dorf_w5')], unlosable: true };
+    const dense: BattleSetup = { ...defense, keepLevel: 2, unlosable: true, waves: [{ groups: [{ unit: 'raeuber', count: 16, startTick: 0, intervalTicks: 4, jitterTicks: 0 }] }] };
     const kills = (setup: BattleSetup): number => killedCount(runBattle(setup, 5, [], data));
     const bow = kills({ ...dense, towers: [{ slot: 's1', def: 'bogenturm', level: 1 }] });
     const catapult = kills({ ...dense, towers: [{ slot: 's1', def: 'katapult', level: 1 }] });
@@ -151,22 +153,90 @@ describe('Verteidigung', () => {
   });
 });
 
+describe('Eingreifen des Verteidigers', () => {
+  const active: BattleSetup = { ...defense, volley: true, rally: true, towers: [{ slot: 's1', def: 'bogenturm', level: 1 }], unlosable: true };
+
+  it('Pfeilhagel trifft alle Angreifer im Umkreis des Punktes, bringt Kopfgeld und hat eine Abklingzeit', () => {
+    let s = createBattle({ ...active, towers: [] }, 3, data);
+    for (let i = 0; i < 120; i++) s = stepBattle(s, [], data);
+    const road = data.roads.roads[0]!;
+    const target = s.units[0]!;
+    const [x, y] = roadPointMilli(road, target.pos);
+    const near = s.units.filter((u) => { const [ux, uy] = roadPointMilli(road, u.pos); return (ux - x) ** 2 + (uy - y) ** 2 <= data.rules.volley.radiusMilli ** 2; });
+    const after = stepBattle(s, [{ type: 'Volley', x, y }], data);
+    for (const u of near) {
+      const hit = after.units.find((a) => a.id === u.id);
+      const armor = data.units.units.find((d) => d.id === u.def)!.armor;
+      if (hit) expect(hit.hp).toBe(u.hp - (data.rules.volley.damage - armor));
+      else expect(u.hp).toBeLessThanOrEqual(data.rules.volley.damage - armor);
+    }
+    const far = s.units.filter((u) => !near.includes(u));
+    for (const u of far) expect(after.units.find((a) => a.id === u.id)?.hp).toBe(u.hp);
+    expect(after.volleyReadyAt).toBe(s.tick + data.rules.volley.cooldownTicks);
+    expect(validateBattleAction(after, { type: 'Volley', x, y }, data)).toBe('ability_not_ready');
+    expect(validateBattleAction(s, { type: 'Volley', x: 1.5, y }, data)).toBe('invalid_target');
+  });
+
+  it('ohne Freigabe im Startzustand gibt es weder Pfeilhagel noch Kampfruf; der Angreifer hat sie nie', () => {
+    const plain = createBattle(defense, 1, data);
+    expect(validateBattleAction(plain, { type: 'Volley', x: 0, y: 0 }, data)).toBe('unknown_ability');
+    expect(validateBattleAction(plain, { type: 'Rally' }, data)).toBe('unknown_ability');
+    expect(validateBattleAction(createBattle(attack, 1, data), { type: 'Volley', x: 0, y: 0 }, data)).toBe('not_your_side');
+  });
+
+  it('Kampfruf: Türme schießen für die Dauer doppelt so schnell', () => {
+    const shots = (rally: boolean): number => {
+      let s = createBattle(active, 3, data);
+      let n = 0;
+      let last = -1;
+      for (let i = 0; i < 60 + data.hero.rally.durationTicks; i++) {
+        s = stepBattle(s, rally && i === 60 ? [{ type: 'Rally' }] : [], data);
+        const t = s.towers[0]!;
+        if (i >= 60 && t.lastShotTick !== last) n++;
+        last = t.lastShotTick;
+      }
+      return n;
+    };
+    expect(shots(true)).toBeGreaterThan(shots(false) * 1.5);
+    const s = stepBattle(createBattle(active, 3, data), [{ type: 'Rally' }], data);
+    expect(s.hasteUntil).toBe(data.hero.rally.durationTicks);
+    expect(validateBattleAction(s, { type: 'Rally' }, data)).toBe('ability_not_ready');
+  });
+
+  it('wer eingreift, lässt weniger Angreifer durch als wer zuschaut', () => {
+    const w3: BattleSetup = { ...active, waves: [wave('dorf_w3')], rally: false };
+    const passive = runBattle(w3, 5, [], data);
+    let s = createBattle(w3, 5, data);
+    const road = data.roads.roads[0]!;
+    while (s.result === 'running') {
+      const front = s.units.reduce<typeof s.units[number] | null>((a, b) => (a && a.pos > b.pos ? a : b), null);
+      const act: BattleAction[] = front && s.tick >= s.volleyReadyAt ? [{ type: 'Volley', x: roadPointMilli(road, front.pos)[0], y: roadPointMilli(road, front.pos)[1] }] : [];
+      s = stepBattle(s, act, data);
+    }
+    expect(s.leaked).toBeLessThan(passive.leaked);
+  });
+});
+
 describe('Haltepunkt und Unverlierbarkeit', () => {
-  const first: BattleSetup = { ...defense, waves: [wave('dorf_w1')], gold: 50, unlosable: true, holdMilliUntilTower: 2400 };
+  const first: BattleSetup = { ...defense, waves: [wave('dorf_w1')], gold: 50, unlosable: true, holdMilliUntilTower: data.tutorial.defenses[0]!.holdMilliUntilTower };
+  const firstCount = wave('dorf_w1').groups.reduce((n, g) => n + g.count, 0);
 
   it('ohne ersten Turm wartet die Welle am Haltepunkt, beliebig lange', () => {
     const s = runBattle(first, 3, [], data, 3000);
     expect(s.result).toBe('running');
-    expect(s.units[0]!.pos).toBe(2400);
-    expect(s.units.length + s.pending.length).toBe(4);
+    expect(s.units[0]!.pos).toBeGreaterThanOrEqual(first.holdMilliUntilTower);
+    expect(s.units[0]!.pos).toBeLessThan(first.holdMilliUntilTower + 100);
+    expect(s.units.length + s.pending.length).toBe(firstCount);
     expect(s.leaked).toBe(0);
   });
 
   it('Warten kostet nichts: gleiches Ergebnis wie bei sofortigem Bau', () => {
     const late = runBattle(first, 3, [{ tick: 400, action: build('s1') }], data);
     expect(late.result).toBe('held');
-    expect(killedCount(late)).toBe(4);
-    expect(killedCount(runBattle(first, 3, [{ tick: 0, action: build('s1') }], data))).toBe(4);
+    const early = runBattle(first, 3, [{ tick: 0, action: build('s1') }], data);
+    expect(killedCount(late)).toBe(killedCount(early));
+    expect(late.leaked).toBe(early.leaked);
+    expect(killedCount(late) + late.leaked).toBe(firstCount);
   });
 
   it('unverlierbare Schlachten gehen bei beliebigen Eingaben nie verloren', () => {
@@ -177,10 +247,10 @@ describe('Haltepunkt und Unverlierbarkeit', () => {
       for (let tick = 0; tick < 1500; tick += 1 + rngInt(rng, 40)) {
         const slot = slots[rngInt(rng, slots.length)]!;
         const kind = rngInt(rng, 4);
-        random.push({ tick, action: kind === 0 ? build(slot) : kind === 1 ? { type: 'UpgradeTower', slot } : kind === 2 ? build(slot, 'katapult') : release });
+        random.push({ tick, action: kind === 0 ? build(slot) : kind === 1 ? { type: 'UpgradeTower', slot } : kind === 2 ? build(slot, 'katapult') : rngInt(rng, 2) === 0 ? release : { type: 'Volley', x: rngInt(rng, 9000), y: rngInt(rng, 14000) } });
       }
       for (const def of data.tutorial.defenses) {
-        const s = runBattle({ ...first, waves: [wave(def.wave)], holdMilliUntilTower: def.holdMilliUntilTower }, seed, random, data);
+        const s = runBattle({ ...first, volley: true, rally: true, waves: [wave(def.wave)], holdMilliUntilTower: def.holdMilliUntilTower }, seed, random, data);
         expect(s.result).not.toBe('breached');
         expect(s.keepHp).toBe(10);
       }

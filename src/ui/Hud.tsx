@@ -1,5 +1,6 @@
 import type { ComponentChildren } from 'preact';
 import type { Resources, RoadDef } from '../sim/index.ts';
+import { atlasSprite } from '../render/sprites.ts';
 
 /**
  * Oberfläche über dem Spielfeld. Zeigt ein fertig berechnetes Modell und löst Rückrufe aus;
@@ -53,6 +54,8 @@ export interface HudModel {
   /** Durchbruchstiefe 0 bis 3 als drei Marken; `null` blendet sie aus. */
   readonly depth: number | null;
   readonly banner: string | null;
+  /** Vorschau der nächsten Welle über den Schaltflächen. */
+  readonly preview: { readonly label: string; readonly items: readonly { readonly sprite: string; readonly scale: number; readonly count: number; readonly name: string }[] } | null;
   readonly bottom: readonly Btn[];
   /** Zweite, kleinere Reihe über der Hauptleiste. */
   readonly bottomSecondary: readonly Btn[];
@@ -69,6 +72,22 @@ const RES_ICON = { gold: 'gold', wood: 'holz', stone: 'stein' } as const;
 /** Symbol aus `public/sprites/icons/` (erzeugt von `scripts/sprites.py`). */
 export function Icon({ name, size }: { name: string; size: number }) {
   return <img src={`${ICON_BASE}${name}.png`} alt="" width={size} height={size} style={{ display: 'block', flex: 'none' }} draggable={false} />;
+}
+
+/** Motiv aus dem Bildatlas in der Höhe `height`. */
+function AtlasIcon({ name, height }: { name: string; height: number }) {
+  const a = atlasSprite(name);
+  if (!a) return null;
+  const k = height / a.rect.h;
+  return (
+    <span
+      style={{
+        display: 'inline-block', flex: 'none', width: `${a.rect.w * k}px`, height: `${height}px`,
+        backgroundImage: `url(${a.url})`, backgroundSize: `${(a.size[0] ?? 0) * k}px ${(a.size[1] ?? 0) * k}px`,
+        backgroundPosition: `${-a.rect.x * k}px ${-a.rect.y * k}px`,
+      }}
+    />
+  );
 }
 
 function Res({ kind, value, big }: { kind: keyof typeof RES_ICON; value: number | string; big?: boolean }) {
@@ -173,6 +192,17 @@ export function Hud({ m }: { m: HudModel }) {
 
       {m.bottom.length > 0 && !m.sheet && !m.panel && !m.map && (
         <div class="bar" style={{ bottom: 'env(safe-area-inset-bottom)', paddingBottom: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          {m.preview && (
+            <div data-testid="preview" style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', padding: '2px 4px', flexWrap: 'wrap' }}>
+              <span style={{ opacity: 0.75 }}>{m.preview.label}</span>
+              {m.preview.items.map((it) => (
+                <span title={it.name} style={{ display: 'inline-flex', alignItems: 'flex-end', gap: '3px', fontWeight: 600 }}>
+                  <AtlasIcon name={it.sprite} height={Math.round(26 * it.scale)} />
+                  {it.count} {it.name}
+                </span>
+              ))}
+            </div>
+          )}
           {m.bottomSecondary.length > 0 && (
             <div class="small" style={{ display: 'flex', gap: '6px' }}>{m.bottomSecondary.map((b) => <Button b={b} key={b.id} />)}</div>
           )}

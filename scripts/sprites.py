@@ -179,7 +179,7 @@ def build_game_assets(index: dict) -> None:
         rects[name] = {"x": px, "y": py, "w": img.width, "h": img.height}
     # WebP statt PNG: die Rohbilder sind verrauscht, als PNG wäre der Atlas rund 1 MB groß.
     atlas.save(GAME / "atlas.webp", quality=86, method=6)
-    (ROOT / "src" / "render" / "atlas.json").write_text(json.dumps(rects, indent=1, sort_keys=True) + "\n")
+    (ROOT / "src" / "render" / "atlas.json").write_text(json.dumps({"size": [atlas.size[0], atlas.size[1]], "sprites": rects}, indent=1, sort_keys=True) + "\n")
     for entry in index.get("symbole", []):
         img = Image.open(OUT / entry["file"])
         side = max(img.size)

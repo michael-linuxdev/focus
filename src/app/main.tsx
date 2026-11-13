@@ -1,11 +1,12 @@
 import { render } from 'preact';
 import { registerSW } from 'virtual:pwa-register';
 import {
-  MILLI, STATE_VERSION, attackSetup, canAfford, cityHint, createBattle, createGame, dataVersion, defaultLineup, defenseDef, defenseSetup, findById, hashBattle,
+  MILLI, STATE_VERSION, attackSetup, canAfford, cityHint, createBattle, createGame, dataVersion, defaultLineup, defenseStars, defenseDef, defenseSetup, findById, hashBattle,
   readyTroops, reduceGame, roadLengthMilli, roadPointMilli, stepBattle, towerActionCost, tutorialStep, unlocked, validateBattleAction, validateGameAction,
   type BattleAction, type BattleInput, type BattleState, type GameAction, type GameState, type Resources, type SavedReplay, type UnitCount,
 } from '../sim/index.ts';
 import { drawStage, formatSeconds, targetAt, tileCenter, type Effect, type Layout, type Scene } from '../render/stage.ts';
+import { spriteAspect } from '../render/sprites.ts';
 import { Hud, type Btn, type HudModel, type MapNode, type StepperRow } from '../ui/Hud.tsx';
 import { gameData as data } from './data.ts';
 import { consumeTicks } from './loop.ts';
@@ -64,6 +65,10 @@ let lastSaveMs = 0;
 let victoryGold = 0;
 /** Die Heldin ist beigetreten, ihre Meldung steht noch aus. */
 let heroBannerDue = false;
+/** Vom Spieler gewähltes Schlachttempo (1 oder 2); gilt für Verteidigung und Angriff. */
+let userSpeed = 1;
+/** Stufe der gerade gespielten Verteidigung, für die Sterne nach dem Sieg. */
+let playedDefense = defenseDef(game, data);
 /** Nach einer Wiederholung hervorgehobener schwacher Abschnitt. */
 let weak: { section: string; until: number } | null = null;
 /** Die Oberfläche wird höchstens zehnmal pro Sekunde neu aufgebaut, nach Eingaben sofort. */
@@ -192,7 +197,8 @@ function toCity(): void {
 function startDefense(): void {
   tickClock();
   sheet = null;
-  victoryGold = defenseDef(game, data).victoryGold;
+  playedDefense = defenseDef(game, data);
+  victoryGold = playedDefense.victoryGold;
   record('battle_start', { kind: 'defense', wave: defenseDef(game, data).wave });
   localStorage.setItem(BATTLE_FLAG, 'defense');
   screen = { kind: 'battle', side: 'defense', battle: createBattle(defenseSetup(game, data), game.nextSeed, data), inputs: [], queued: [], camp: '', lineup: [], targeting: null };
@@ -226,14 +232,18 @@ function finishBattle(s: Extract<Screen, { kind: 'battle' }>): void {
     : dispatch({ type: 'ResolveAttack', camp: s.camp, lineup: s.lineup, inputs: s.inputs });
   if (!ok || game.replays[game.replays.length - 1]?.replay.finalHash !== expected) desync = true;
   localStorage.removeItem(BATTLE_FLAG);
-  record('battle_end', { kind: s.side, result: s.battle.result, depth: s.battle.depth, ticks: s.battle.tick, leaked: s.battle.leaked, fallen: s.battle.fallen.length });
+  record('battle_end', {
+    kind: s.side, result: s.battle.result, depth: s.battle.depth, ticks: s.battle.tick, leaked: s.battle.leaked, fallen: s.battle.fallen.length,
+    stars: s.side === 'defense' ? defenseStars(s.battle, playedDefense, data) : 0,
+  });
   if (s.side === 'attack') {
     screen = { kind: 'result' };
     return;
   }
   const won = s.battle.result === 'held';
   const lostGold = game.replays[game.replays.length - 1]?.loot.gold ?? 0;
-  showBanner(won ? t('banner.victory', { gold: victoryGold }) : lostGold > 0 ? `${t('banner.defeat')} · ${t('banner.lost', { gold: lostGold })}` : t('banner.defeat'), toCity);
+  const stars = defenseStars(s.battle, playedDefense, data);
+  showBanner(won ? t('banner.victory', { stars: '★'.repeat(stars) + '☆'.repeat(3 - stars), gold: victoryGold + (data.rules.starGold[stars] ?? 0) }) : lostGold > 0 ? `${t('banner.defeat')} · ${t('banner.lost', { gold: lostGold })}` : t('banner.defeat'), toCity);
 }
 
 // ---------- Tippen auf das Spielfeld ----------
@@ -247,14 +257,35 @@ function onTap(clientX: number, clientY: number): void {
   const rect = canvas.getBoundingClientRect();
   const road = findById(data.roads.roads, currentRoadId(), 'Straße');
   const target = targetAt(layout, road, clientX - rect.left, clientY - rect.top, data);
-  if (!target) return;
+  if (!target) {
+    if (screen.kind === 'battle' && screen.side === 'defense' && !sheet) volleyAt(clientX - rect.left, clientY - rect.top);
+    return;
+  }
 
   if (screen.kind === 'battle' && screen.side === 'attack') {
-    if (screen.targeting && target.kind === 'slot' && battleAct({ type: 'UseAbility', ability: screen.targeting, slot: target.id })) screen.targeting = null;
+    if (screen.targeting && target.kind === 'slot' && battleAct({ type: 'UseAbility', ability: screen.targeting, slot: target.id })) {
+      record('ability_used', { ability: screen.targeting });
+      screen.targeting = null;
+    }
     return;
   }
   const inDefense = screen.kind === 'battle';
   if (screen.kind !== 'city' && !inDefense) return;
+  if (screen.kind === 'battle' && !sheet) {
+    // In der Verteidigung baut nur ein Tipp genau auf einen Bauplatz; jeder andere Tipp ins Feld ruft den Pfeilhagel dorthin.
+    const px = clientX - rect.left;
+    const py = clientY - rect.top;
+    let onSlot = false;
+    if (target.kind === 'slot') {
+      const sl = findById(data.city.towerSlots, target.id, 'Bauplatz');
+      const c = tileCenter(layout, sl.x, sl.y);
+      onSlot = (c.x - px) ** 2 + (c.y - py) ** 2 <= (layout.tile * 0.5) ** 2;
+    }
+    if (!onSlot) {
+      volleyAt(px, py);
+      return;
+    }
+  }
   if (sheet || (screen.kind === 'city' && cityPanel() !== null)) return;
   weak = null;
 
@@ -297,6 +328,19 @@ function onTap(clientX: number, clientY: number): void {
   }
   if (target.kind === 'keep' && unlocked(game, 'keep', data) && game.keepDoneAt === null && data.city.keepLevels.some((l) => l.level === game.keepLevel + 1)) {
     sheet = { kind: 'keep' };
+  }
+}
+
+/** Pfeilhagel auf einen Punkt des Spielfelds (CSS-Pixel relativ zur Zeichenfläche). */
+function volleyAt(px: number, py: number): void {
+  if (!layout || screen.kind !== 'battle') return;
+  const x = Math.round(((px - layout.ox) / layout.tile - 0.5) * MILLI);
+  const y = Math.round(((py - layout.oy) / layout.tile - 0.5) * MILLI);
+  const { cols, rows } = data.roads.grid;
+  if (x < -MILLI / 2 || y < -MILLI / 2 || x > (cols - 0.5) * MILLI || y > (rows - 0.5) * MILLI) return;
+  if (battleAct({ type: 'Volley', x, y })) {
+    record('ability_used', { ability: 'pfeilhagel' });
+    navigator.vibrate?.(8);
   }
 }
 
@@ -360,9 +404,15 @@ function hintTile(): Scene['hint'] {
   if (banner?.then || sheet) return null;
   if (weak) return weakTile();
   const hint = tutorialStep(game, data).hint;
-  if (!hint) return null;
   if (screen.kind === 'battle' && screen.side === 'defense') {
-    if (hint.type !== 'slot') return null;
+    // In den ersten zwei Verteidigungen zeigt der Finger auf die vorderste Gruppe, bis der erste Pfeilhagel gefallen ist.
+    const b = screen.battle;
+    if (game.defensesWon < 2 && b.towers.length > 0 && b.lastVolleyTick < 0 && b.tick >= b.volleyReadyAt && b.units.length > 0) {
+      const front = b.units.reduce((a, u) => (u.pos > a.pos ? u : a));
+      const [fx, fy] = roadPointMilli(findById(data.roads.roads, b.setup.roadId, 'Straße'), front.pos);
+      return { x: fx / MILLI, y: fy / MILLI, cost: null };
+    }
+    if (!hint || hint.type !== 'slot') return null;
     const occupied = screen.battle.towers.some((tw) => tw.slot === hint.slot);
     const action: BattleAction = occupied ? { type: 'UpgradeTower', slot: hint.slot } : { type: 'BuildTower', slot: hint.slot, tower: hint.tower };
     if (validateBattleAction(screen.battle, action, data) !== null) return null;
@@ -391,15 +441,20 @@ function hintTile(): Scene['hint'] {
 
 /** Platz, den die Schaltflächen unten brauchen; das Spielfeld bekommt den Rest. */
 function bottomInset(): number {
-  if (screen.kind === 'battle') return screen.side === 'defense' ? 16 : 88;
+  if (screen.kind === 'battle') return 88;
   if (screen.kind === 'replay') return 88;
   if (!unlocked(game, 'defend', data)) return 16;
-  return unlocked(game, 'hero', data) ? 138 : 88;
+  return unlocked(game, 'hero', data) ? 166 : 116;
 }
 
 function buildScene(nowMs: number): Scene {
   const cheapestTower = Math.min(...availableTowers().map((tw) => tw.levels[0]!.cost));
-  const base = { hint: hintTile(), effects, timeMs: nowMs, bottomInset: bottomInset(), cheapestTower, weakSection: screen.kind === 'city' && weak ? weak.section : null };
+  const fight = screen.kind === 'battle' || screen.kind === 'replay' ? screen.battle : null;
+  const base = {
+    hint: hintTile(), effects, timeMs: nowMs, bottomInset: bottomInset(), cheapestTower,
+    volley: fight && fight.lastVolleyTick >= 0 ? { x: fight.lastVolleyX, y: fight.lastVolleyY, age: fight.tick - fight.lastVolleyTick } : null,
+    haste: fight !== null && fight.tick < fight.hasteUntil,
+    weakSection: screen.kind === 'city' && weak ? weak.section : null };
   if (screen.kind === 'battle' || screen.kind === 'replay') {
     const b = screen.battle;
     const attack = b.setup.playerSide === 'attacker';
@@ -445,6 +500,7 @@ function buildHud(nowMs: number): HudModel {
     onTopRight: openDevOnTaps,
     depth: null as number | null,
     banner: banner?.text ?? null,
+    preview: null as HudModel['preview'],
     bottom: [] as Btn[],
     bottomSecondary: [] as Btn[],
     status: null as string | null,
@@ -456,7 +512,27 @@ function buildHud(nowMs: number): HudModel {
   if (screen.kind === 'battle') {
     const s = screen;
     const b = s.battle;
-    if (s.side === 'defense') return { ...model, resources: { ...game.resources, gold: b.gold }, sheet: towerSheet() };
+    const speedBtn: Btn = { id: 'speed', label: t('hud.speed', { n: userSpeed }), quiet: true, onClick: () => { userSpeed = userSpeed === 1 ? 2 : 1; } };
+    const waitText = (readyAt: number): string | undefined => {
+      const wait = Math.ceil((readyAt - b.tick) / data.game.ticksPerSecond);
+      return wait > 0 ? t('ability.wait', { n: wait }) : undefined;
+    };
+    if (s.side === 'defense') {
+      const bottom: Btn[] = [];
+      // Die erste Minute bleibt ohne Schaltflächen: Sie erscheinen erst, wenn der erste Turm steht.
+      if (b.setup.volley === true && b.towers.length > 0) {
+        // Der Pfeilhagel wird durch Tippen ins Feld ausgelöst; die Schaltfläche zeigt Bereitschaft und Wartezeit.
+        bottom.push({ id: 'ability-pfeilhagel', label: t('ability.pfeilhagel'), sub: waitText(b.volleyReadyAt) ?? t('ability.pfeilhagel.sub'), disabled: b.tick < b.volleyReadyAt, onClick: () => undefined });
+      }
+      if (b.setup.rally === true) {
+        bottom.push({
+          id: 'ability-kampfruf', label: t('ability.kampfruf'), icon: 'alruna', sub: waitText(b.rallyReadyAt), disabled: b.tick < b.rallyReadyAt,
+          onClick: () => { if (battleAct({ type: 'Rally' })) record('ability_used', { ability: 'kampfruf' }); },
+        });
+      }
+      if (unlocked(game, 'defend', data)) bottom.push(speedBtn);
+      return { ...model, resources: { ...game.resources, gold: b.gold }, bottom, sheet: towerSheet() };
+    }
     const left = Math.max(0, Math.ceil((b.setup.maxTicks - b.tick) / data.game.ticksPerSecond));
     const bottom: Btn[] = [{
       id: 'release', icon: 'angriff', label: t('attack.release', { n: Math.min(b.releasedWaves + 1, b.setup.waves.length) }),
@@ -470,16 +546,19 @@ function buildHud(nowMs: number): HudModel {
         disabled: wait > 0, active: s.targeting === id,
         onClick: () => {
           if (def.kind === 'disableTower') s.targeting = s.targeting === id ? null : id;
-          else battleAct({ type: 'UseAbility', ability: id, slot: null });
+          else if (battleAct({ type: 'UseAbility', ability: id, slot: null })) record('ability_used', { ability: id });
         },
       });
     });
+    bottom.push(speedBtn);
     return { ...model, topRight: t('attack.time', { n: left }), depth: b.depth, bottom };
   }
 
   if (screen.kind === 'replay') {
     const s = screen;
-    const verdict = s.verdict === null ? null : s.verdict === 'ok' ? t('replay.identical') : t('replay.mismatch');
+    // Wiederholungen gelten nur gegen den Datenstand, mit dem sie gespielt wurden.
+    const outdated = s.saved.replay.dataVersion !== dataVersion(data);
+    const verdict = s.verdict === null ? null : s.verdict === 'ok' ? t('replay.identical') : outdated ? t('replay.old') : t('replay.mismatch');
     return {
       ...model, topRight: verdict ?? t(`replay.${s.saved.kind}`), depth: s.saved.kind === 'attack' ? s.battle.depth : null, banner: verdict,
       bottom: [
@@ -557,7 +636,9 @@ function buildHud(nowMs: number): HudModel {
   if (screen.kind === 'world') return { ...model, map: worldMap(hint) };
 
   // Stadt
-  const buttonHint = (id: string): boolean => hint?.type === 'button' && hint.button === id && !game.roadChoicePending;
+  // Fehlt für den nächsten Schritt nur Gold, zeigt die Spiellogik stattdessen auf die Verteidigung.
+  const shown = cityHint(game, data);
+  const buttonHint = (id: string): boolean => shown?.type === 'button' && shown.button === id && !game.roadChoicePending;
   const bottom: Btn[] = [];
   const second: Btn[] = [];
   if (unlocked(game, 'defend', data)) bottom.push({ id: 'defend', label: t('hud.defend'), icon: 'turm', hint: buttonHint('defend'), onClick: startDefense });
@@ -570,9 +651,26 @@ function buildHud(nowMs: number): HudModel {
   if (unlocked(game, 'alliance', data)) second.push({ id: 'alliance', label: t('hud.alliance'), icon: 'allianz', hint: buttonHint('alliance'), onClick: () => { sheet = { kind: 'alliance' }; } });
   if (unlocked(game, 'goals', data)) second.push({ id: 'goals', label: t('hud.goals'), icon: 'ziele', hint: buttonHint('goals'), onClick: () => { sheet = { kind: 'goals' }; } });
   if (unlocked(game, 'replays', data)) second.push({ id: 'replays', label: t('hud.replays'), onClick: () => { screen = { kind: 'replays' }; } });
+  const preview = unlocked(game, 'defend', data) ? wavePreview() : null;
   const weakBanner = weak ? t('raid.weakBanner', { section: t(`section.${weak.section}`) }) : null;
   const panel = cityPanel();
-  return { ...model, banner: model.banner ?? weakBanner, bottom, bottomSecondary: second, status: unlocked(game, 'world', data) ? shieldText() : null, sheet: panel ? null : citySheet(hint), panel };
+  return { ...model, banner: model.banner ?? weakBanner, preview, bottom, bottomSecondary: second, status: unlocked(game, 'world', data) ? shieldText() : null, sheet: panel ? null : citySheet(hint), panel };
+}
+
+/** Was in der nächsten Welle kommt: Einheiten nach Art zusammengezählt, in der Reihenfolge der Daten. */
+function wavePreview(): HudModel['preview'] {
+  const wave = findById(data.waves.waves, defenseDef(game, data).wave, 'Welle');
+  const alias: Readonly<Record<string, { sprite: string; scale: number }>> = { laeufer: { sprite: 'raeuber', scale: 0.8 } };
+  const items = data.units.units
+    .map((u) => ({ unit: u.id, count: wave.groups.filter((g) => g.unit === u.id).reduce((n, g) => n + g.count, 0) }))
+    .filter((it) => it.count > 0)
+    .map((it) => {
+      const sprite = alias[it.unit]?.sprite ?? it.unit;
+      // Fahrzeuge sind breiter als hoch und werden etwas niedriger gezeigt.
+      const scale = (alias[it.unit]?.scale ?? 1) * (spriteAspect(sprite) < 0.9 ? 0.8 : 1);
+      return { sprite, scale, count: it.count, name: t(`unit.${it.unit}`) };
+    });
+  return { label: t('hud.nextWave'), items };
 }
 
 function shieldText(): string | null {
@@ -799,7 +897,7 @@ function frame(nowMs: number): void {
   const budget = consumeTicks(restMs, nowMs - last, tickMs);
   last = nowMs;
   restMs = budget.restMs;
-  const factor = speedFactor * (screen.kind === 'replay' ? screen.speed : 1);
+  const factor = speedFactor * (screen.kind === 'replay' ? screen.speed : screen.kind === 'battle' ? userSpeed : 1);
   for (let i = 0; i < budget.ticks * factor && !dev; i++) stepScreen(nowMs);
   if (weak && nowMs > weak.until) weak = null;
   if (screen.kind !== 'battle') {
@@ -875,6 +973,14 @@ window.addEventListener('hashchange', () => { if (location.hash === '#dev') dev 
     return { x: rect.left + c.x, y: rect.top + c.y };
   },
   skip: addLapse,
+  /** Ort einer Wegstrecke der laufenden Schlacht auf dem Bildschirm. */
+  roadPos: (pos: number) => {
+    if (!layout || (screen.kind !== 'battle' && screen.kind !== 'replay')) return null;
+    const [x, y] = roadPointMilli(findById(data.roads.roads, screen.battle.setup.roadId, 'Straße'), pos);
+    const rect = canvas.getBoundingClientRect();
+    const c = tileCenter(layout, x / MILLI, y / MILLI);
+    return { x: rect.left + c.x, y: rect.top + c.y };
+  },
   speed: (factor: number) => { speedFactor = factor; },
   exportData,
   openDev: () => { dev = { message: null, confirming: null }; },

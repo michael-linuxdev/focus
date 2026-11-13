@@ -16,7 +16,7 @@ import { makeReplay, runBattle, type Replay } from './replay.ts';
  * Schlachten werden nicht "gemeldet", sondern nachgerechnet: `ResolveDefense` und `ResolveAttack`
  * bekommen nur die Eingaben des Spielers; Startzustand und Startwert stammen aus dem Spielzustand.
  */
-export const STATE_VERSION = 5;
+export const STATE_VERSION = 6;
 
 export interface Building {
   readonly plot: string;
@@ -50,6 +50,8 @@ export interface SavedReplay {
   readonly kind: 'defense' | 'attack' | 'raid';
   readonly at: number;
   readonly result: 'held' | 'breached';
+  /** Sterne einer Verteidigung (0 bis 3); bei Angriffen 0. */
+  readonly stars: number;
   readonly depth: number;
   /** Beute des Angreifers: beim Angriff Gewinn des Spielers, bei Verteidigung und Nachtangriff sein Verlust. */
   readonly loot: Resources;
@@ -250,8 +252,20 @@ function cityDefense(state: GameState, def: DefenseDef, data: GameData): BattleS
     waves: [{ groups: findById(data.waves.waves, def.wave, 'Welle').groups }],
     autoRelease: true,
     abilities: [],
+    volley: true,
+    rally: state.hero.joined,
     maxTicks: 0,
   };
+}
+
+/**
+ * Sterne einer Verteidigung: 1 gehalten, 2 ohne Durchbruch, 3 ohne Durchbruch in der Richtzeit.
+ * Verloren gibt es keinen Stern.
+ */
+export function defenseStars(final: BattleState, def: DefenseDef, data: GameData): number {
+  if (final.result !== 'held') return 0;
+  if (final.leaked > 0) return 1;
+  return final.tick <= def.parSeconds * data.game.ticksPerSecond ? 3 : 2;
 }
 
 /** Startzustand der nächsten Verteidigung, vollständig aus Spielzustand und Daten abgeleitet. */
@@ -261,7 +275,7 @@ export function defenseSetup(state: GameState, data: GameData): BattleSetup {
 
 /** Startzustand des Nachtangriffs: die Stadt verteidigt sich ohne Eingaben des Spielers. */
 export function raidSetup(state: GameState, data: GameData): BattleSetup {
-  return cityDefense(state, { wave: data.rules.nightRaidWave, holdMilliUntilTower: 0, unlosable: false, victoryGold: 0 }, data);
+  return cityDefense(state, { wave: data.rules.nightRaidWave, holdMilliUntilTower: 0, unlosable: false, victoryGold: 0, parSeconds: 0 }, data);
 }
 
 /**
@@ -551,9 +565,9 @@ function nextSeed(seed: number): number {
   return (Math.imul(seed, 0x9e3779b1) + 1) >>> 0;
 }
 
-function withReplay(state: GameState, kind: SavedReplay['kind'], final: BattleState, loot: Resources, replay: Replay, data: GameData): GameState {
+function withReplay(state: GameState, kind: SavedReplay['kind'], final: BattleState, loot: Resources, replay: Replay, data: GameData, stars = 0): GameState {
   const weak = kind === 'attack' ? null : weakSection(final, data);
-  const saved: SavedReplay = { id: state.nextReplayId, kind, at: state.now, weakSection: weak, result: final.result === 'breached' ? 'breached' : 'held', depth: final.depth, loot, replay };
+  const saved: SavedReplay = { id: state.nextReplayId, kind, at: state.now, weakSection: weak, stars, result: final.result === 'breached' ? 'breached' : 'held', depth: final.depth, loot, replay };
   return { ...state, nextReplayId: state.nextReplayId + 1, replays: [...state.replays, saved].slice(-data.rules.maxReplays) };
 }
 
@@ -573,15 +587,17 @@ function apply(state: GameState, action: GameAction, data: GameData): GameState 
       if (final.result === 'running') return 'battle_not_finished';
       const won = final.result === 'held';
       const loss = cityLoss(state, final, data);
+      const def = defenseDef(state, data);
+      const stars = defenseStars(final, def, data);
       const s: GameState = {
         ...count(state, 'defenses', won ? 1 : 0),
         nextSeed: nextSeed(state.nextSeed),
-        resources: { ...loss.resources, gold: loss.resources.gold + (won ? defenseDef(state, data).victoryGold : 0) },
+        resources: { ...loss.resources, gold: loss.resources.gold + (won ? def.victoryGold : 0) + (data.rules.starGold[stars] ?? 0) },
         shieldUntil: loss.shieldUntil,
         towers: final.towers.map((t) => ({ slot: t.slot, def: t.def, level: t.level })),
         defensesWon: state.defensesWon + (won ? 1 : 0),
       };
-      return withReplay(s, 'defense', final, loss.loot, makeReplay(setup, state.nextSeed, action.inputs, final, data), data);
+      return withReplay(s, 'defense', final, loss.loot, makeReplay(setup, state.nextSeed, action.inputs, final, data), data, stars);
     }
     case 'ResolveNightRaid': {
       // Verteidigung in Abwesenheit: dieselbe Schlacht, nur ohne Eingaben. Der nächste Angriff wird gleich wieder angekündigt.

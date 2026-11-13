@@ -1,11 +1,17 @@
-import rects from './atlas.json';
+import atlasInfo from './atlas.json';
 
 /**
  * Bilder des Spiels: ein Atlas mit allen Motiven (erzeugt von `scripts/sprites.py`) und drei Bodenkacheln.
  * Solange sie nicht geladen sind, zeichnet die Darstellung die einfachen Formen; das Spiel wartet nie auf Bilder.
  */
 type Rect = { readonly x: number; readonly y: number; readonly w: number; readonly h: number };
-const atlasRects: Readonly<Record<string, Rect>> = rects;
+const atlasRects: Readonly<Record<string, Rect>> = atlasInfo.sprites;
+
+/** Lage eines Motivs im Atlas und Größe des Atlas, für Symbole in der Oberfläche (CSS-Hintergrund). */
+export function atlasSprite(name: string): { rect: Rect; size: readonly number[]; url: string } | null {
+  const rect = atlasRects[name];
+  return rect ? { rect, size: atlasInfo.size, url: `${import.meta.env.BASE_URL}sprites/atlas.webp` } : null;
+}
 
 function load(file: string): HTMLImageElement {
   const img = new Image();

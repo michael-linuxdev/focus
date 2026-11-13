@@ -70,6 +70,11 @@ der Verteidiger baut Türme (`BuildTower`, `UpgradeTower`), der Angreifer löst 
   aufgehaltene Einheit mit der kleinsten Kennung: `max(1, Schaden * militiaDamagePermille / 1000 - armor)`.
   Pro Einheit und Tick greift höchstens ein Hindernis: das Tor geht vor, danach die erste Wachstube in Listenreihenfolge.
 - **Brandpfeile auf Pechnase oder Wachstube:** Bremsen, Pech und Zuschlagen setzen aus; stehende Miliz hält weiter auf.
+- **Pfeilhagel (`Volley { x, y }`, nur Verteidiger, nur wenn `setup.volley`):** wirkt in Schritt 1 sofort auf alle Einheiten,
+  deren Ort höchstens `volley.radiusMilli` vom Punkt entfernt ist: `max(1, volley.damage - armor)`. Besiegte bringen Kopfgeld
+  und zählen in `fallen`, aber bei keinem Turm als `kills`. Danach `volleyReadyAt = Tick + volley.cooldownTicks`.
+- **Kampfruf (`Rally`, nur Verteidiger, nur wenn `setup.rally`):** setzt `hasteUntil = Tick + rally.durationTicks`. Solange
+  `Tick < hasteUntil`, sinkt die Abklingzeit jedes Turms je Tick um 2 statt um 1 (nicht unter 0).
 - **Tor:** Belagerungswert 0 heißt: die Einheit steht vor dem Tor und richtet nichts aus (derzeit alles außer Rammbock, Sturmbock und Räuber).
 - **Tor:** steht bei `gateMilli`. Solange es Leben hat, bleibt jede Einheit dort stehen und zieht ihm je Tick `siege` ab.
   Fällt es mitten in einem Tick, laufen die danach bewegten Einheiten desselben Ticks schon durch.
@@ -107,6 +112,9 @@ der Verteidiger baut Türme (`BuildTower`, `UpgradeTower`), der Angreifer löst 
 - **Allianz (Platzhalter):** Nach `RequestHelp` wirkt die n-te Hilfe zum Zeitpunkt `Bitte + n * helpIntervalSeconds` und setzt
   `doneAt = max(dieser Zeitpunkt, doneAt - helpReduceSeconds)`, höchstens `maxHelps`-mal und nur, solange der Bau noch läuft.
 - **Tagesziele:** Zähler je Tag (`floor(now / 86400000)`, also UTC-Tage). Ein neuer Tag setzt Zähler und Abholungen zurück.
+- **Sterne (`defenseStars`):** 0 verloren, 1 gehalten, 2 gehalten ohne Durchbruch, 3 ohne Durchbruch in höchstens
+  `parSeconds` der Welle. `ResolveDefense` vergibt zusätzlich `starGold[Sterne]`.
+- **Hinweis bei Goldmangel (`cityHint`):** Scheitert der Hinweis des Schritts nur am Gold, zeigt er auf die Verteidigung.
 - **Lazarett:** Gefallene Truppen des Spielers werden nach dem Angriff aus `ready` in `hospital` verschoben und kehren nach
   `healSeconds * Anzahl` (mal `healTimePermille` des Lazaretts) zurück. Es geht nie eine Einheit verloren.
 - **Tutorial:** `tutorialStep` rückt nach jeder Aktion vor, solange die Bedingung des aktuellen Schritts erfüllt ist.
@@ -141,7 +149,7 @@ Die Oberfläche spielt sie über dieselbe `stepBattle`-Funktion ab und vergleich
   `shieldUntil`, `worldSeen`, `allianceJoined`, `daily` (Tag, Zähler, abgeholte Ziele), `goalsClaimed`, `raidDueAt`,
   `raidAcknowledged`, `raidReport`, `raidsResolved`; Gebäude tragen zusätzlich `helpRequestedAt` und `helpsReceived`
 - `BattleState`: `tick`, `rng`, `setup`, `releasedWaves`, `pending[]`, `units[]`, `towers[]`, `gold`, `keepHp`, `gateHp`,
-  `depth`, `shieldUntil`, `abilityReadyAt[]`, `fallen[]`, `leaked`, `result`; Türme tragen `kills`, `militiaHp`,
+  `depth`, `shieldUntil`, `abilityReadyAt[]`, `volleyReadyAt`, `rallyReadyAt`, `hasteUntil`, `fallen[]`, `leaked`, `result`; Türme tragen `kills`, `militiaHp`,
   `militiaRespawnAt`, `militiaPos`
 - `army.ready` ist eine Zuordnung Einheit → Anzahl. Gelesen wird sie immer in der Reihenfolge von `data/troops.json`.
 
@@ -164,6 +172,8 @@ Die Oberfläche spielt sie über dieselbe `stepBattle`-Funktion ab und vergleich
 | `JoinAlliance` | Spiel | noch nicht Mitglied (Platzhalter) |
 | `RequestHelp { plot }` | Spiel | Mitglied, Bau läuft, noch keine Bitte für diesen Bau |
 | `ClaimDailyGoal { goal }` | Spiel | Ziel bekannt, Zähler erreicht, heute noch nicht abgeholt |
+| `Volley { x, y }` | Schlacht (Verteidiger) | im Startzustand freigegeben, ganzzahliger Punkt, Abklingzeit abgelaufen |
+| `Rally` | Schlacht (Verteidiger) | im Startzustand freigegeben (Heldin beigetreten), Abklingzeit abgelaufen |
 | `ReleaseWave` | Schlacht (Angreifer) | noch eine Welle übrig |
 | `UseAbility { ability, slot }` | Schlacht (Angreifer) | Fähigkeit vorhanden und bereit; `disableTower` braucht einen Turm als Ziel |
 

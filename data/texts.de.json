@@ -1,12 +1,12 @@
 {
-  "version": 8,
+  "version": 9,
   "lang": "de",
   "texts": {
     "hud.defend": "Verteidigen",
     "hud.attack": "Angreifen",
     "hud.replays": "Rückblick",
     "hud.wave": "Welle {n}",
-    "banner.victory": "Sieg! +{gold}",
+    "banner.victory": "Sieg! {stars} +{gold}",
     "banner.defeat": "Der Burgfried ist gefallen",
     "banner.hero": "{name} schließt sich an",
     "res.gold": "Gold",
@@ -165,6 +165,15 @@
     "dev.close": "Schließen",
     "dev.install": "Installation {id} · Sitzung {n}",
     "attack.noRam": "Ohne Rammbock fällt kein Tor",
-    "banner.keep": "Burgfried Stufe {n}"
+    "banner.keep": "Burgfried Stufe {n}",
+    "unit.laeufer": "Läufer",
+    "unit.schildtraeger": "Schildträger",
+    "unit.sturmbock": "Sturmbock",
+    "ability.pfeilhagel": "Pfeilhagel",
+    "ability.pfeilhagel.sub": "Straße antippen",
+    "ability.kampfruf": "Kampfruf",
+    "hud.nextWave": "Nächste Welle",
+    "hud.speed": "×{n}",
+    "replay.old": "Alter Datenstand"
   }
 }

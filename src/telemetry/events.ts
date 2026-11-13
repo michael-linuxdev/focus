@@ -24,7 +24,7 @@ export type EventType =
   | 'app_open' | 'app_close' | 'app_reopen'
   | 'tutorial_step' | 'tower_built' | 'building_started'
   | 'battle_start' | 'battle_end'
-  | 'action_cancelled'
+  | 'action_cancelled' | 'ability_used'
   | 'alliance_joined' | 'help_requested' | 'goal_claimed' | 'raid_report';
 
 /**

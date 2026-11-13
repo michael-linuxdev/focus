@@ -135,6 +135,8 @@ export interface HeroData {
   readonly sectionBonusPermille: number;
   readonly retinue: readonly UnitCount[];
   readonly abilities: readonly AbilityDef[];
+  /** Kampfruf in der Verteidigung: alle Türme schießen für die Dauer doppelt so schnell. */
+  readonly rally: { readonly id: string; readonly durationTicks: number; readonly cooldownTicks: number };
 }
 
 export interface UnitCount {
@@ -164,6 +166,10 @@ export interface RulesData {
   readonly defeatShieldHours: number;
   readonly nightRaidAfterHours: number;
   readonly nightRaidWave: string;
+  /** Pfeilhagel des Verteidigers: Schaden an allen Angreifern im Umkreis um den angetippten Punkt. */
+  readonly volley: { readonly damage: number; readonly radiusMilli: number; readonly cooldownTicks: number };
+  /** Bonusgold je Sternezahl 0 bis 3 nach einer Verteidigung. */
+  readonly starGold: readonly number[];
   /** Die eigene Stadt verliert erst ab dieser Durchbruchstiefe Vorräte. */
   readonly cityLossMinDepth: number;
   /** So viele erste Nachtangriffe kosten den Spieler nichts. */
@@ -210,6 +216,8 @@ export interface DefenseDef {
   /** Der Burgfried nimmt keinen Schaden, die Schlacht kann nicht verloren gehen. */
   readonly unlosable: boolean;
   readonly victoryGold: number;
+  /** Ohne Durchbruch in dieser Zeit gibt es den dritten Stern. */
+  readonly parSeconds: number;
 }
 
 export type HintDef =

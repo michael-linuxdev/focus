@@ -57,8 +57,28 @@ const SHOTS = process.env.SHOTS ?? 'test-results';
     assert.equal(s.battle.result, 'running');
     await tapAt('slot', 's1');
     await page.waitForFunction(() => window.__mk.state().battle?.towers.length === 1);
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(1500);
     await shot('02-erster-turm');
+    // Eingreifen: ein Tipp auf die vorderste Gruppe ruft den Pfeilhagel dorthin.
+    const volley = async () => {
+      const p = await page.evaluate(() => {
+        const b = window.__mk.state().battle;
+        if (!b || b.units.length === 0) return null;
+        return window.__mk.roadPos(Math.max(...b.units.map((u) => u.pos)));
+      });
+      if (p) await page.touchscreen.tap(p.x, p.y);
+      return p !== null;
+    };
+    await page.waitForFunction(() => window.__mk.state().battle?.units.length > 0);
+    const hpBefore = (await state()).battle.units.reduce((n, u) => n + u.hp, 0);
+    assert.equal(await volley(), true);
+    await page.waitForFunction(() => window.__mk.state().battle.lastVolleyTick >= 0);
+    await page.waitForTimeout(150);
+    await shot('02b-pfeilhagel');
+    s = await state();
+    assert.ok(s.battle.units.reduce((n, u) => n + u.hp, 0) < hpBefore || s.battle.fallen.length > 0, 'Pfeilhagel trifft');
+    assert.ok(s.battle.volleyReadyAt > s.battle.tick, 'Abklingzeit läuft');
+    assert.equal(await page.getByTestId('ability-pfeilhagel').isDisabled(), true);
     await page.evaluate(() => window.__mk.speed(4));
     await waitStep('zweiter_turm');
 
@@ -67,7 +87,16 @@ const SHOTS = process.env.SHOTS ?? 'test-results';
     await tapAt('slot', 's2');
     await tapAt('slot', 's3'); // kein Gold mehr: wird abgelehnt
     assert.equal((await state()).game.towers.length, 2);
-    await defend('erster_ausbau');
+    assert.match(await page.getByTestId('preview').textContent(), /Nächste Welle/);
+    await shot('03b-vorschau');
+    await click('defend');
+    await click('speed');
+    assert.match(await page.getByTestId('speed').textContent(), /×2/);
+    await click('speed');
+    // Die Welle wird mit Pfeilhagel gespielt, sonst kommen Läufer durch.
+    for (let i = 0; i < 40 && (await state()).screen === 'battle'; i++) { await volley(); await page.waitForTimeout(400); }
+    await waitStep('erster_ausbau');
+    assert.match(String((await state()).game.replays.at(-1).stars), /[123]/);
     await tapAt('slot', 's1');
     await defend('holzfaeller');
 
@@ -267,7 +296,10 @@ const SHOTS = process.env.SHOTS ?? 'test-results';
     assert.equal(await page.getByTestId('kpi-minute10').getAttribute('data-value'), 'true');
     assert.equal(await page.getByTestId('kpi-alliance').getAttribute('data-value'), 'true');
     assert.equal(await page.getByTestId('kpi-nextday').getAttribute('data-value'), 'false');
-    await click('dev-1d'); // Zeitraffer: einen Tag weiter, dann die App neu öffnen
+    // Zeitraffer: zum nächsten Kalendertag, dann die App neu öffnen. Läuft der Test spät am Abend, hat schon der
+    // Vier-Stunden-Sprung zum Nachtangriff den Tag gewechselt; dann genügt das Neuöffnen.
+    const days = await page.evaluate(() => { const e = window.__mk.exportData(); return { first: e.summary.firstDay, now: e.events.at(-1).day }; });
+    if (days.now === days.first) await click('dev-1d');
     await click('dev-close');
     await page.reload();
     await page.waitForFunction(() => window.__mk?.state().screen === 'city');

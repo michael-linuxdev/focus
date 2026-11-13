@@ -1,49 +1,56 @@
 {
-  "version": 4,
+  "version": 5,
   "preliminary": true,
   "defenses": [
     {
       "wave": "dorf_w1",
-      "holdMilliUntilTower": 2400,
+      "holdMilliUntilTower": 500,
       "unlosable": true,
-      "victoryGold": 30
+      "victoryGold": 30,
+      "parSeconds": 25
     },
     {
       "wave": "dorf_w2",
       "holdMilliUntilTower": 0,
       "unlosable": true,
-      "victoryGold": 30
+      "victoryGold": 40,
+      "parSeconds": 30
     },
     {
       "wave": "dorf_w3",
       "holdMilliUntilTower": 0,
       "unlosable": true,
-      "victoryGold": 40
+      "victoryGold": 45,
+      "parSeconds": 35
     },
     {
       "wave": "dorf_w4",
       "holdMilliUntilTower": 0,
       "unlosable": true,
-      "victoryGold": 60
+      "victoryGold": 60,
+      "parSeconds": 40
     },
     {
       "wave": "dorf_w5",
       "holdMilliUntilTower": 0,
       "unlosable": true,
-      "victoryGold": 80
+      "victoryGold": 80,
+      "parSeconds": 45
     },
     {
       "wave": "dorf_w6",
       "holdMilliUntilTower": 0,
       "unlosable": false,
-      "victoryGold": 100
+      "victoryGold": 100,
+      "parSeconds": 45
     }
   ],
   "afterDefenses": {
     "wave": "dorf_loop",
     "holdMilliUntilTower": 0,
     "unlosable": false,
-    "victoryGold": 60
+    "victoryGold": 60,
+    "parSeconds": 50
   },
   "steps": [
     {

@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Geführter Ablauf. defenses: Verteidigungen in Reihenfolge, danach afterDefenses. steps: Schritte mit Hinweis und Abschlussbedingung; unlocks schaltet Teile der Oberfläche frei. minute10Step: Schritt, dessen Erreichen in der Messung als \"Minute 10 erreicht\" zählt",
+  "title": "Geführter Ablauf. defenses: Verteidigungen in Reihenfolge, danach afterDefenses. steps: Schritte mit Hinweis und Abschlussbedingung; unlocks schaltet Teile der Oberfläche frei. minute10Step: Schritt, dessen Erreichen in der Messung als \"Minute 10 erreicht\" zählt. parSeconds: wer die Welle ohne Durchbruch in dieser Zeit schafft, bekommt den dritten Stern",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -29,7 +29,8 @@
           "wave",
           "holdMilliUntilTower",
           "unlosable",
-          "victoryGold"
+          "victoryGold",
+          "parSeconds"
         ],
         "properties": {
           "wave": {
@@ -46,6 +47,10 @@
           "victoryGold": {
             "type": "integer",
             "minimum": 0
+          },
+          "parSeconds": {
+            "type": "integer",
+            "minimum": 1
           }
         }
       }
@@ -57,7 +62,8 @@
         "wave",
         "holdMilliUntilTower",
         "unlosable",
-        "victoryGold"
+        "victoryGold",
+        "parSeconds"
       ],
       "properties": {
         "wave": {
@@ -74,6 +80,10 @@
         "victoryGold": {
           "type": "integer",
           "minimum": 0
+        },
+        "parSeconds": {
+          "type": "integer",
+          "minimum": 1
         }
       }
     },

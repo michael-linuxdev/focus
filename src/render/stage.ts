@@ -100,6 +100,10 @@ export interface Scene {
   /** Der Spieler wählt gerade einen Turm als Ziel. */
   readonly targeting: boolean;
   readonly shielded: boolean;
+  /** Letzter Pfeilhagel: Ort in Milli-Kacheln und Alter in Ticks; `null`, wenn keiner zu zeigen ist. */
+  readonly volley: { readonly x: number; readonly y: number; readonly age: number } | null;
+  /** Kampfruf aktiv: Türme schießen doppelt so schnell. */
+  readonly haste: boolean;
   /** Kachel, auf die der Tutorial-Hinweis zeigt. */
   readonly hint: { readonly x: number; readonly y: number; readonly cost: string | null } | null;
   readonly effects: readonly Effect[];
@@ -471,6 +475,38 @@ function cost(ctx: CanvasRenderingContext2D, cx: number, cy: number, tile: numbe
   ctx.fillText(text, cx + tile * 0.1, cy + 1);
 }
 
+/** Pfeilhagel: Kreis des Wirkungsbereichs und schräg einschlagende Pfeile, wenige Ticks lang. */
+function drawVolley(ctx: CanvasRenderingContext2D, scene: Scene, data: GameData, tile: number): void {
+  const v = scene.volley;
+  if (!v || v.age > 8) return;
+  const cx = (v.x / MILLI + 0.5) * tile;
+  const cy = (v.y / MILLI + 0.5) * tile;
+  const radius = (data.rules.volley.radiusMilli / MILLI) * tile;
+  const t = v.age / 8;
+  ctx.globalAlpha = 1 - t;
+  ctx.fillStyle = 'rgba(244, 227, 161, 0.18)';
+  ctx.strokeStyle = COLORS.shot;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.lineWidth = 2.5;
+  for (let i = 0; i < 9; i++) {
+    // Feste Streuung je Pfeil, damit das Bild nicht flackert.
+    const angle = i * 2.4;
+    const dist = radius * (0.2 + ((i * 37) % 70) / 100);
+    const x = cx + Math.cos(angle) * dist;
+    const y = cy + Math.sin(angle) * dist * 0.7;
+    const fall = (1 - Math.min(1, t * 2.5)) * tile * 1.6;
+    ctx.beginPath();
+    ctx.moveTo(x + fall * 0.5, y - fall - tile * 0.35);
+    ctx.lineTo(x + fall * 0.5 - tile * 0.1, y - fall);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
 /** Preis auf einem dunklen Schild mit Münze; rot gedämpft, wenn das Gold nicht reicht. */
 function priceTag(ctx: CanvasRenderingContext2D, cx: number, cy: number, tile: number, text: string, affordable: boolean): void {
   ctx.font = `700 ${Math.round(tile * 0.3)}px system-ui, sans-serif`;
@@ -518,6 +554,8 @@ function pointer(ctx: CanvasRenderingContext2D, cx: number, cy: number, tile: nu
 
 /** Breite eines Turms in Kacheln, je Art (die Bilder sind unterschiedlich schlank). */
 const TOWER_WIDTH: Readonly<Record<string, number>> = { bogenturm: 0.72, katapult: 0.95, pechnase: 0.82, wachstube: 0.86 };
+/** Einheiten ohne eigenes Bild leihen sich eines und werden in anderer Größe gezeichnet. */
+const UNIT_SPRITE: Readonly<Record<string, { sprite: string; scale: number }>> = { laeufer: { sprite: 'raeuber', scale: 0.8 } };
 /** Fahrzeuge werden breiter gezeichnet als Fußtruppen und rütteln statt zu hüpfen. */
 const VEHICLES = new Set(['ramme', 'sturmbock']);
 
@@ -733,6 +771,15 @@ function drawWithSprites(ctx: CanvasRenderingContext2D, scene: Scene, data: Game
       }
     }
     overlays.push(() => {
+      if (scene.haste && !disabled) {
+        ctx.strokeStyle = COLORS.gold;
+        ctx.lineWidth = 2.5;
+        ctx.globalAlpha = 0.5 + 0.5 * Math.sin(timeMs / 70);
+        ctx.beginPath();
+        ctx.ellipse(cx, cy + tile * 0.12, tile * 0.46, tile * 0.27, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
       if (disabled) {
         ctx.fillStyle = COLORS.disabled;
         ctx.beginPath();
@@ -808,10 +855,12 @@ function drawWithSprites(ctx: CanvasRenderingContext2D, scene: Scene, data: Game
     const state = look;
     const x = px(ux);
     const y = px(uy);
-    const step = timeMs / (vehicle ? 70 : 110) + u.id * 1.7;
+    const step = timeMs / (vehicle ? 70 : def.speedMilliPerTick > 60 ? 70 : 110) + u.id * 1.7;
     const hop = vehicle ? Math.sin(step * 2) * tile * 0.012 : Math.abs(Math.sin(step)) * tile * 0.07;
-    const width = vehicle ? tile * 0.78 : (tile * 0.62) / spriteAspect(u.def);
-    const height = width * spriteAspect(u.def);
+    const sprite = UNIT_SPRITE[u.def]?.sprite ?? u.def;
+    const scale = UNIT_SPRITE[u.def]?.scale ?? 1;
+    const width = (vehicle ? tile * 0.78 : (tile * 0.62) / spriteAspect(sprite)) * scale;
+    const height = width * spriteAspect(sprite);
     things.push({ y: y + 2, draw: () => {
       // Schatten am Boden, damit das Hüpfen lesbar ist.
       ctx.fillStyle = 'rgba(0,0,0,0.25)';
@@ -821,12 +870,12 @@ function drawWithSprites(ctx: CanvasRenderingContext2D, scene: Scene, data: Game
       ctx.save();
       ctx.translate(x, y + tile * 0.26 - hop);
       if (!vehicle) ctx.rotate(Math.sin(step) * 0.06);
-      drawSprite(ctx, u.def, 0, 0, width, state.flip);
+      drawSprite(ctx, sprite, 0, 0, width, state.flip);
       if (timeMs < state.flashUntil) {
         // Treffer: dasselbe Bild noch einmal aufhellend darüber (billiger als ein Filter).
         ctx.globalCompositeOperation = 'lighter';
         ctx.globalAlpha = 0.7;
-        drawSprite(ctx, u.def, 0, 0, width, state.flip);
+        drawSprite(ctx, sprite, 0, 0, width, state.flip);
       }
       ctx.restore();
     } });
@@ -846,6 +895,8 @@ function drawWithSprites(ctx: CanvasRenderingContext2D, scene: Scene, data: Game
   things.sort((a, b) => a.y - b.y);
   for (const thing of things) thing.draw();
   for (const overlay of overlays) overlay();
+
+  drawVolley(ctx, scene, data, tile);
 
   // Effekte
   for (const e of scene.effects) {

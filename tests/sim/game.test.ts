@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  attackSetup, cityHint, computeLoot, createGame, defaultLineup, defenseSetup, lootLimit, protectedStock, readyTroops, reduceGame, rngFromSeed, rngInt, unlocked, verifyReplay,
+  attackSetup, cityHint, computeLoot, createGame, defaultLineup, defenseSetup, defenseStars, lootLimit, protectedStock, readyTroops, reduceGame, rngFromSeed, rngInt, unlocked, verifyReplay,
   type GameAction, type GameState, type Resources,
 } from '../../src/sim/index.ts';
 import { playBattle, playTutorial, firstTowerOnly, simpleAttack } from './bot.ts';
@@ -33,12 +33,40 @@ describe('Zeit und Aktionen', () => {
     const { inputs, final } = playBattle(defenseSetup(g, data), g.nextSeed, data, firstTowerOnly(data));
     const next = act(g, { type: 'ResolveDefense', inputs });
     expect(next.defensesWon).toBe(1);
-    expect(next.resources.gold).toBe(final.gold + 30);
+    const firstDef = data.tutorial.defenses[0]!;
+    const stars = defenseStars(final, firstDef, data);
+    expect(stars).toBeGreaterThanOrEqual(2);
+    expect(next.resources.gold).toBe(final.gold + firstDef.victoryGold + data.rules.starGold[stars]!);
+    expect(next.replays[0]!.stars).toBe(stars);
     expect(next.towers).toEqual([{ slot: 's1', def: 'bogenturm', level: 1 }]);
     expect(next.nextSeed).not.toBe(g.nextSeed);
     expect(next.replays.length).toBe(1);
     expect(verifyReplay(next.replays[0]!.replay, data)).toBe('ok');
     expect(next.tutorialStep).toBe(1);
+  });
+});
+
+describe('Sterne und Hinweise', () => {
+  it('Sterne: 0 verloren, 1 gehalten mit Durchbruch, 2 ohne Durchbruch, 3 ohne Durchbruch in der Richtzeit', () => {
+    const g = start();
+    const def = data.tutorial.defenses[0]!;
+    const { final } = playBattle(defenseSetup(g, data), g.nextSeed, data, firstTowerOnly(data));
+    const par = def.parSeconds * data.game.ticksPerSecond;
+    expect(defenseStars({ ...final, leaked: 0, tick: par }, def, data)).toBe(3);
+    expect(defenseStars({ ...final, leaked: 0, tick: par + 1 }, def, data)).toBe(2);
+    expect(defenseStars({ ...final, leaked: 1, tick: 1 }, def, data)).toBe(1);
+    expect(defenseStars({ ...final, result: 'breached' }, def, data)).toBe(0);
+    expect(data.rules.starGold[3]!).toBeGreaterThan(data.rules.starGold[2]!);
+  });
+
+  it('fehlt für den nächsten Schritt nur Gold, zeigt der Hinweis auf die Verteidigung statt ins Leere', () => {
+    const g = playTutorial(start(), data, 'erster_ausbau').game;
+    expect(cityHint(g, data)).toEqual({ type: 'slot', slot: 's1', tower: 'bogenturm' });
+    const poor = { ...g, resources: { ...g.resources, gold: 0 } };
+    expect(cityHint(poor, data)).toEqual({ type: 'button', button: 'defend' });
+    // Vor der Freischaltung der Verteidigung gibt es diesen Ausweg nicht.
+    const early = { ...playTutorial(start(), data, 'zweiter_turm').game, resources: { gold: 0, wood: 0, stone: 0 } };
+    expect(cityHint(early, data)).toBeNull();
   });
 });
 

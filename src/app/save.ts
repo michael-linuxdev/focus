@@ -50,6 +50,8 @@ export const migrations: Readonly<Record<number, Migration>> = {
   },
   // 4 -> 5: Zähler der Nachtangriffe (der erste kostet nichts). Wer schon einen Bericht gesehen hat, hatte seinen ersten.
   4: (old) => ({ ...old, version: 5, raidsResolved: Array.isArray(old['replays']) && old['replays'].some((r) => (r as Record<string, unknown>)['kind'] === 'raid') ? 1 : 0 }),
+  // 5 -> 6: Sterne je gespeicherter Schlacht (ältere Schlachten haben keine).
+  5: (old) => ({ ...old, version: 6, replays: (Array.isArray(old['replays']) ? (old['replays'] as Record<string, unknown>[]) : []).map((r) => ({ ...r, stars: 0 })) }),
 };
 
 function num(value: unknown, fallback: number): number {

@@ -9,12 +9,12 @@
  *   4. Turm gegen Truppe: prüft die Tabelle "Stärke gegen"
  */
 import {
-  attackSetup, createBattle, createGame, defaultLineup, defenseSetup, raidSetup, runBattle, stepBattle, tutorialStep,
+  attackSetup, createBattle, createGame, defaultLineup, defenseSetup, defenseStars, raidSetup, runBattle, stepBattle, tutorialStep,
   type BattleSetup, type GameData, type GameState,
 } from '../src/sim/index.ts';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { firstTowerOnly, playBattle, playTutorial, skilledAttack, type Policy } from './lib/bot.ts';
+import { activeDefense, firstTowerOnly, playBattle, playTutorial, skilledAttack, type Policy } from './lib/bot.ts';
 import { loadData } from './lib/data.ts';
 
 const data: GameData = loadData();
@@ -27,40 +27,51 @@ const pad = (s: string | number, w: number): string => String(s).padEnd(w);
 const head = (title: string): void => console.log(`\n== ${title} ==`);
 
 // ---------- 1. Verteidigungen des Ablaufs ----------
-head(`1. Verteidigungen des Ablaufs (${N} Startwerte je Welle, Stadt wie vom Hinweis-Bot gebaut)`);
-console.log(`${pad('Welle', 12)}${pad('gehalten', 10)}${pad('Ø durch', 9)}${pad('Ø Tiefe', 9)}${pad('Ø Dauer', 9)}Türme`);
+head(`1. Verteidigungen des Ablaufs (${N} Startwerte je Welle): zuschauen gegen eingreifen (Pfeilhagel, Kampfruf)`);
+console.log(`${pad('Welle', 10)}${pad('zuschauen: durch / 3 Sterne / Dauer', 38)}${pad('eingreifen: durch / 3 Sterne / Dauer', 38)}Türme`);
 {
-  // Zustand unmittelbar vor jeder Verteidigung einsammeln, indem der Bot den Ablauf einmal spielt.
+  // Zustand unmittelbar vor jeder Verteidigung einsammeln; der Bot folgt den Hinweisen und greift ein.
   const before: GameState[] = [];
   let game = createGame(1, 0, data);
-  for (let guard = 0; guard < 60 && tutorialStep(game, data).id !== 'freies_spiel'; guard++) {
+  for (let guard = 0; guard < 80 && tutorialStep(game, data).id !== 'freies_spiel'; guard++) {
     const stepId = tutorialStep(game, data).id;
     const hint = tutorialStep(game, data).hint;
     const defends = tutorialStep(game, data).autoDefense || (hint?.type === 'button' && hint.button === 'defend');
     if (defends && before.length === game.defensesWon) before.push(game);
     const next = data.tutorial.steps[game.tutorialStep + 1]!.id;
-    game = playTutorial(game, data, next).game;
+    game = playTutorial(game, data, next, 0, true).game;
     if (tutorialStep(game, data).id === stepId) break;
   }
+  const styles: [string, (d: GameData) => Policy][] = [['passive', firstTowerOnly], ['active', activeDefense]];
   before.forEach((state, i) => {
-    let held = 0, leaked = 0, depth = 0, ticks = 0;
-    for (let seed = 1; seed <= N; seed++) {
-      const { final } = playBattle(defenseSetup(state, data), seed, data, firstTowerOnly(data));
-      if (final.result === 'held') held++;
-      leaked += final.leaked;
-      depth += final.depth;
-      ticks += final.tick;
+    const def = data.tutorial.defenses[i] ?? data.tutorial.afterDefenses;
+    const cells: string[] = [];
+    for (const [key, policy] of styles) {
+      let held = 0, leaked = 0, ticks = 0, three = 0;
+      for (let seed = 1; seed <= N; seed++) {
+        const { final } = playBattle(defenseSetup(state, data), seed, data, policy(data));
+        if (final.result === 'held') held++;
+        if (defenseStars(final, def, data) === 3) three++;
+        leaked += final.leaked;
+        ticks += final.tick;
+      }
+      const seconds = ticks / N / data.game.ticksPerSecond;
+      measured.set(`defense.${key}.w${i + 1}.leaked`, Math.round((leaked / N) * 10) / 10);
+      measured.set(`defense.${key}.w${i + 1}.stars3`, share(three, N));
+      measured.set(`defense.${key}.minHeld`, Math.min(measured.get(`defense.${key}.minHeld`) ?? 100, share(held, N)));
+      measured.set(`defense.${key}.maxSeconds`, Math.max(measured.get(`defense.${key}.maxSeconds`) ?? 0, Math.round(seconds)));
+      if (i > 0) {
+        measured.set(`defense.${key}.leakedFrom2`, Math.round((((measured.get(`defense.${key}.leakedFrom2`) ?? 0) * (i - 1) + leaked / N) / i) * 10) / 10);
+        measured.set(`defense.${key}.stars3From2`, Math.round((((measured.get(`defense.${key}.stars3From2`) ?? 0) * (i - 1) + share(three, N)) / i) * 10) / 10);
+      }
+      cells.push(pad(`${(leaked / N).toFixed(1)} / ${pct(three, N).trim()} / ${seconds.toFixed(0)} s${held < N ? ` (hält ${pct(held, N).trim()})` : ''}`, 38));
     }
-    const wave = (data.tutorial.defenses[i] ?? data.tutorial.afterDefenses).wave;
-    measured.set('defense.minHeld', Math.min(measured.get('defense.minHeld') ?? 100, share(held, N)));
-    measured.set('defense.maxLeaked', Math.max(measured.get('defense.maxLeaked') ?? 0, leaked / N));
-    measured.set('defense.maxSeconds', Math.max(measured.get('defense.maxSeconds') ?? 0, ticks / N / data.game.ticksPerSecond));
-    console.log(`${pad(wave, 12)}${pad(pct(held, N), 10)}${pad((leaked / N).toFixed(1), 9)}${pad((depth / N).toFixed(1), 9)}${pad(`${(ticks / N / data.game.ticksPerSecond).toFixed(0)} s`, 9)}${state.towers.map((t) => `${t.def}${t.level}`).join(' ') || '(keine)'}`);
+    console.log(`${pad(def.wave, 10)}${cells.join('')}${state.towers.map((t) => `${t.def}${t.level}`).join(' ') || '(keine)'}`);
   });
 }
 
 // ---------- 2. Nachtangriff ----------
-const end = playTutorial(createGame(1, 0, data), data, 'freies_spiel').game;
+const end = playTutorial(createGame(1, 0, data), data, 'freies_spiel', 0, true).game;
 head(`2. Nachtangriff (${N} Startwerte, ohne Eingaben)`);
 console.log(`${pad('Stadt', 34)}${pad('gehalten', 10)}Tiefe 0/1/2/3`);
 {

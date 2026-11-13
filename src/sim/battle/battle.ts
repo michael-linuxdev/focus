@@ -9,7 +9,8 @@ import { rngFromSeed, rngInt, type RngState } from '../rng.ts';
  * Nur die Seite des Spielers unterscheidet sich (`playerSide`) und damit, welche Eingaben er hat.
  *
  * Reihenfolge innerhalb eines Ticks (verbindlich, auch für die C#-Fassung):
- *   1. Eingaben dieses Ticks in Listenreihenfolge anwenden (ungültige werden übergangen)
+ *   1. Eingaben dieses Ticks in Listenreihenfolge anwenden (ungültige werden übergangen);
+ *      ein Pfeilhagel trifft sofort die Einheiten, die zu Beginn des Ticks auf der Straße stehen
  *   2. Fällige Einheiten in Planreihenfolge aufstellen
  *   3. Einheiten in Reihenfolge ihrer Kennung bewegen (Pechnasen bremsen); vor einem stehenden Tor und vor
  *      stehender Miliz halten sie an und beschädigen sie
@@ -47,6 +48,10 @@ export interface BattleSetup {
   readonly autoRelease: boolean;
   /** Fähigkeiten des Angreifer-Helden. */
   readonly abilities: readonly string[];
+  /** Der Verteidiger kann einen Pfeilhagel rufen (fehlt in älteren Wiederholungen: dann nein). */
+  readonly volley?: boolean;
+  /** Die Heldin des Verteidigers ist da und kann den Kampfruf geben. */
+  readonly rally?: boolean;
   /** Nach so vielen Ticks endet die Schlacht zugunsten des Verteidigers (0 = keine Grenze). */
   readonly maxTicks: number;
 }
@@ -55,7 +60,11 @@ export type BattleAction =
   | { readonly type: 'ReleaseWave' }
   | { readonly type: 'BuildTower'; readonly slot: string; readonly tower: string }
   | { readonly type: 'UpgradeTower'; readonly slot: string }
-  | { readonly type: 'UseAbility'; readonly ability: string; readonly slot: string | null };
+  | { readonly type: 'UseAbility'; readonly ability: string; readonly slot: string | null }
+  /** Pfeilhagel des Verteidigers auf einen Punkt (Milli-Kacheln). */
+  | { readonly type: 'Volley'; readonly x: number; readonly y: number }
+  /** Kampfruf der Heldin des Verteidigers. */
+  | { readonly type: 'Rally' };
 
 export interface BattleInput {
   readonly tick: number;
@@ -114,6 +123,15 @@ export interface BattleState {
   readonly shieldUntil: number;
   /** Je Fähigkeit aus `setup.abilities`: frühester Tick des nächsten Einsatzes. */
   readonly abilityReadyAt: readonly number[];
+  /** Frühester Tick des nächsten Pfeilhagels bzw. Kampfrufs. */
+  readonly volleyReadyAt: number;
+  readonly rallyReadyAt: number;
+  /** Bis zu diesem Tick schießen alle Türme doppelt so schnell (Kampfruf). */
+  readonly hasteUntil: number;
+  /** Letzter Pfeilhagel, nur für die Darstellung (-1 = noch keiner). */
+  readonly lastVolleyTick: number;
+  readonly lastVolleyX: number;
+  readonly lastVolleyY: number;
   /** Besiegte Angreifer in Reihenfolge ihres Falls (Einheitentyp). */
   readonly fallen: readonly string[];
   readonly leaked: number;
@@ -134,7 +152,8 @@ export type ActionError =
   | 'not_enough_gold'
   | 'unknown_ability'
   | 'ability_not_ready'
-  | 'target_required';
+  | 'target_required'
+  | 'invalid_target';
 
 /** Wie viele Angreifer gefallen sind. */
 export function killedCount(state: BattleState): number {
@@ -250,6 +269,12 @@ export function createBattle(setup: BattleSetup, seed: number, data: GameData): 
     depth: 0,
     shieldUntil: 0,
     abilityReadyAt: setup.abilities.map(() => 0),
+    volleyReadyAt: 0,
+    rallyReadyAt: 0,
+    hasteUntil: 0,
+    lastVolleyTick: -1,
+    lastVolleyX: 0,
+    lastVolleyY: 0,
     fallen: [],
     leaked: 0,
     result: 'running',
@@ -270,6 +295,15 @@ export function validateBattleAction(state: BattleState, action: BattleAction, d
       if (typeof cost !== 'number') return cost;
       return cost > state.gold ? 'not_enough_gold' : null;
     }
+    case 'Volley':
+      if (state.setup.playerSide !== 'defender') return 'not_your_side';
+      if (state.setup.volley !== true) return 'unknown_ability';
+      if (!Number.isInteger(action.x) || !Number.isInteger(action.y)) return 'invalid_target';
+      return state.tick >= state.volleyReadyAt ? null : 'ability_not_ready';
+    case 'Rally':
+      if (state.setup.playerSide !== 'defender') return 'not_your_side';
+      if (state.setup.rally !== true) return 'unknown_ability';
+      return state.tick >= state.rallyReadyAt ? null : 'ability_not_ready';
     case 'UseAbility': {
       if (state.setup.playerSide !== 'attacker') return 'not_your_side';
       const index = state.setup.abilities.indexOf(action.ability);
@@ -300,6 +334,34 @@ function applyAction(state: BattleState, action: BattleAction, rng: RngState, ro
       const cost = towerActionCost(state.towers, state.setup.keepLevel, action, data) as number;
       return { ...state, gold: state.gold - cost, towers: state.towers.map((t) => (t.slot === action.slot ? { ...t, level: t.level + 1 } : t)) };
     }
+    case 'Volley': {
+      // Trifft sofort alle Einheiten im Umkreis; Rüstung zieht wie bei einem Turmschuss ab.
+      const v = data.rules.volley;
+      const radiusSq = v.radiusMilli * v.radiusMilli;
+      let gold = state.gold;
+      let fallen = state.fallen;
+      const units: Unit[] = [];
+      for (const u of state.units) {
+        const [ux, uy] = roadPointMilli(road, u.pos);
+        const dx = ux - action.x;
+        const dy = uy - action.y;
+        if (dx * dx + dy * dy > radiusSq) {
+          units.push(u);
+          continue;
+        }
+        const ud = findById(data.units.units, u.def, 'Einheit');
+        const hp = u.hp - Math.max(1, v.damage - ud.armor);
+        if (hp <= 0) {
+          gold += ud.bounty;
+          fallen = [...fallen, u.def];
+        } else {
+          units.push({ id: u.id, def: u.def, pos: u.pos, hp });
+        }
+      }
+      return { ...state, units, gold, fallen, volleyReadyAt: state.tick + v.cooldownTicks, lastVolleyTick: state.tick, lastVolleyX: action.x, lastVolleyY: action.y };
+    }
+    case 'Rally':
+      return { ...state, rallyReadyAt: state.tick + data.hero.rally.cooldownTicks, hasteUntil: state.tick + data.hero.rally.durationTicks };
     case 'UseAbility': {
       const index = state.setup.abilities.indexOf(action.ability);
       const def = findById(data.hero.abilities, action.ability, 'Fähigkeit');
@@ -444,7 +506,8 @@ export function stepBattle(state: BattleState, actions: readonly BattleAction[],
       continue;
     }
     if (tower.cooldown > 0) {
-      towers.push({ ...tower, cooldown: tower.cooldown - 1 });
+      // Unter dem Kampfruf läuft die Abklingzeit doppelt so schnell.
+      towers.push({ ...tower, cooldown: Math.max(0, tower.cooldown - (s.tick < s.hasteUntil ? 2 : 1)) });
       continue;
     }
     const base = slot.section === s.setup.heroSection ? mulDiv(level.damage, PERMILLE + data.hero.sectionBonusPermille, PERMILLE) : level.damage;
@@ -552,6 +615,9 @@ export function hashBattle(state: BattleState): number {
   add(state.depth);
   add(state.shieldUntil);
   for (const t of state.abilityReadyAt) add(t);
+  add(state.volleyReadyAt);
+  add(state.rallyReadyAt);
+  add(state.hasteUntil);
   add(state.fallen.length);
   add(state.leaked);
   add(state.result === 'running' ? 0 : state.result === 'held' ? 1 : 2);

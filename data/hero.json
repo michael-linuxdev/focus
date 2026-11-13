@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "preliminary": true,
   "id": "alruna",
   "joinsAtKeepLevel": 2,
@@ -29,5 +29,10 @@
       "cooldownTicks": 300,
       "damageTakenPermille": 1000
     }
-  ]
+  ],
+  "rally": {
+    "id": "kampfruf",
+    "durationTicks": 80,
+    "cooldownTicks": 400
+  }
 }

@@ -1,5 +1,5 @@
 {
-  "version": 4,
+  "version": 5,
   "preliminary": true,
   "gateMilli": 1000,
   "marketPermille": 500,
@@ -21,5 +21,16 @@
   "nightRaidAfterHours": 4,
   "nightRaidWave": "nacht",
   "cityLossMinDepth": 2,
-  "freeNightRaids": 1
+  "freeNightRaids": 1,
+  "volley": {
+    "damage": 14,
+    "radiusMilli": 1000,
+    "cooldownTicks": 120
+  },
+  "starGold": [
+    0,
+    0,
+    10,
+    25
+  ]
 }

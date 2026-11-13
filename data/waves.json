@@ -1,5 +1,5 @@
 {
-  "version": 5,
+  "version": 6,
   "preliminary": true,
   "waves": [
     {
@@ -7,9 +7,9 @@
       "groups": [
         {
           "unit": "raeuber",
-          "count": 4,
+          "count": 5,
           "startTick": 10,
-          "intervalTicks": 50,
+          "intervalTicks": 36,
           "jitterTicks": 6
         }
       ]
@@ -19,10 +19,17 @@
       "groups": [
         {
           "unit": "raeuber",
-          "count": 10,
+          "count": 8,
           "startTick": 10,
-          "intervalTicks": 30,
-          "jitterTicks": 8
+          "intervalTicks": 18,
+          "jitterTicks": 6
+        },
+        {
+          "unit": "laeufer",
+          "count": 6,
+          "startTick": 130,
+          "intervalTicks": 9,
+          "jitterTicks": 4
         }
       ]
     },
@@ -31,10 +38,24 @@
       "groups": [
         {
           "unit": "raeuber",
-          "count": 16,
+          "count": 10,
           "startTick": 10,
-          "intervalTicks": 22,
-          "jitterTicks": 8
+          "intervalTicks": 16,
+          "jitterTicks": 6
+        },
+        {
+          "unit": "laeufer",
+          "count": 7,
+          "startTick": 120,
+          "intervalTicks": 9,
+          "jitterTicks": 4
+        },
+        {
+          "unit": "schildtraeger",
+          "count": 2,
+          "startTick": 180,
+          "intervalTicks": 40,
+          "jitterTicks": 6
         }
       ]
     },
@@ -43,10 +64,24 @@
       "groups": [
         {
           "unit": "raeuber",
-          "count": 18,
+          "count": 10,
           "startTick": 10,
-          "intervalTicks": 20,
-          "jitterTicks": 8
+          "intervalTicks": 14,
+          "jitterTicks": 6
+        },
+        {
+          "unit": "laeufer",
+          "count": 8,
+          "startTick": 110,
+          "intervalTicks": 9,
+          "jitterTicks": 4
+        },
+        {
+          "unit": "schildtraeger",
+          "count": 2,
+          "startTick": 180,
+          "intervalTicks": 30,
+          "jitterTicks": 6
         }
       ]
     },
@@ -61,18 +96,32 @@
           "jitterTicks": 2
         },
         {
-          "unit": "raeuber",
-          "count": 8,
-          "startTick": 220,
-          "intervalTicks": 5,
-          "jitterTicks": 2
+          "unit": "laeufer",
+          "count": 14,
+          "startTick": 100,
+          "intervalTicks": 6,
+          "jitterTicks": 3
         },
         {
           "unit": "raeuber",
           "count": 8,
-          "startTick": 430,
+          "startTick": 180,
           "intervalTicks": 5,
           "jitterTicks": 2
+        },
+        {
+          "unit": "schildtraeger",
+          "count": 7,
+          "startTick": 60,
+          "intervalTicks": 20,
+          "jitterTicks": 6
+        },
+        {
+          "unit": "laeufer",
+          "count": 10,
+          "startTick": 300,
+          "intervalTicks": 6,
+          "jitterTicks": 3
         }
       ]
     },
@@ -81,24 +130,38 @@
       "groups": [
         {
           "unit": "raeuber",
-          "count": 10,
+          "count": 12,
           "startTick": 10,
-          "intervalTicks": 14,
+          "intervalTicks": 12,
           "jitterTicks": 6
         },
         {
+          "unit": "laeufer",
+          "count": 14,
+          "startTick": 90,
+          "intervalTicks": 7,
+          "jitterTicks": 3
+        },
+        {
           "unit": "schildtraeger",
-          "count": 4,
-          "startTick": 120,
-          "intervalTicks": 40,
+          "count": 8,
+          "startTick": 40,
+          "intervalTicks": 22,
           "jitterTicks": 6
         },
         {
           "unit": "sturmbock",
-          "count": 1,
+          "count": 2,
           "startTick": 60,
-          "intervalTicks": 0,
+          "intervalTicks": 40,
           "jitterTicks": 0
+        },
+        {
+          "unit": "laeufer",
+          "count": 10,
+          "startTick": 280,
+          "intervalTicks": 6,
+          "jitterTicks": 3
         }
       ]
     },
@@ -109,8 +172,15 @@
           "unit": "raeuber",
           "count": 10,
           "startTick": 10,
-          "intervalTicks": 16,
+          "intervalTicks": 14,
           "jitterTicks": 8
+        },
+        {
+          "unit": "laeufer",
+          "count": 8,
+          "startTick": 120,
+          "intervalTicks": 8,
+          "jitterTicks": 3
         },
         {
           "unit": "raeuber",
@@ -118,6 +188,13 @@
           "startTick": 260,
           "intervalTicks": 5,
           "jitterTicks": 2
+        },
+        {
+          "unit": "schildtraeger",
+          "count": 4,
+          "startTick": 340,
+          "intervalTicks": 30,
+          "jitterTicks": 6
         },
         {
           "unit": "raeuber",

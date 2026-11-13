@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Schlacht- und Beuteregeln. lootMaxPermille ist die feste Verlustgrenze: höchster Anteil der ungeschützten Vorräte. depthLootPermille: Anteil davon je Durchbruchstiefe 0 bis 3. Schild: newPlayerShieldHours für neue Spieler, defeatShieldHours nach einer Niederlage. Nachtangriff: frühestens nightRaidAfterHours nach der Ankündigung. cityLossMinDepth: Die eigene Stadt verliert erst ab dieser Durchbruchstiefe Vorräte. freeNightRaids: So viele erste Nachtangriffe kosten nichts",
+  "title": "Schlacht- und Beuteregeln. lootMaxPermille ist die feste Verlustgrenze: höchster Anteil der ungeschützten Vorräte. depthLootPermille: Anteil davon je Durchbruchstiefe 0 bis 3. Schild: newPlayerShieldHours für neue Spieler, defeatShieldHours nach einer Niederlage. Nachtangriff: frühestens nightRaidAfterHours nach der Ankündigung. cityLossMinDepth: Die eigene Stadt verliert erst ab dieser Durchbruchstiefe Vorräte. freeNightRaids: So viele erste Nachtangriffe kosten nichts. volley: Pfeilhagel des Verteidigers (Schaden im Umkreis um den angetippten Punkt). starGold: Bonusgold je Sternezahl 0 bis 3 nach einer Verteidigung",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -21,7 +21,9 @@
     "nightRaidAfterHours",
     "nightRaidWave",
     "cityLossMinDepth",
-    "freeNightRaids"
+    "freeNightRaids",
+    "volley",
+    "starGold"
   ],
   "properties": {
     "version": {
@@ -103,6 +105,38 @@
     "freeNightRaids": {
       "type": "integer",
       "minimum": 0
+    },
+    "volley": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "damage",
+        "radiusMilli",
+        "cooldownTicks"
+      ],
+      "properties": {
+        "damage": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "radiusMilli": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "cooldownTicks": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "starGold": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "integer",
+        "minimum": 0
+      }
     }
   }
 }

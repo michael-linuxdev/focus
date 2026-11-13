@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Die Heldin: Abschnittsbonus in der Verteidigung, Gefolge beim Beitritt, Fähigkeiten im Angriff",
+  "title": "Die Heldin: Abschnittsbonus in der Verteidigung, Gefolge beim Beitritt, Fähigkeiten im Angriff. rally: Kampfruf in der Verteidigung, alle Türme schießen für die Dauer doppelt so schnell",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -10,7 +10,8 @@
     "joinsAtKeepLevel",
     "sectionBonusPermille",
     "retinue",
-    "abilities"
+    "abilities",
+    "rally"
   ],
   "properties": {
     "version": {
@@ -90,6 +91,29 @@
             "type": "integer",
             "minimum": 0
           }
+        }
+      }
+    },
+    "rally": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "durationTicks",
+        "cooldownTicks"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "durationTicks": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "cooldownTicks": {
+          "type": "integer",
+          "minimum": 1
         }
       }
     }

@@ -66,6 +66,10 @@ aber erst ab dem Marktplatz (ein genommenes Tor allein kostet nichts). Der erste
 Der erste Angriff auf das Räuberlager bleibt leicht: mit der vorgeschlagenen Aufstellung soll er fast immer gelingen.
 Nach jedem Nachtangriff ist der nächste angekündigt.
 Nur Rammböcke brechen Tore (Leichte und Gepanzerte haben Belagerungswert 0).
+Eingreifen in der Verteidigung (nach dem ersten Spieltest ergänzt, steht nicht im ursprünglichen Auftrag): Ein Tipp ins
+Feld ruft einen Pfeilhagel auf den Punkt, ab der Heldin gibt es den Kampfruf. Jede Verteidigung endet mit ein bis drei
+Sternen und Bonusgold. Ab Welle 2 sind die Wellen so eng, dass ohne Eingreifen Räuber durchkommen; verlierbar werden
+die ersten fünf Wellen dadurch nicht. Fehlt für den nächsten Tutorial-Schritt nur Gold, zeigt der Hinweis auf „Verteidigen“.
 
 ## Ordner
 

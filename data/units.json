@@ -1,5 +1,5 @@
 {
-  "version": 6,
+  "version": 7,
   "preliminary": true,
   "units": [
     {
@@ -14,9 +14,20 @@
       "militiaDamagePermille": 1000
     },
     {
+      "id": "laeufer",
+      "hp": 14,
+      "speedMilliPerTick": 80,
+      "bounty": 4,
+      "keepDamage": 1,
+      "armor": 0,
+      "siege": 1,
+      "melee": 1,
+      "militiaDamagePermille": 1000
+    },
+    {
       "id": "schildtraeger",
       "hp": 70,
-      "speedMilliPerTick": 30,
+      "speedMilliPerTick": 36,
       "bounty": 10,
       "keepDamage": 1,
       "armor": 4,
