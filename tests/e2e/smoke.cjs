@@ -422,7 +422,11 @@ const SHOTS = process.env.SHOTS ?? 'test-results';
     await page.waitForFunction(() => window.__mk.state().game.raidReport !== null || window.__mk.state().game.now > 0);
     await page.waitForTimeout(300);
     if (await page.getByTestId('raid-ok').count()) await click('raid-ok');
+    // Hat der Nachtangriff Holz gekostet, ist es zwei Stunden später wieder aufgefüllt (der nächste kommt erst nach vier).
+    await skip(2 * 3600);
+    await page.waitForTimeout(300);
     s = await state();
+    assert.ok(s.game.resources.wood >= 5000, `Holz ist wieder aufgefüllt (${s.game.resources.wood})`);
     assert.ok(s.game.resources.wood <= Math.max(stockBefore.wood, 5000), `Holz bleibt an der Lagergrenze (${s.game.resources.wood})`);
     assert.equal(await page.getByTestId('res-wood').getAttribute('data-full'), 'true');
     await shot('34-lager-voll');
