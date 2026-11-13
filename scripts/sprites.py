@@ -2,7 +2,7 @@
 Schneidet die Rohbilder der Bild-KI (art/roh/) in einzelne freigestellte Sprites (art/sprites/).
 
 Die Motive stehen auf einfarbig magentafarbenem Hintergrund in einem groben Raster. Das Skript
-findet die Zeilen und Spalten über leere Streifen, stellt jedes Motiv frei (weiche Kante, Magenta-Stich
+findet die Motive als zusammenhängende Flächen, stellt jedes Motiv frei (weiche Kante, Magenta-Stich
 an den Rändern entfernt) und speichert es als PNG mit den Namen aus SHEETS.
 
 Aufruf: python3 scripts/sprites.py            (braucht Pillow und numpy; nur ein Werkzeug, nicht Teil des Spiels)
@@ -41,22 +41,56 @@ def background_distance(rgb: np.ndarray) -> np.ndarray:
     return np.clip((dist - low) / (high - low), 0.0, 1.0), key
 
 
-def runs(filled: np.ndarray, min_gap: int, min_size: int):
-    """Zusammenhängende Abschnitte eines 1D-Belegungsprofils; Lücken unter min_gap werden überbrückt."""
-    out, start, gap = [], None, 0
-    for i, f in enumerate(filled):
-        if f:
-            if start is None:
-                start = i
-            gap = 0
-        elif start is not None:
-            gap += 1
-            if gap >= min_gap:
-                out.append((start, i - gap + 1))
-                start, gap = None, 0
-    if start is not None:
-        out.append((start, len(filled)))
-    return [(a, b) for a, b in out if b - a >= min_size]
+def components(solid: np.ndarray):
+    """Zusammenhängende Flächen (8er-Nachbarschaft): Kästen [links, oben, rechts, unten, Fläche, Nummern] und die Nummernkarte."""
+    h, w = solid.shape
+    seen = np.zeros_like(solid, dtype=bool)
+    labels = np.zeros(solid.shape, dtype=np.int32)
+    boxes = []
+    for y0, x0 in zip(*np.nonzero(solid)):
+        if seen[y0, x0]:
+            continue
+        stack = [(y0, x0)]
+        seen[y0, x0] = True
+        left, top, right, bottom, area = x0, y0, x0, y0, 0
+        while stack:
+            y, x = stack.pop()
+            labels[y, x] = len(boxes) + 1
+            area += 1
+            left, right, top, bottom = min(left, x), max(right, x), min(top, y), max(bottom, y)
+            for ny in (y - 1, y, y + 1):
+                for nx in (x - 1, x, x + 1):
+                    if 0 <= ny < h and 0 <= nx < w and solid[ny, nx] and not seen[ny, nx]:
+                        seen[ny, nx] = True
+                        stack.append((ny, nx))
+        boxes.append([left, top, right + 1, bottom + 1, area, [len(boxes) + 1]])
+    return boxes, labels
+
+
+def find_objects(solid: np.ndarray):
+    """Motive in Lesereihenfolge. Kleine lose Teile (Fahne, Splitter) werden dem nächsten großen Motiv zugeschlagen."""
+    parts, labels = components(solid)
+    if not parts:
+        return [], labels
+    biggest = max(p[4] for p in parts)
+    main = [p for p in parts if p[4] >= biggest * 0.12]
+    for p in parts:
+        if p[4] >= biggest * 0.12 or p[4] < 30:
+            continue
+        cx, cy = (p[0] + p[2]) / 2, (p[1] + p[3]) / 2
+        near = min(main, key=lambda m: max(m[0] - cx, 0, cx - m[2]) + max(m[1] - cy, 0, cy - m[3]))
+        near[0], near[1], near[2], near[3] = min(near[0], p[0]), min(near[1], p[1]), max(near[2], p[2]), max(near[3], p[3])
+        near[5] = near[5] + p[5]
+    # Zeilen bilden: Motive, deren senkrechte Mitten nah beieinander liegen, gehören in dieselbe Zeile.
+    main.sort(key=lambda m: (m[1] + m[3]) / 2)
+    rows, height = [], float(np.median([m[3] - m[1] for m in main]))
+    for m in main:
+        mid = (m[1] + m[3]) / 2
+        if rows and abs(mid - rows[-1]["mid"]) < height * 0.5:
+            rows[-1]["items"].append(m)
+        else:
+            rows.append({"mid": mid, "items": [m]})
+    return [(m[0], m[1], m[2], m[3], m[5]) for row in rows for m in sorted(row["items"], key=lambda m: m[0])], labels
 
 
 def cut(sheet: str, names: list) -> list:
@@ -66,21 +100,23 @@ def cut(sheet: str, names: list) -> list:
     rgb = np.asarray(Image.open(path).convert("RGB"), dtype=np.float32)
     alpha, key = background_distance(rgb)
     solid = alpha > 0.5
-    boxes = []
-    for top, bottom in runs(solid.any(axis=1), min_gap=6, min_size=24):
-        for left, right in runs(solid[top:bottom].any(axis=0), min_gap=6, min_size=24):
-            rows = np.where(solid[top:bottom, left:right].any(axis=1))[0]
-            boxes.append((left, top + rows[0], right, top + rows[-1] + 1))
+    boxes, labels = find_objects(solid)
     if len(boxes) != len([n for n in names if n]):
         print(f"  WARNUNG {sheet}: {len(boxes)} Motive gefunden, {len(names)} erwartet")
     (OUT / sheet).mkdir(parents=True, exist_ok=True)
     written = []
-    for name, (left, top, right, bottom) in zip(names, boxes):
+    for name, (left, top, right, bottom, ids) in zip(names, boxes):
         if not name:
             continue
         pad = 2
         l, t, r, b = max(0, left - pad), max(0, top - pad), min(rgb.shape[1], right + pad), min(rgb.shape[0], bottom + pad)
-        a = alpha[t:b, l:r]
+        # Nur Pixel dieses Motivs behalten (benachbarte Motive können in den Kasten ragen), mit etwas Rand für die weiche Kante.
+        own = np.isin(labels[t:b, l:r], ids)
+        grown = own.copy()
+        for dy in range(-3, 4):
+            for dx in range(-3, 4):
+                grown |= np.roll(np.roll(own, dy, axis=0), dx, axis=1)
+        a = alpha[t:b, l:r] * grown
         c = rgb[t:b, l:r].copy()
         # Magenta-Stich entfernen: wo Rot und Blau das Grün deutlich übersteigen (typisch für den Rand), beide absenken.
         spill = np.clip(np.minimum(c[..., 0], c[..., 2]) - c[..., 1] - 25, 0, None) * (1 - a) * 1.0
