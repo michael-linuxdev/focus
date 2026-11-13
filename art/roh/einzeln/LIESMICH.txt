@@ -1,0 +1,1 @@
+Einzelbilder: je Datei genau ein Motiv auf Magenta, Dateiname = Name im Spiel (siehe docs/SPRITES.md, Abschnitt Einzelbilder).

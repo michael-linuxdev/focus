@@ -410,8 +410,27 @@ const SHOTS = process.env.SHOTS ?? 'test-results';
     assert.ok(s.game.buildings.find((b) => b.plot === woodPlot).upgradeDoneAt > s.game.now, 'der Ausbau läuft');
     await skip(125);
     await page.waitForFunction((p) => window.__mk.state().game.buildings.find((b) => b.plot === p).level === 2, woodPlot);
+    // Nach dem geführten Ablauf zeigt eine Zeile das offene Kapitel der Chronik; ein Tipp öffnet die Ziele.
+    assert.match(await page.getByTestId('goal-line').textContent(), /Kapitel 1: Baue den Burgfried auf Stufe 3 aus/);
+    await click('goal-line');
+    assert.match(await page.getByTestId('chapter').textContent(), /Die ersten Mauern.*Kapitel 1 von 13.*2 \/ 3/);
+    assert.equal(await page.getByTestId('chapter').isDisabled(), true);
+    await shot('33a-chronik');
+    await click('sheet-close');
+    // Ein Turm auf Stufe 2: Der nächste Ausbau braucht einen höheren Burgfried, das sagt ein Text am Turm statt Schweigen.
+    s = await state();
+    const tall = s.game.towers.find((tw) => tw.level === 2);
+    const goldAtTower = s.game.resources.gold;
+    await tapAt('slot', tall.slot);
+    await page.waitForTimeout(250);
+    await shot('33b-turm-gesperrt');
+    s = await state();
+    assert.equal(s.sheet, null);
+    assert.ok(s.game.resources.gold >= goldAtTower, 'kein Gold ausgegeben');
+    assert.equal(s.game.towers.find((tw) => tw.slot === tall.slot).level, 2, 'der Turm bleibt auf Stufe 2');
     await tapAt('keep');
     await page.getByTestId('keep-upgrade').waitFor();
+    assert.match(await page.getByTestId('sheet').textContent(), /Bringt: 1 Turmplatz, 6 neue Wellen/);
     assert.match(await page.getByTestId('keep-upgrade').textContent(), /Braucht Speicher Stufe 2/);
     assert.equal(await page.getByTestId('keep-upgrade').isDisabled(), true);
     await shot('33-burgfried-braucht-speicher');

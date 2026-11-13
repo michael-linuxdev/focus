@@ -1,5 +1,5 @@
 {
-  "version": 15,
+  "version": 16,
   "lang": "de",
   "texts": {
     "hud.defend": "Verteidigen",
@@ -335,6 +335,20 @@
     "crown.text": "Vom ersten Turm bis zur Königsburg: Du hast die Chronik vollendet, an Tag {day}.",
     "crown.thanks": "Danke fürs Testen. Schick uns jetzt bitte deinen Testbericht.",
     "crown.ok": "Weiterspielen",
-    "crown.report": "Testbericht senden"
+    "crown.report": "Testbericht senden",
+    "tower.maxLevel": "Höchste Stufe",
+    "sheet.towerUp": "{name} · Stufe {n}",
+    "stat.damage": "Schaden {a} → {b}",
+    "stat.range": "Reichweite {a} → {b}",
+    "stat.rate": "Schüsse je 10 s {a} → {b}",
+    "stat.slow": "bremst auf {a} % → {b} %",
+    "stat.militia": "Miliz {a} → {b} Leben",
+    "keep.unlocks": "Bringt: 1 Turmplatz, {waves} neue Wellen, neue Ziele im Umland, höhere Stufen für Türme und Gebäude",
+    "keep.unlocksLast": "Bringt: 1 Turmplatz, {waves} neue Wellen, höhere Stufen für Türme und Gebäude",
+    "hud.fullList": "Lager voll: {list}",
+    "hud.chapter": "Kapitel {n}: {text}",
+    "hud.chapterReady": "Kapitel {n} geschafft – Belohnung abholen",
+    "chronicle.sub": "Chronik · Kapitel {n} von {of}",
+    "train.fill": "Heer auffüllen: +{n} {unit}"
   }
 }

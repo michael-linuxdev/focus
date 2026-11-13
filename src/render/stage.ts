@@ -3,7 +3,7 @@ import {
   type BattleTower, type Building, type CityTower, type GameData, type RoadDef, type Unit,
 } from '../sim/index.ts';
 
-import { drawSprite, groundPattern, setPixelRatio, spriteAspect, spritesReady } from './sprites.ts';
+import { drawSprite, groundPattern, setPixelRatio, spriteAspect, spritesReady, levelSprite, unitSprite } from './sprites.ts';
 
 /**
  * Darstellung des Spielfelds. Liest den Zustand, ändert ihn nie.
@@ -561,10 +561,7 @@ function pointer(ctx: CanvasRenderingContext2D, cx: number, cy: number, tile: nu
 /** Breite eines Turms in Kacheln, je Art (die Bilder sind unterschiedlich schlank). */
 const TOWER_WIDTH: Readonly<Record<string, number>> = { bogenturm: 0.72, katapult: 0.95, pechnase: 0.82, wachstube: 0.86 };
 /** Einheiten ohne eigenes Bild leihen sich eines und werden in anderer Größe gezeichnet. */
-/** Einheiten ohne eigenes Bild leihen sich eines und unterscheiden sich in der Größe. Ritter und Hauptmann sind PLATZHALTER, bis es Bilder gibt. */
-export const UNIT_SPRITE: Readonly<Record<string, { sprite: string; scale: number }>> = {
-  laeufer: { sprite: 'raeuber', scale: 0.8 }, ritter: { sprite: 'schildtraeger', scale: 1.25 }, hauptmann: { sprite: 'schildtraeger', scale: 1.8 },
-};
+
 /** Fahrzeuge werden breiter gezeichnet als Fußtruppen und rütteln statt zu hüpfen. */
 const VEHICLES = new Set(['ramme', 'sturmbock']);
 
@@ -652,7 +649,7 @@ function drawWithSprites(ctx: CanvasRenderingContext2D, scene: Scene, data: Game
   {
     const [kx, ky] = roadPointMilli(road, length);
     const width = tile * (scene.keepLevel >= 2 ? 1.45 : 1.25);
-    const name = scene.keepLevel >= 2 ? 'burgfried_2' : 'burgfried_1';
+    const name = levelSprite('burgfried', scene.keepLevel, 'burgfried_1');
     things.push({ y: px(ky) + tile * 0.2, draw: () => void drawSprite(ctx, name, px(kx), px(ky) + tile * 0.5, width) });
     const top = px(ky) + tile * 0.5 - width * spriteAspect(name);
     if (scene.keep && scene.keep.hp < scene.keep.max) {
@@ -677,7 +674,7 @@ function drawWithSprites(ctx: CanvasRenderingContext2D, scene: Scene, data: Game
         continue;
       }
       const remaining = Math.ceil((b.doneAt - info.now) / 1000);
-      const name = remaining > 0 ? 'baustelle' : b.def;
+      const name = remaining > 0 ? 'baustelle' : levelSprite(b.def, b.level, b.def);
       const width = tile * 0.96;
       things.push({ y: cy, draw: () => void drawSprite(ctx, name, cx, cy + tile * 0.42, width) });
       if (remaining > 0) {
@@ -746,7 +743,7 @@ function drawWithSprites(ctx: CanvasRenderingContext2D, scene: Scene, data: Game
     }
     const def = findById(data.towers.towers, tower.def, 'Turm');
     const level = towerLevel(tower, data);
-    const name = `${tower.def}_${Math.min(tower.level, 2)}`;
+    const name = levelSprite(tower.def, tower.level, `${tower.def}_1`);
     const width = tile * (TOWER_WIDTH[tower.def] ?? 0.8) * (tower.level >= 2 ? 1.08 : 1);
     const base = cy + tile * 0.4;
     const height = width * spriteAspect(name);
@@ -869,8 +866,7 @@ function drawWithSprites(ctx: CanvasRenderingContext2D, scene: Scene, data: Game
     const y = px(uy);
     const step = timeMs / (vehicle ? 70 : def.speedMilliPerTick > 60 ? 70 : 110) + u.id * 1.7;
     const hop = vehicle ? Math.sin(step * 2) * tile * 0.012 : Math.abs(Math.sin(step)) * tile * 0.07;
-    const sprite = UNIT_SPRITE[u.def]?.sprite ?? u.def;
-    const scale = UNIT_SPRITE[u.def]?.scale ?? 1;
+    const { sprite, scale } = unitSprite(u.def);
     const boss = scale > 1.5;
     const width = (vehicle ? tile * 0.78 : (tile * 0.62) / spriteAspect(sprite)) * scale;
     const height = width * spriteAspect(sprite);

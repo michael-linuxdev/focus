@@ -63,6 +63,8 @@ export interface HudModel {
   readonly bottomSecondary: readonly Btn[];
   /** Kleine Schaltfläche unter der Anzeige oben rechts (Testbericht); nur in der Stadt. */
   readonly corner: Btn | null;
+  /** Zeile unter der Statuszeile: woran der Spieler gerade arbeitet (Kapitel der Chronik); ein Tipp öffnet die Ziele. */
+  readonly goal: { readonly text: string; readonly ready: boolean; readonly onClick: () => void } | null;
   /** Kleine Statuszeile unter den Vorräten (Schild). */
   readonly status: string | null;
   readonly map: { readonly title: string; readonly nodes: readonly MapNode[]; readonly back: Btn } | null;
@@ -178,6 +180,10 @@ export function Hud({ m }: { m: HudModel }) {
         </div>
       )}
 
+      {m.goal && !m.sheet && !m.panel && !m.map && (
+        <button data-testid="goal-line" class={`goal-line${m.goal.ready ? ' pulse' : ''}`} style={{ top: `calc(env(safe-area-inset-top) + ${m.status !== null ? 60 : 44}px)` }} onClick={m.goal.onClick}>{m.goal.text}</button>
+      )}
+
       {m.corner && !m.sheet && !m.panel && !m.map && (
         <button data-testid={m.corner.id} class={`corner${m.corner.hint ? ' pulse' : ''}`} onClick={m.corner.onClick}>{m.corner.label}</button>
       )}
@@ -243,9 +249,9 @@ export function Hud({ m }: { m: HudModel }) {
           {m.panel.lines.map((line) => <div style={{ fontSize: '15px', opacity: 0.85, marginBottom: '4px' }}>{line}</div>)}
           {m.panel.loot && (
             <div data-testid="loot" style={{ fontSize: '20px', fontWeight: 600, margin: '10px 0' }}>
-              <Res kind="gold" value={`+${m.panel.loot.gold}`} big />
-              <Res kind="wood" value={`+${m.panel.loot.wood}`} big />
-              <Res kind="stone" value={`+${m.panel.loot.stone}`} big />
+              <Res kind="gold" value={`+${compact(m.panel.loot.gold)}`} big />
+              <Res kind="wood" value={`+${compact(m.panel.loot.wood)}`} big />
+              <Res kind="stone" value={`+${compact(m.panel.loot.stone)}`} big />
             </div>
           )}
           {m.panel.rows.map((row) => (

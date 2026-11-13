@@ -13,6 +13,28 @@ export function atlasSprite(name: string): { rect: Rect; size: readonly number[]
   return rect ? { rect, size: atlasInfo.size, url: `${import.meta.env.BASE_URL}sprites/atlas.webp` } : null;
 }
 
+/**
+ * Name des Motivs für eine Stufe: `<name>_<n>` mit der höchsten vorhandenen Stufe bis `level`, sonst `fallback`.
+ * So greift ein neues Bild (etwa `bogenturm_4` oder `burgfried_5`), sobald es im Atlas liegt, und ohne es bleibt das bisherige.
+ */
+export function levelSprite(name: string, level: number, fallback: string): string {
+  for (let n = level; n >= 1; n--) if (atlasRects[`${name}_${n}`]) return `${name}_${n}`;
+  return fallback;
+}
+
+/** Einheiten ohne eigenes Bild leihen sich eines und unterscheiden sich in der Größe. PLATZHALTER, bis es Bilder gibt. */
+const UNIT_ALIAS: Readonly<Record<string, { sprite: string; scale: number }>> = {
+  laeufer: { sprite: 'raeuber', scale: 0.8 }, ritter: { sprite: 'schildtraeger', scale: 1.25 }, hauptmann: { sprite: 'schildtraeger', scale: 1.8 },
+};
+/** Größe gegenüber einer gewöhnlichen Figur, wenn die Einheit ihr eigenes Bild hat. */
+const UNIT_SCALE: Readonly<Record<string, number>> = { laeufer: 0.85, ritter: 1.15, hauptmann: 1.6 };
+
+/** Bild und Größe einer Einheit: das eigene, wenn es im Atlas liegt, sonst das geliehene. */
+export function unitSprite(unit: string): { readonly sprite: string; readonly scale: number } {
+  if (atlasRects[unit]) return { sprite: unit, scale: UNIT_SCALE[unit] ?? 1 };
+  return UNIT_ALIAS[unit] ?? { sprite: unit, scale: 1 };
+}
+
 /** Bilder, die fertig dekodiert sind. Erst dann lassen sie sich in jedem Browser sicher in eine Zeichenfläche kopieren. */
 const decoded = new Set<HTMLImageElement>();
 

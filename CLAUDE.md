@@ -67,6 +67,9 @@ Verlierbare Verteidigungen und der Nachtangriff kosten Vorräte nach Durchbruchs
 aber erst ab dem Marktplatz (ein genommenes Tor allein kostet nichts). Der erste Nachtangriff kostet nichts.
 Der erste Angriff auf das Räuberlager bleibt leicht: mit der vorgeschlagenen Aufstellung soll er fast immer gelingen.
 Nach jedem Nachtangriff ist der nächste angekündigt.
+Oberfläche: Die ersten beiden Turmstufen entstehen mit einem Tipp; ab Stufe 3 fragt ein Blatt mit den Werten nach, weil der Ausbau
+ein Vielfaches kostet. Ist ein Ausbau gesperrt, sagt ein kurzer Text am Turm, welcher Burgfried fehlt. Nach dem geführten Ablauf zeigt
+eine Zeile oben links das offene Kapitel der Chronik.
 Seit M10: Wer eine Nachbarstadt angreift, verliert seinen Schild sofort; ihr Gegenangriff kommt nach einigen Stunden und wartet, solange ein Schild läuft.
 Nur Rammböcke brechen Tore (Leichte und Gepanzerte haben Belagerungswert 0).
 Eingreifen in der Verteidigung (nach dem ersten Spieltest ergänzt, steht nicht im ursprünglichen Auftrag): Ein Tipp ins
@@ -121,6 +124,9 @@ durchgekommene Räuber bis zu 30 % der ungeschützten Vorräte, bei vielen Verte
   Rohbilder liegen in `art/roh/`, `python3 scripts/sprites.py` stellt frei und erzeugt `public/sprites/` und
   `src/render/atlas.json`. Je Figur ein Bild; Bewegung (Hüpfen, Spiegeln, Aufblitzen) kommt aus `src/render/stage.ts`.
 - Nicht im Umfang: Server, Konten, Chat, Käufe, Werbung, fremde Tracking-Dienste, Unity-Umsetzung.
+- Fehlende Bilder für den Spielmonat (Läufer, Ritter, Hauptmann, Turmstufen 3 bis 5, Burgfried, ausgebaute Gebäude): je Bild ein
+  eigener Prompt in `docs/SPRITES.md` („Einzelbilder“), Ablage unter `art/roh/einzeln/<name>.png`. Das Spiel nimmt für eine Stufe
+  das Bild der höchsten vorhandenen Stufe darunter (`levelSprite`), fehlende Bilder brechen nichts.
 - Bot-Allianz und Weltkarte sind Attrappen und im Code als Platzhalter zu markieren.
 - Arbeit in Meilensteinen; nach jedem anhalten und Bericht geben. M0 bis M5: die ersten 30 Minuten. M6: Testpaket.
   M7: Wachstum (Burgfried bis 8, Ausbaustufen, Lagerplatz). M8: Gegner (berechnete Wellen, Ritter, Hauptmann, Nachtangriff wächst mit).

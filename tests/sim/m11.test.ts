@@ -78,3 +78,12 @@ describe('M11: Chronik', () => {
     expect(g.chapter).toBe(1);
   });
 });
+
+describe('Feinschliff: Rückfrage vor teuren Turmausbauten', () => {
+  it('die Stufen ab 3 kosten ein Vielfaches der ersten beiden, deshalb fragt die Oberfläche dort nach', () => {
+    for (const tower of data.towers.towers) {
+      expect(tower.levels[1]!.cost).toBeLessThan(500);
+      expect(tower.levels[2]!.cost).toBeGreaterThanOrEqual(tower.levels[1]!.cost * 10);
+    }
+  });
+});
