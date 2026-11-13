@@ -1,6 +1,6 @@
 # Umzug nach Unity 6 / C# / Metaplay
 
-Stand: M3. Dieses Dokument wird mit jedem Meilenstein nachgezogen.
+Stand: M4. Dieses Dokument wird mit jedem Meilenstein nachgezogen.
 
 ## Was übernommen wird
 
@@ -40,14 +40,14 @@ Verboten in `src/sim/` (per Test erzwungen): Gleitkomma-Funktionen, `Math.random
 
 1. Eingaben dieses Ticks in Listenreihenfolge anwenden (ungültige werden übergangen)
 2. Fällige Einheiten in Planreihenfolge aufstellen
-3. Einheiten in Reihenfolge ihrer Kennung bewegen; vor einem stehenden Tor halten sie an und beschädigen es
+3. Einheiten in Reihenfolge ihrer Kennung bewegen (Pechnasen bremsen); vor einem stehenden Tor und vor stehender Miliz halten sie an und beschädigen sie
 4. Am Burgfried angekommene Einheiten entfernen, Burgfried-Schaden (nicht bei `unlosable`)
-5. Türme in Reihenfolge der Bauplätze in `data/city.json`: außer Gefecht, Abklingzeit herunterzählen oder schießen
+5. Türme in Reihenfolge der Bauplätze in `data/city.json`: außer Gefecht, Miliz nachrücken lassen, Abklingzeit herunterzählen oder wirken (Schuss, Pech, Miliz)
 6. Durchbruchstiefe und Ergebnis prüfen (`breached` vor `held`, zuletzt die Zeitgrenze), Tick hochzählen
 
 Sortierungen müssen stabil sein (in C# `OrderBy`, nicht `List.Sort`).
 
-### Regeln der Schlacht (Stand M3)
+### Regeln der Schlacht (Stand M4)
 
 Verteidigung und Angriff sind dieselbe Schlacht. `playerSide` legt nur fest, welche Eingaben der Spieler hat:
 der Verteidiger baut Türme (`BuildTower`, `UpgradeTower`), der Angreifer löst Wellen aus und setzt Fähigkeiten ein
@@ -59,6 +59,16 @@ der Verteidiger baut Türme (`BuildTower`, `UpgradeTower`), der Angreifer löst 
   der früheren desselben Ticks. `splashMilli > 0` (Katapult): alle Einheiten im Umkreis um den Ort des Ziels werden getroffen.
 - **Schaden:** `max(1, Schaden - armor)`; unter Schildwall danach `max(1, Schaden * damageTakenPermille / 1000)`.
   Steht der Turm im Abschnitt der Heldin des Verteidigers, gilt vorher `Schaden * (1000 + sectionBonusPermille) / 1000`.
+- **Pechnase (`kind: slow`):** Jede Einheit, die zu Beginn ihrer Bewegung im Umkreis einer aktiven Pechnase steht, bewegt sich mit
+  `max(1, Tempo * slowPermille / 1000)`; bei mehreren zählt der kleinste Wert. Im Takt `cooldownTicks` trifft sie alle Einheiten
+  im Umkreis ohne Rüstungsabzug. Steht niemand im Umkreis, verfällt der Takt nicht.
+- **Wachstube (`kind: militia`):** Die Miliz steht auf der Straße am Punkt `militiaPosition` (nächster Punkt zum Bauplatz, gesucht
+  in 250er-Schritten ab `gateMilli + 250`, bei Gleichstand der frühere). Solange sie Leben hat, bleibt jede Einheit stehen, die
+  den Punkt in diesem Tick erreichen oder überschreiten würde, und zieht ihr `melee` ab. Einheiten, die schon dahinter sind,
+  laufen weiter. Fällt die Miliz, rückt sie `militiaRespawnTicks` später mit vollem Leben nach. Im Takt schlägt sie die
+  aufgehaltene Einheit mit der kleinsten Kennung: `max(1, Schaden * militiaDamagePermille / 1000 - armor)`.
+  Pro Einheit und Tick greift höchstens ein Hindernis: das Tor geht vor, danach die erste Wachstube in Listenreihenfolge.
+- **Brandpfeile auf Pechnase oder Wachstube:** Bremsen, Pech und Zuschlagen setzen aus; stehende Miliz hält weiter auf.
 - **Tor:** steht bei `gateMilli`. Solange es Leben hat, bleibt jede Einheit dort stehen und zieht ihm je Tick `siege` ab.
   Fällt es mitten in einem Tick, laufen die danach bewegten Einheiten desselben Ticks schon durch.
 - **Durchbruchstiefe:** 1, sobald das Tor gefallen ist und eine Einheit dahinter steht; 2, sobald eine Einheit den Marktplatz
@@ -69,10 +79,12 @@ der Verteidiger baut Türme (`BuildTower`, `UpgradeTower`), der Angreifer löst 
   eine Abklingzeit je Fähigkeit (`abilityReadyAt`).
 - **Haltepunkt (`holdMilliUntilTower`):** Solange kein Turm steht und der vorderste Angreifer die Wegstrecke erreicht hat,
   entfallen Schritt 2 und 3, und alle geplanten Aufstellungen verschieben sich um einen Tick. Nur in der ersten Welle gesetzt.
-- **Unverlierbar (`unlosable`):** Angekommene Angreifer verschwinden ohne Burgfried-Schaden. Gilt für die ersten fünf Wellen.
+- **Unverlierbar (`unlosable`):** Angekommene Angreifer verschwinden ohne Burgfried-Schaden. Gilt für die ersten fünf Wellen;
+  sie laufen ohne Tor. Alle späteren Verteidigungen und der Nachtangriff haben das Stadttor (`cityGateHp`).
+- **Besiegte je Turm (`kills`)** werden mitgezählt; daraus folgt der schwache Abschnitt.
 - **Zufall:** nur der Versatz beim Aufstellen (`jitterTicks`). Angriffswellen des Spielers haben keinen.
 
-### Regeln außerhalb der Schlacht (Stand M3)
+### Regeln außerhalb der Schlacht (Stand M4)
 
 - **Zeit:** kommt nur über `AdvanceTime` herein. Dabei wird abgerechnet (`settle`): Burgfried-Ausbau, Beitritt der Heldin
   mit Gefolge, Erträge, Ausbildung, Lazarett. Das Ergebnis hängt nur von der Zeit ab, nicht davon, wie oft abgerechnet wird.
@@ -80,6 +92,18 @@ der Verteidiger baut Türme (`BuildTower`, `UpgradeTower`), der Angreifer löst 
   Menge bis Takt k ist `k * producePerHour * Takt / 3600`, abgeschnitten. Ausgeschüttet wird die Differenz.
 - **Beute (`computeLoot`):** je Rohstoff `ungeschützt = max(0, Vorrat - Grundstock)`, davon höchstens `lootMaxPermille`,
   davon der Anteil der Durchbruchstiefe. Jede Stufe schneidet ab. Das ist die Verlustgrenze, und sie gilt in beide Richtungen.
+- **Verlust der eigenen Stadt (`cityLoss`):** Nach jeder verlierbaren Verteidigung und nach dem Nachtangriff nehmen die
+  Angreifer `computeLoot(Vorräte nach der Schlacht, Grundstock der Speicher, Durchbruchstiefe)` mit. Bei `breached` gilt ein
+  Schild bis `max(bisheriger Schild, jetzt + defeatShieldHours)`. Neue Spieler starten mit `newPlayerShieldHours`.
+  Der Schild betrifft nur Nachbarstädte; Räuber greifen trotzdem an.
+- **Nachtangriff:** Mit dem Tutorial-Schritt `announcesRaid` wird `raidDueAt = jetzt + nightRaidAfterHours` gesetzt.
+  `ResolveNightRaid` ist ab dann gültig und rechnet die Verteidigung mit der Welle `nightRaidWave` ohne Eingaben; danach ist
+  der nächste Angriff wieder angekündigt. Die Hülle löst die Aktion beim Öffnen aus.
+- **Schwacher Abschnitt (`weakSection`):** der Abschnitt mit bebaubaren Plätzen, dessen Türme die wenigsten Angreifer besiegt
+  haben; bei Gleichstand der erste in `data/city.json`.
+- **Allianz (Platzhalter):** Nach `RequestHelp` wirkt die n-te Hilfe zum Zeitpunkt `Bitte + n * helpIntervalSeconds` und setzt
+  `doneAt = max(dieser Zeitpunkt, doneAt - helpReduceSeconds)`, höchstens `maxHelps`-mal und nur, solange der Bau noch läuft.
+- **Tagesziele:** Zähler je Tag (`floor(now / 86400000)`, also UTC-Tage). Ein neuer Tag setzt Zähler und Abholungen zurück.
 - **Lazarett:** Gefallene Truppen des Spielers werden nach dem Angriff aus `ready` in `hospital` verschoben und kehren nach
   `healSeconds * Anzahl` (mal `healTimePermille` des Lazaretts) zurück. Es geht nie eine Einheit verloren.
 - **Tutorial:** `tutorialStep` rückt nach jeder Aktion vor, solange die Bedingung des aktuellen Schritts erfüllt ist.
@@ -106,16 +130,19 @@ die eine Schlacht beeinflussen (game, roads, city, units, towers, hero, rules). 
 und alte Wiederholungen gelten nur gegen den alten Datenstand. Der Spielzustand bewahrt die letzten `maxReplays` Schlachten auf.
 Die Oberfläche spielt sie über dieselbe `stepBattle`-Funktion ab und vergleicht am Ende Tick und Prüfsumme.
 
-## Zustandsmodell (Stand M3)
+## Zustandsmodell (Stand M4)
 
 - `GameState`: `version`, `now`, `nextSeed`, `resources` (Gold, Holz, Stein), `towers[]`, `buildings[]` (Bauplatz, Gebäude,
   `doneAt`, `producedUntil`), `keepLevel`, `keepDoneAt`, `roadId`, `roadChoicePending`, `hero` (beigetreten, Abschnitt),
-  `army` (`ready` je Einheit, `training`, `hospital[]`), `defensesWon`, `attacksDone`, `tutorialStep`, `replays[]`, `lastAttack`
+  `army` (`ready` je Einheit, `training`, `hospital[]`), `defensesWon`, `attacksDone`, `tutorialStep`, `replays[]`, `lastAttack`,
+  `shieldUntil`, `worldSeen`, `allianceJoined`, `daily` (Tag, Zähler, abgeholte Ziele), `goalsClaimed`, `raidDueAt`,
+  `raidAcknowledged`, `raidReport`; Gebäude tragen zusätzlich `helpRequestedAt` und `helpsReceived`
 - `BattleState`: `tick`, `rng`, `setup`, `releasedWaves`, `pending[]`, `units[]`, `towers[]`, `gold`, `keepHp`, `gateHp`,
-  `depth`, `shieldUntil`, `abilityReadyAt[]`, `fallen[]`, `leaked`, `result`
+  `depth`, `shieldUntil`, `abilityReadyAt[]`, `fallen[]`, `leaked`, `result`; Türme tragen `kills`, `militiaHp`,
+  `militiaRespawnAt`, `militiaPos`
 - `army.ready` ist eine Zuordnung Einheit → Anzahl. Gelesen wird sie immer in der Reihenfolge von `data/troops.json`.
 
-## Aktionen (Stand M3)
+## Aktionen (Stand M4)
 
 | Aktion | Ebene | Prüfung |
 | --- | --- | --- |
@@ -128,7 +155,12 @@ Die Oberfläche spielt sie über dieselbe `stepBattle`-Funktion ab und vergleich
 | `AssignHero { section }` | Spiel | Heldin beigetreten, Abschnitt bekannt |
 | `TrainTroops { unit, count }` | Spiel | Kaserne fertig, keine Ausbildung läuft, Vorräte reichen |
 | `ResolveDefense { inputs }` | Spiel | Rechnet die Verteidigung aus eigenem Startzustand, eigenem Startwert und den Eingaben nach; lehnt unfertige Schlachten ab |
-| `ResolveAttack { camp, lineup, inputs }` | Spiel | Aufstellung hat die richtige Wellenzahl, nur eigene bereite Truppen, mindestens eine Einheit; dann wie oben nachgerechnet. Beute und Lazarett stammen aus dem Ergebnis |
+| `ResolveAttack { camp, lineup, inputs }` | Spiel | Aufstellung hat die richtige Wellenzahl, nur eigene bereite Truppen, mindestens eine Einheit, Ziel nicht unter Schild; dann wie oben nachgerechnet. Beute und Lazarett stammen aus dem Ergebnis |
+| `ResolveNightRaid` | Spiel | Angriff angekündigt und fällig; rechnet ohne Eingaben |
+| `DismissRaidReport`, `AcknowledgeRaid`, `OpenWorldMap` | Spiel | nur Merker für Oberfläche und Tutorial |
+| `JoinAlliance` | Spiel | noch nicht Mitglied (Platzhalter) |
+| `RequestHelp { plot }` | Spiel | Mitglied, Bau läuft, noch keine Bitte für diesen Bau |
+| `ClaimDailyGoal { goal }` | Spiel | Ziel bekannt, Zähler erreicht, heute noch nicht abgeholt |
 | `ReleaseWave` | Schlacht (Angreifer) | noch eine Welle übrig |
 | `UseAbility { ability, slot }` | Schlacht (Angreifer) | Fähigkeit vorhanden und bereit; `disableTower` braucht einen Turm als Ziel |
 
@@ -139,6 +171,9 @@ Die Oberfläche spielt sie über dieselbe `stepBattle`-Funktion ab und vergleich
 - **Vertrauen.** Der Client wendet Aktionen selbst an und speichert das Ergebnis. Auf dem Server werden Aktionen geprüft und Schlachten aus der Wiederholung nachgerechnet.
 - **Speicherstand.** Liegt unverschlüsselt in `localStorage` und ist veränderbar. Migrationen (`src/app/save.ts`) werden durch die Schema-Migration des Backends ersetzt.
 - **Angriff ohne Sperre.** Truppen werden erst bei `ResolveAttack` abgerechnet. Bricht der Spieler den Angriff ab, ist nichts passiert. Ein Server muss den Angriff beim Start anlegen und die Truppen binden.
-- **Lager.** Räuberlager haben feste Vorräte, die sich nicht leeren.
+- **Weltkarte.** Lager und Nachbarstädte sind feste Einträge in `data/camps.json` mit Vorräten, die sich nicht leeren, und einem Schild, der nie abläuft. Nachbarn greifen nie an.
+- **Allianz.** Mitglieder und ihre Hilfe sind ein Zeitplan aus `data/alliance.json`. Auf dem Server kommt Hilfe von echten Spielern.
+- **Nachtangriff.** Der Client entscheidet beim Öffnen, dass der Angriff fällig ist. Der Server plant und rechnet ihn selbst.
+- **Tagesgrenze.** Tagesziele wechseln um Mitternacht UTC.
 - **Einzelspieler.** Es gibt keine gleichzeitigen Zugriffe auf einen Zustand, also keine Konfliktbehandlung.
 - **JSON-Zahlen.** Alle Zahlen im Zustand bleiben unter 2^53 (`now` in Millisekunden), in Schlachten unter 2^31.

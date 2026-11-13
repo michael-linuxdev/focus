@@ -55,6 +55,9 @@ Gebäude, Ausbau und Burgfried. Tutorial-Schritte hängen am Fortschritt, nicht 
 Im ersten Schritt wartet die Welle am Haltepunkt, bis der erste Turm steht;
 die ersten fünf Wellen sind `unlosable` (kein Burgfried-Schaden). Türme entstehen auch im Stadtbau sofort.
 Die Heldin kommandiert einen Abschnitt und führt zugleich Angriffe. Lazarett gilt immer, das Gebäude verkürzt nur die Zeit. Nachtangriff: beim ersten Öffnen nach mindestens vier Stunden Abwesenheit (Wert in den Daten).
+Wachstube und Rammbock: beides gilt. Rammböcke räumen Miliz schnell weg, nehmen dabei aber besonders viel Schaden.
+Verlierbare Verteidigungen und der Nachtangriff kosten Vorräte nach Durchbruchstiefe, innerhalb der Verlustgrenze.
+Nach jedem Nachtangriff ist der nächste angekündigt.
 
 ## Ordner
 
