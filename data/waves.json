@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "preliminary": true,
+  "waves": [
+    {
+      "id": "demo_1",
+      "groups": [{ "unit": "raeuber", "count": 6, "startTick": 0, "intervalTicks": 16, "jitterTicks": 8 }]
+    }
+  ]
+}

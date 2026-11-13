@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "preliminary": true,
+  "units": [{ "id": "raeuber", "hp": 30, "speedMilliPerTick": 40 }]
+}

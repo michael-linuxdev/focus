@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Texte einer Sprache (Platzhalter in geschweiften Klammern)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "lang", "texts"],
+  "properties": {
+    "version": { "type": "integer", "minimum": 1 },
+    "lang": { "type": "string", "pattern": "^[a-z]{2}$" },
+    "texts": {
+      "type": "object",
+      "propertyNames": { "pattern": "^[a-z0-9]+(\\.[a-zA-Z0-9]+)+$" },
+      "additionalProperties": { "type": "string", "minLength": 1 }
+    }
+  }
+}

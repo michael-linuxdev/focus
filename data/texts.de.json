@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "lang": "de",
+  "texts": {
+    "m0.releaseWave": "Räuber loslassen",
+    "m0.running": "Räuber unterwegs …",
+    "m0.again": "Nochmal",
+    "m0.arrived": "Am Burgfried angekommen: {n}",
+    "m0.debug": "Tick {tick} · Prüfsumme {hash}",
+    "status.offlineReady": "Offline bereit",
+    "status.battles": "Durchläufe: {n}"
+  }
+}
