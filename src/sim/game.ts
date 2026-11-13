@@ -6,6 +6,7 @@ import { mulDiv, PERMILLE } from './fixed.ts';
 import { towerActionCost, type BattleInput, type BattleSetup, type BattleState, type CityTower } from './battle/battle.ts';
 import { computeLoot } from './loot.ts';
 import { makeReplay, runBattle, type Replay } from './replay.ts';
+import { fixedDefense, scaledDefense, scaledWave, wavesUnlocked, type PlannedDefense } from './waves.ts';
 
 /**
  * Dauerhafter Spielzustand und seine Aktionen, Stand M4.
@@ -16,7 +17,7 @@ import { makeReplay, runBattle, type Replay } from './replay.ts';
  * Schlachten werden nicht "gemeldet", sondern nachgerechnet: `ResolveDefense` und `ResolveAttack`
  * bekommen nur die Eingaben des Spielers; Startzustand und Startwert stammen aus dem Spielzustand.
  */
-export const STATE_VERSION = 7;
+export const STATE_VERSION = 8;
 
 export interface Building {
   readonly plot: string;
@@ -96,6 +97,8 @@ export interface GameState {
   readonly hero: { readonly joined: boolean; readonly section: string | null };
   readonly army: Army;
   readonly defensesWon: number;
+  /** Geschlagene berechnete Wellen nach dem geführten Ablauf; die nächste hat diese Nummer. */
+  readonly wavesCleared: number;
   readonly attacksDone: number;
   /** Index in `data.tutorial.steps`. */
   readonly tutorialStep: number;
@@ -177,6 +180,7 @@ export function createGame(seed: number, now: number, data: GameData): GameState
     hero: { joined: false, section: null },
     army: { ready: {}, training: null, hospital: [] },
     defensesWon: 0,
+    wavesCleared: 0,
     attacksDone: 0,
     tutorialStep: 0,
     replays: [],
@@ -261,12 +265,26 @@ export function unlocked(state: GameState, feature: string, data: GameData): boo
   return data.tutorial.steps.some((s, i) => i <= state.tutorialStep && s.unlocks.includes(feature));
 }
 
-/** Die Verteidigung, die als Nächstes ansteht. */
-export function defenseDef(state: GameState, data: GameData): DefenseDef {
-  return data.tutorial.defenses[state.defensesWon] ?? data.tutorial.afterDefenses;
+/**
+ * Die Verteidigung, die als Nächstes ansteht: erst die Wellen des geführten Ablaufs, dann die berechneten.
+ * Sind alle Wellen der Burgfried-Stufe geschlagen, kommt die letzte gewöhnliche noch einmal (weniger Gold,
+ * kein Fortschritt), bis der Burgfried wächst. Auf Stufe 1 ist das die Übungswelle `afterDefenses`.
+ */
+export function defenseDef(state: GameState, data: GameData): PlannedDefense {
+  const guided = data.tutorial.defenses[state.defensesWon];
+  if (guided) return fixedDefense(guided, false, data);
+  const unlockedWaves = wavesUnlocked(state.keepLevel, data);
+  if (state.wavesCleared < unlockedWaves) return scaledDefense(state.wavesCleared, false, data);
+  if (unlockedWaves < 2) return fixedDefense(data.tutorial.afterDefenses, true, data);
+  return scaledDefense(unlockedWaves - 2, true, data);
 }
 
-function cityDefense(state: GameState, def: DefenseDef, data: GameData): BattleSetup {
+/** Nummer der anstehenden Welle für die Anzeige (ab 1, über Ablauf und berechnete Wellen hinweg). */
+export function waveNumber(state: GameState, data: GameData): number {
+  return Math.min(state.defensesWon, data.tutorial.defenses.length) + state.wavesCleared + 1;
+}
+
+function cityDefense(state: GameState, def: PlannedDefense, data: GameData): BattleSetup {
   return {
     playerSide: 'defender',
     roadId: state.roadId,
@@ -279,11 +297,13 @@ function cityDefense(state: GameState, def: DefenseDef, data: GameData): BattleS
     heroSection: state.hero.section,
     // Unverlierbare Tutorial-Wellen laufen ohne Tor, damit sie sofort an den Türmen ankommen.
     gateHp: def.unlosable ? 0 : data.rules.cityGateHp,
-    waves: [{ groups: findById(data.waves.waves, def.wave, 'Welle').groups }],
+    waves: [{ groups: def.groups }],
     autoRelease: true,
     abilities: [],
     volley: true,
     rally: state.hero.joined,
+    // Nur gesetzt, wenn die Welle zäher ist: Setups des geführten Ablaufs bleiben unverändert.
+    ...(def.hpPermille === PERMILLE ? {} : { unitHpPermille: def.hpPermille }),
     maxTicks: 0,
   };
 }
@@ -298,6 +318,12 @@ export function defenseStars(final: BattleState, def: DefenseDef, data: GameData
   return final.tick <= def.parSeconds * data.game.ticksPerSecond ? 3 : 2;
 }
 
+/** Bonusgold für die Sterne; für eine schon geschlagene Welle nur anteilig. */
+export function starGold(stars: number, def: PlannedDefense, data: GameData): number {
+  const gold = data.rules.starGold[stars] ?? 0;
+  return def.repeat ? mulDiv(gold, data.waves.scaling.repeatGoldPermille, PERMILLE) : gold;
+}
+
 /** Startzustand der nächsten Verteidigung, vollständig aus Spielzustand und Daten abgeleitet. */
 export function defenseSetup(state: GameState, data: GameData): BattleSetup {
   return cityDefense(state, defenseDef(state, data), data);
@@ -305,7 +331,12 @@ export function defenseSetup(state: GameState, data: GameData): BattleSetup {
 
 /** Startzustand des Nachtangriffs: die Stadt verteidigt sich ohne Eingaben des Spielers. */
 export function raidSetup(state: GameState, data: GameData): BattleSetup {
-  return cityDefense(state, { wave: data.rules.nightRaidWave, holdMilliUntilTower: 0, unlosable: false, victoryGold: 0, parSeconds: 0 }, data);
+  const base = { wave: data.rules.nightRaidWave, holdMilliUntilTower: 0, unlosable: false, victoryGold: 0, parSeconds: 0 };
+  const sc = data.waves.scaling;
+  // Anfangs die feste Nachtwelle; später wächst der Nachtangriff mit: die zuletzt geschlagene Welle, etwas schwächer.
+  if (state.wavesCleared < sc.raidFromWave) return cityDefense(state, fixedDefense(base, false, data), data);
+  const wave = scaledWave(state.wavesCleared - 1, data, true);
+  return cityDefense(state, { ...base, wave: `nacht_${state.wavesCleared}`, groups: wave.groups, hpPermille: wave.hpPermille, index: null, boss: false, repeat: false }, data);
 }
 
 /**
@@ -496,11 +527,13 @@ function count(state: GameState, counter: GoalCounter, n: number): GameState {
 }
 
 /** Verlust der Stadt nach einer Verteidigung: Beute der Angreifer innerhalb der Verlustgrenze, Schild nach einer Niederlage. */
-function cityLoss(state: GameState, final: BattleState, data: GameData, free = false): { resources: Resources; loot: Resources; shieldUntil: number } {
+function cityLoss(state: GameState, final: BattleState, data: GameData, free = false, raid = false): { resources: Resources; loot: Resources; shieldUntil: number } {
   // Vorräte nach der Schlacht (Gold kann sich durch Kopfgeld und Turmbau geändert haben).
   const stock: Resources = { ...state.resources, gold: final.gold };
   // Kein Verlust bei unverlierbaren Wellen, bei kostenlosen Nachtangriffen und solange die Angreifer nicht tief genug kamen.
-  const spared = final.setup.unlosable || free || final.depth < data.rules.cityLossMinDepth;
+  // Wer selbst verteidigt und den Burgfried hält, verliert nichts, auch wenn einzelne Angreifer durchkommen.
+  const heldOwnDefense = !raid && data.rules.defenseLossOnlyWhenBreached && final.result !== 'breached';
+  const spared = final.setup.unlosable || free || heldOwnDefense || final.depth < data.rules.cityLossMinDepth;
   const loot = spared ? NO_RESOURCES : computeLoot(stock, protectedStock(state, data), final.depth, data.rules);
   const shieldUntil = final.result === 'breached' ? Math.max(state.shieldUntil, state.now + data.rules.defeatShieldHours * HOUR_MS) : state.shieldUntil;
   return { resources: addResources(stock, loot, -1), loot, shieldUntil };
@@ -647,10 +680,11 @@ function apply(state: GameState, action: GameAction, data: GameData): GameState 
       const s: GameState = {
         ...count(state, 'defenses', won ? 1 : 0),
         nextSeed: nextSeed(state.nextSeed),
-        resources: { ...loss.resources, gold: loss.resources.gold + (won ? def.victoryGold : 0) + (data.rules.starGold[stars] ?? 0) },
+        resources: { ...loss.resources, gold: loss.resources.gold + (won ? def.victoryGold : 0) + starGold(stars, def, data) },
         shieldUntil: loss.shieldUntil,
         towers: final.towers.map((t) => ({ slot: t.slot, def: t.def, level: t.level })),
         defensesWon: state.defensesWon + (won ? 1 : 0),
+        wavesCleared: state.wavesCleared + (won && def.index !== null && !def.repeat ? 1 : 0),
       };
       return withReplay(s, 'defense', final, loss.loot, makeReplay(setup, state.nextSeed, action.inputs, final, data), data, stars);
     }
@@ -659,7 +693,7 @@ function apply(state: GameState, action: GameAction, data: GameData): GameState 
       const setup = raidSetup(state, data);
       const final = runBattle(setup, state.nextSeed, [], data);
       if (final.result === 'running') return 'battle_not_finished';
-      const loss = cityLoss(state, final, data, state.raidsResolved < data.rules.freeNightRaids);
+      const loss = cityLoss(state, final, data, state.raidsResolved < data.rules.freeNightRaids, true);
       const s: GameState = {
         ...state,
         raidsResolved: state.raidsResolved + 1,

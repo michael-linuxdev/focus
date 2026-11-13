@@ -1,5 +1,5 @@
 {
-  "version": 11,
+  "version": 12,
   "lang": "de",
   "texts": {
     "hud.defend": "Verteidigen",
@@ -270,6 +270,12 @@
     "effect.next": "Danach: {text}",
     "build.time": "Bauzeit",
     "hud.full": "Lager voll",
-    "build.level": "St. {n}"
+    "build.level": "St. {n}",
+    "unit.ritter": "Ritter",
+    "unit.hauptmann": "Hauptmann",
+    "hud.repeatWave": "Schon geschlagen · weniger Gold",
+    "hud.bossWave": "Der Hauptmann führt sie an",
+    "banner.boss": "Der Hauptmann ist geschlagen! {stars} +{gold}",
+    "hud.needKeep": "Neue Wellen ab Burgfried {n}"
   }
 }

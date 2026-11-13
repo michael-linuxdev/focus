@@ -72,6 +72,9 @@ Eingreifen in der Verteidigung (nach dem ersten Spieltest ergänzt, steht nicht 
 Feld ruft einen Pfeilhagel auf den Punkt, ab der Heldin gibt es den Kampfruf. Jede Verteidigung endet mit ein bis drei
 Sternen und Bonusgold. Ab Welle 2 sind die Wellen so eng, dass ohne Eingreifen Räuber durchkommen; verlierbar werden
 die ersten fünf Wellen dadurch nicht. Fehlt für den nächsten Tutorial-Schritt nur Gold, zeigt der Hinweis auf „Verteidigen“.
+Seit M8 (vom Auftraggeber noch zu bestätigen): Eine selbst gestartete Verteidigung kostet nur Vorräte, wenn der Burgfried fällt
+(`defenseLossOnlyWhenBreached`); für den Nachtangriff gilt weiter die Durchbruchstiefe ab dem Marktplatz. Ohne das kostete jeder
+durchgekommene Räuber bis zu 30 % der ungeschützten Vorräte, bei vielen Verteidigungen am Tag.
 
 ## Ordner
 
@@ -103,8 +106,8 @@ die ersten fünf Wellen dadurch nicht. Fehlt für den nächsten Tutorial-Schritt
 - Neue Messpunkte nur über `record(...)` in `src/app/main.tsx`; neue Arten in `EventType` eintragen.
 - „Minute 10 erreicht“ heißt: Tutorial-Schritt `minute10Step` aus `data/tutorial.json` erreicht.
 - Balance-Werte nie nach Gefühl ändern: erst `npm run balance`, dann Daten ändern, dann wieder laufen lassen.
-- Kosten und Bauzeiten des Monats ebenso: erst `npm run month`, dann Daten ändern, dann wieder laufen lassen. Die erlaubten
-  Tage je Burgfried-Stufe stehen in `tests/sim/m7.test.ts`.
+- Kosten und Bauzeiten des Monats ebenso: erst `npm run month`, dann Daten ändern, dann wieder laufen lassen. Dasselbe gilt für `waves.scaling`.
+  Der erlaubte Rahmen (Tage je Burgfried-Stufe, Siegquote, Sterne, Nachtangriffe) steht in `tests/sim/month.test.ts`.
 - Zielwerte der Balance stehen in `scripts/balance-targets.json`. `npm run balance -- --check` endet mit Fehler,
   wenn einer verfehlt wird. Nach jeder Änderung an `data/` (Türme, Einheiten, Wellen, Lager, Regeln) laufen lassen.
 
@@ -118,5 +121,6 @@ die ersten fünf Wellen dadurch nicht. Fehlt für den nächsten Tutorial-Schritt
 - Nicht im Umfang: Server, Konten, Chat, Käufe, Werbung, fremde Tracking-Dienste, Unity-Umsetzung.
 - Bot-Allianz und Weltkarte sind Attrappen und im Code als Platzhalter zu markieren.
 - Arbeit in Meilensteinen; nach jedem anhalten und Bericht geben. M0 bis M5: die ersten 30 Minuten. M6: Testpaket.
-  M7: Wachstum (Burgfried bis 8, Ausbaustufen, Lagerplatz). Offen: M8 Gegner, M9 Tagesrhythmus, M10 Welt, M11 Monatsbogen.
+  M7: Wachstum (Burgfried bis 8, Ausbaustufen, Lagerplatz). M8: Gegner (berechnete Wellen, Ritter, Hauptmann, Nachtangriff wächst mit).
+  Offen: M9 Tagesrhythmus, M10 Welt, M11 Monatsbogen.
 - Veröffentlichung: Push auf `main` baut und veröffentlicht nach `focus.micana.de` (GitHub Pages).

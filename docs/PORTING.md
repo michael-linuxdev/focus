@@ -137,6 +137,23 @@ der Verteidiger baut Türme (`BuildTower`, `UpgradeTower`), der Angreifer löst 
 - **Messen statt schätzen.** `scripts/lib/month.ts` spielt 30 Tage mit einem sparsamen Spieler; `tests/sim/m7.test.ts` hält fest,
   an welchen Tagen die Burgfried-Stufen frühestens und spätestens erreicht werden.
 
+## Gegner, die mitwachsen (M8)
+
+- **Berechnete Wellen** (`src/sim/waves.ts`, Regeln in `waves.json` unter `scaling`). Nach den fest aufgeschriebenen Wellen des
+  geführten Ablaufs wird Welle n (ab 0) berechnet: Budget `budgetBase * budgetGrowth^n` an Lebenspunkten, verteilt nach
+  `sharePermille` auf die Einheiten mit `fromWave <= n` (Anzahl = Anteil / Lebenspunkte der Einheit, mindestens 1), je Art zwei
+  Schübe. Alle Angreifer sind um `hpBase * hpGrowth^n` Promille zäher (`BattleSetup.unitHpPermille`, beim Aufstellen angewandt,
+  abschneidend, mindestens 1). Wachstum wird Schritt für Schritt mit `mulDiv` gerechnet (`growPermille`), kein Zufall.
+- **Mit der Stadt.** Jede Burgfried-Stufe ab 2 gibt `wavesPerKeepLevel` weitere Wellen frei (`wavesUnlocked`). Die letzte davon
+  führt der Anführer `boss.unit` an. `GameState.wavesCleared` zählt die geschlagenen; `defenseDef` liefert die nächste als
+  `PlannedDefense` mit ausgeschriebenen Gruppen. Sind alle freigegebenen geschlagen, kommt die letzte gewöhnliche noch einmal
+  (`repeat`): Sieg- und Sternegold nur `repeatGoldPermille`, kein Fortschritt. Auf Stufe 1 ist das die Übungswelle `afterDefenses`.
+- **Nachtangriff.** Bis `raidFromWave` geschlagene Wellen die feste Welle `nightRaidWave`, danach die zuletzt geschlagene Welle als
+  Nachtangriff: Budget mal `raidStrengthPermille`, eigene Zähigkeit `raidHpBase * raidHpGrowth^n`, ohne Anführer.
+- **Verluste.** `rules.defenseLossOnlyWhenBreached`: Eine vom Spieler gestartete Verteidigung kostet nur Vorräte, wenn der Burgfried
+  fällt. Für den Nachtangriff gilt weiter die Durchbruchstiefe ab `cityLossMinDepth`. Die Verlustgrenze selbst ist unverändert.
+- `dataVersion` enthält jetzt auch die Version von `waves.json`.
+
 ## Wiederholungsformat
 
 ```json

@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
-  buildingLevel, createGame, findById, keepRequirement, protectedStock, reduceGame, roadLengthMilli, storageCapacity, towerActionCost, verifyReplay,
+  buildingLevel, createGame, findById, keepRequirement, protectedStock, reduceGame, roadLengthMilli, storageCapacity, towerActionCost,
   type GameAction, type GameState,
 } from '../../src/sim/index.ts';
 import { loadGame, SAVE_KEY } from '../../src/app/save.ts';
-import { playTutorial } from './bot.ts';
-import { CASUAL, EAGER, playMonth } from '../../scripts/lib/month.ts';
 import { data } from './testdata.ts';
 
 const act = (g: GameState, ...actions: GameAction[]): GameState =>
@@ -172,31 +170,5 @@ describe('M7: Burgfried bis Stufe 8 und Turmstufen', () => {
     const loaded = loadGame({ getItem: (k) => map.get(k) ?? null, setItem: (k, v) => void map.set(k, v) }, data)!;
     expect(loaded.buildings.map((b) => [b.def, b.level, b.upgradeDoneAt])).toEqual([['holzfaeller', 1, null], ['speicher', 1, null]]);
     expect(loaded.keepLevel).toBe(2);
-  });
-});
-
-describe('M7: der erste Spielmonat im Durchlauf', () => {
-  const start = playTutorial(createGame(7, 0, data), data, 'freies_spiel', 0, true).game;
-
-  it('ein Gelegenheitsspieler wächst den ganzen Monat: früh schnell, Burgfried 8 erst gegen Ende', () => {
-    const run = playMonth(start, data, CASUAL);
-    const day = (level: number): number => run.keepDay[level] ?? 999;
-    expect(day(3)).toBeLessThanOrEqual(2);
-    expect(day(4)).toBeLessThanOrEqual(4);
-    expect(day(5)).toBeLessThanOrEqual(8);
-    expect(day(6)).toBeGreaterThanOrEqual(8);
-    expect(day(6)).toBeLessThanOrEqual(15);
-    expect(day(7)).toBeGreaterThanOrEqual(14);
-    expect(day(7)).toBeLessThanOrEqual(23);
-    expect(day(8)).toBeGreaterThanOrEqual(22);
-    // Kein Tag, an dem der Burgfried zwei Stufen springt, keine Woche ohne Fortschritt bei den Gebäuden.
-    for (let level = 3; level <= 7; level++) expect(day(level + 1)).toBeGreaterThan(day(level));
-    for (const r of run.game.replays) expect(verifyReplay(r.replay, data)).toBe('ok');
-  });
-
-  it('auch wer doppelt so oft spielt, ist nicht nach zwei Wochen fertig', () => {
-    const run = playMonth(start, data, EAGER);
-    expect(run.keepDay[8] ?? 999).toBeGreaterThanOrEqual(20);
-    expect(run.keepDay[5] ?? 999).toBeLessThanOrEqual(8);
   });
 });

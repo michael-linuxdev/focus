@@ -1,11 +1,11 @@
 import { render } from 'preact';
 import { registerSW } from 'virtual:pwa-register';
 import {
-  MILLI, STATE_VERSION, attackSetup, buildingBusyUntil, buildingLevel, canAfford, keepRequirement, storageCapacity, cityHint, createBattle, createGame, dataVersion, defaultLineup, defenseStars, defenseDef, defenseSetup, findById, hashBattle,
+  MILLI, STATE_VERSION, attackSetup, buildingBusyUntil, buildingLevel, canAfford, keepRequirement, storageCapacity, cityHint, createBattle, createGame, dataVersion, defaultLineup, defenseStars, defenseDef, defenseSetup, starGold, waveNumber, wavesUnlocked, findById, hashBattle,
   readyTroops, reduceGame, roadLengthMilli, roadPointMilli, stepBattle, towerActionCost, tutorialStep, unlocked, validateBattleAction, validateGameAction,
   type BattleAction, type BattleInput, type BattleState, type GameAction, type GameState, type Resources, type SavedReplay, type UnitCount,
 } from '../sim/index.ts';
-import { drawStage, formatSeconds, targetAt, tileCenter, type Effect, type Layout, type Scene } from '../render/stage.ts';
+import { UNIT_SPRITE, drawStage, formatSeconds, targetAt, tileCenter, type Effect, type Layout, type Scene } from '../render/stage.ts';
 import { spriteAspect } from '../render/sprites.ts';
 import { Hud, type Btn, type HudModel, type MapNode, type StepperRow } from '../ui/Hud.tsx';
 import { InstallGate, ReportPanel, type GateModel, type ReportModel } from '../ui/InstallGate.tsx';
@@ -360,7 +360,7 @@ function startDefense(): void {
   sheet = null;
   playedDefense = defenseDef(game, data);
   victoryGold = playedDefense.victoryGold;
-  record('battle_start', { kind: 'defense', wave: defenseDef(game, data).wave });
+  record('battle_start', { kind: 'defense', wave: playedDefense.wave, repeat: playedDefense.repeat, boss: playedDefense.boss });
   localStorage.setItem(BATTLE_FLAG, 'defense');
   screen = { kind: 'battle', side: 'defense', battle: createBattle(defenseSetup(game, data), game.nextSeed, data), inputs: [], queued: [], camp: '', lineup: [], targeting: null };
 }
@@ -404,7 +404,7 @@ function finishBattle(s: Extract<Screen, { kind: 'battle' }>): void {
   const won = s.battle.result === 'held';
   const lostGold = game.replays[game.replays.length - 1]?.loot.gold ?? 0;
   const stars = defenseStars(s.battle, playedDefense, data);
-  showBanner(won ? t('banner.victory', { stars: '★'.repeat(stars) + '☆'.repeat(3 - stars), gold: victoryGold + (data.rules.starGold[stars] ?? 0) }) : lostGold > 0 ? `${t('banner.defeat')} · ${t('banner.lost', { gold: lostGold })}` : t('banner.defeat'), toCity);
+  showBanner(won ? t(playedDefense.boss && !playedDefense.repeat ? 'banner.boss' : 'banner.victory', { stars: '★'.repeat(stars) + '☆'.repeat(3 - stars), gold: victoryGold + starGold(stars, playedDefense, data) }) : lostGold > 0 ? `${t('banner.defeat')} · ${t('banner.lost', { gold: lostGold })}` : t('banner.defeat'), toCity);
 }
 
 // ---------- Tippen auf das Spielfeld ----------
@@ -634,6 +634,7 @@ function buildScene(nowMs: number): Scene {
       enemyCity: attack,
       targeting: screen.kind === 'battle' && screen.targeting !== null,
       shielded: b.tick < b.shieldUntil,
+      unitHpPermille: b.setup.unitHpPermille ?? 1000,
     };
   }
   const labels: Record<string, string> = {};
@@ -646,7 +647,7 @@ function buildScene(nowMs: number): Scene {
     buildings: { list: game.buildings.map((b) => (b.upgradeDoneAt !== null ? { ...b, doneAt: b.upgradeDoneAt } : b)), now: game.now, showEmpty: buildableBuildings().length > 0, labels, helpLabel: game.allianceJoined ? t('help.ask') : null },
     gate: null, showMarket: false, keep: null,
     keepBusySeconds: game.keepDoneAt === null ? null : Math.max(0, Math.ceil((game.keepDoneAt - game.now) / 1000)),
-    heroSection: game.hero.section, enemyCity: false, targeting: false, shielded: false,
+    heroSection: game.hero.section, enemyCity: false, targeting: false, shielded: false, unitHpPermille: 1000,
   };
 }
 
@@ -661,7 +662,7 @@ function buildHud(nowMs: number): HudModel {
     full: null as HudModel['full'],
     showAllResources: unlocked(game, 'resources', data),
     goldDenied: nowMs < goldDeniedUntil,
-    topRight: t('hud.wave', { n: game.defensesWon + 1 }),
+    topRight: t('hud.wave', { n: waveNumber(game, data) }),
     onTopRight: openDevOnTaps,
     depth: null as number | null,
     banner: banner?.text ?? null,
@@ -839,8 +840,8 @@ function effectText(level: ReturnType<typeof buildingLevel>): string {
 
 /** Was in der nächsten Welle kommt: Einheiten nach Art zusammengezählt, in der Reihenfolge der Daten. */
 function wavePreview(): HudModel['preview'] {
-  const wave = findById(data.waves.waves, defenseDef(game, data).wave, 'Welle');
-  const alias: Readonly<Record<string, { sprite: string; scale: number }>> = { laeufer: { sprite: 'raeuber', scale: 0.8 } };
+  const wave = defenseDef(game, data);
+  const alias = UNIT_SPRITE;
   const items = data.units.units
     .map((u) => ({ unit: u.id, count: wave.groups.filter((g) => g.unit === u.id).reduce((n, g) => n + g.count, 0) }))
     .filter((it) => it.count > 0)
@@ -850,7 +851,10 @@ function wavePreview(): HudModel['preview'] {
       const scale = (alias[it.unit]?.scale ?? 1) * (spriteAspect(sprite) < 0.9 ? 0.8 : 1);
       return { sprite, scale, count: it.count, name: t(`unit.${it.unit}`) };
     });
-  return { label: t('hud.nextWave'), items };
+  // Schon geschlagen: Hinweis, ab wann es neue Wellen gibt. Anführer: Warnung.
+  const next = data.city.keepLevels.some((l) => l.level === game.keepLevel + 1);
+  const note = wave.repeat && wave.index !== null ? (next && game.wavesCleared >= wavesUnlocked(game.keepLevel, data) ? t('hud.needKeep', { n: game.keepLevel + 1 }) : t('hud.repeatWave')) : wave.boss ? t('hud.bossWave') : null;
+  return { label: t('hud.nextWave'), items, note };
 }
 
 function shieldText(): string | null {

@@ -1,5 +1,5 @@
 import {
-  buildingBusyUntil, defenseSetup, findById, keepRequirement, reduceGame, storageCapacity, validateGameAction,
+  buildingBusyUntil, defenseDef, defenseSetup, defenseStars, waveNumber, findById, keepRequirement, reduceGame, storageCapacity, validateGameAction,
   type GameAction, type GameData, type GameState,
 } from '../../src/sim/index.ts';
 import { activeDefense, playBattle } from './bot.ts';
@@ -25,7 +25,13 @@ export interface MonthRun {
   /** Tag (ab 1), an dem der Burgfried die Stufe erreicht hat; Index = Stufe. */
   readonly keepDay: readonly (number | null)[];
   /** Je Tag: Stufe des Burgfrieds und Vorräte am Abend. */
-  readonly days: readonly { readonly day: number; readonly keep: number; readonly gold: number; readonly wood: number; readonly stone: number; readonly defenses: number; readonly lost: number }[];
+  readonly days: readonly { readonly day: number; readonly keep: number; readonly gold: number; readonly wood: number; readonly stone: number; readonly defenses: number; readonly lost: number; readonly wave: number }[];
+  /** Verteidigungen neuer Wellen: gewonnen und verloren; Wiederholungen schon geschlagener Wellen zählen eigens. */
+  readonly fresh: { readonly won: number; readonly lost: number };
+  readonly repeats: number;
+  /** Je Burgfried-Stufe (Index): neue Wellen gewonnen/verloren, Sterne und Durchgekommene in Summe, Nachtangriffe und wie viele den Marktplatz erreichten. */
+  readonly bands: readonly { won: number; lost: number; stars: number; leaked: number; bossTries: number; bossWon: number; raids: number; raidMarket: number; seconds: number }[];
+  readonly raids: { readonly held: number; readonly breached: number; readonly market: number };
   /** Sitzungen, in denen es außer Verteidigen nichts zu tun gab. */
   readonly idleSessions: number;
   readonly sessions: number;
@@ -41,6 +47,10 @@ export function playMonth(start: GameState, data: GameData, options: MonthOption
   let idleSessions = 0;
   let sessions = 0;
   let lost = 0;
+  const fresh = { won: 0, lost: 0 };
+  let repeats = 0;
+  const bands = Array.from({ length: data.city.keepLevels.length + 1 }, () => ({ won: 0, lost: 0, stars: 0, leaked: 0, bossTries: 0, bossWon: 0, raids: 0, raidMarket: 0, seconds: 0 }));
+  const raids = { held: 0, breached: 0, market: 0 };
   const act = (action: GameAction): boolean => {
     const r = reduceGame(game, action, data);
     if (r.error) return false;
@@ -93,10 +103,10 @@ export function playMonth(start: GameState, data: GameData, options: MonthOption
       const reserve = nextKeep ? nextKeep.cost.gold : 0;
       const slot = data.city.towerSlots.find((s) => s.keepLevel <= game.keepLevel && !game.towers.some((t) => t.slot === s.id));
       const tower = data.towers.towers.filter((t) => t.keepLevel <= game.keepLevel)[game.towers.length % 2 === 0 ? 0 : 1] ?? data.towers.towers[0]!;
-      if (slot && game.resources.gold - tower.levels[0]!.cost >= reserve && act({ type: 'BuildTower', slot: slot.id, tower: tower.id })) { did = true; continue; }
+      if (slot && (game.resources.gold - tower.levels[0]!.cost >= reserve || tower.levels[0]!.cost * 4 <= game.resources.gold) && act({ type: 'BuildTower', slot: slot.id, tower: tower.id })) { did = true; continue; }
       const up = game.towers.find((t) => {
         const next = findById(data.towers.towers, t.def, 'Turm').levels[t.level];
-        return next !== undefined && next.keepLevel <= game.keepLevel && game.resources.gold - next.cost >= reserve;
+        return next !== undefined && next.keepLevel <= game.keepLevel && (game.resources.gold - next.cost >= reserve || next.cost * 4 <= game.resources.gold);
       });
       if (up && act({ type: 'UpgradeTower', slot: up.slot })) { did = true; continue; }
       break;
@@ -114,11 +124,24 @@ export function playMonth(start: GameState, data: GameData, options: MonthOption
       const before = game.resources;
       if (act({ type: 'ResolveNightRaid' })) {
         lost += before.wood - game.resources.wood + before.stone - game.resources.stone + Math.max(0, before.gold - game.resources.gold);
+        if (game.replays.at(-1)?.result === 'breached') raids.breached++; else raids.held++;
+        if ((game.replays.at(-1)?.depth ?? 0) >= 2) { raids.market++; bands[game.keepLevel]!.raidMarket++; }
+        bands[game.keepLevel]!.raids++;
         act({ type: 'DismissRaidReport' });
       }
       let did = build();
       for (let i = 0; i < options.defensesPerSession; i++) {
+        const planned = defenseDef(game, data);
         const { inputs, final } = playBattle(defenseSetup(game, data), game.nextSeed, data, activeDefense(data));
+        if (planned.repeat) repeats++; else if (final.result === 'held') fresh.won++; else fresh.lost++;
+        if (!planned.repeat) {
+          const band = bands[game.keepLevel]!;
+          if (final.result === 'held') band.won++; else band.lost++;
+          band.stars += defenseStars(final, planned, data);
+          band.leaked += final.leaked;
+          band.seconds += final.tick / data.game.ticksPerSecond;
+          if (planned.boss) { band.bossTries++; if (final.result === 'held') band.bossWon++; }
+        }
         if (!act({ type: 'ResolveDefense', inputs })) throw new Error('ResolveDefense abgelehnt');
         act({ type: 'AdvanceTime', now: game.now + Math.ceil(final.tick / data.game.ticksPerSecond) * 1000 });
         defenses++;
@@ -128,7 +151,7 @@ export function playMonth(start: GameState, data: GameData, options: MonthOption
       if (!did) idleSessions++;
       for (let l = 1; l <= game.keepLevel; l++) keepDay[l] ??= day;
     }
-    days.push({ day, keep: game.keepLevel, gold: game.resources.gold, wood: game.resources.wood, stone: game.resources.stone, defenses, lost });
+    days.push({ day, keep: game.keepLevel, gold: game.resources.gold, wood: game.resources.wood, stone: game.resources.stone, defenses, lost, wave: waveNumber(game, data) });
   }
-  return { game, keepDay, days, idleSessions, sessions };
+  return { game, keepDay, days, idleSessions, sessions, fresh, repeats, raids, bands };
 }

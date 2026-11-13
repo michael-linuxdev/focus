@@ -1,5 +1,5 @@
 {
-  "version": 6,
+  "version": 7,
   "preliminary": true,
   "waves": [
     {
@@ -238,5 +238,58 @@
         }
       ]
     }
-  ]
+  ],
+  "scaling": {
+    "wavesPerKeepLevel": 6,
+    "budgetBase": 1500,
+    "budgetGrowthPermille": 1020,
+    "hpGrowthPermille": 1040,
+    "units": [
+      {
+        "unit": "raeuber",
+        "fromWave": 0,
+        "sharePermille": 400
+      },
+      {
+        "unit": "laeufer",
+        "fromWave": 0,
+        "sharePermille": 150
+      },
+      {
+        "unit": "schildtraeger",
+        "fromWave": 0,
+        "sharePermille": 300
+      },
+      {
+        "unit": "sturmbock",
+        "fromWave": 2,
+        "sharePermille": 150
+      },
+      {
+        "unit": "ritter",
+        "fromWave": 8,
+        "sharePermille": 250
+      }
+    ],
+    "firstTick": 10,
+    "windowTicks": 300,
+    "burstTicks": 80,
+    "minIntervalTicks": 3,
+    "maxIntervalTicks": 36,
+    "jitterTicks": 4,
+    "boss": {
+      "unit": "hauptmann",
+      "startTick": 200,
+      "extraParSeconds": 15
+    },
+    "victoryGoldBase": 60,
+    "victoryGoldGrowthPermille": 1080,
+    "repeatGoldPermille": 300,
+    "parSeconds": 85,
+    "raidFromWave": 3,
+    "raidStrengthPermille": 600,
+    "hpBasePermille": 2700,
+    "raidHpBasePermille": 2300,
+    "raidHpGrowthPermille": 1030
+  }
 }

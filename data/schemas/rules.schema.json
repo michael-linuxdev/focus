@@ -23,7 +23,8 @@
     "cityLossMinDepth",
     "freeNightRaids",
     "volley",
-    "starGold"
+    "starGold",
+    "defenseLossOnlyWhenBreached"
   ],
   "properties": {
     "version": {
@@ -137,6 +138,9 @@
         "type": "integer",
         "minimum": 0
       }
+    },
+    "defenseLossOnlyWhenBreached": {
+      "type": "boolean"
     }
   }
 }

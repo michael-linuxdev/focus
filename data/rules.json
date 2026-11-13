@@ -1,5 +1,5 @@
 {
-  "version": 5,
+  "version": 6,
   "preliminary": true,
   "gateMilli": 1000,
   "marketPermille": 500,
@@ -32,5 +32,6 @@
     0,
     10,
     25
-  ]
+  ],
+  "defenseLossOnlyWhenBreached": true
 }

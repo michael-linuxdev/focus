@@ -1,5 +1,5 @@
 {
-  "version": 7,
+  "version": 8,
   "preliminary": true,
   "units": [
     {
@@ -78,6 +78,28 @@
       "siege": 50,
       "melee": 15,
       "militiaDamagePermille": 3000
+    },
+    {
+      "id": "ritter",
+      "hp": 160,
+      "speedMilliPerTick": 30,
+      "bounty": 20,
+      "keepDamage": 2,
+      "armor": 7,
+      "siege": 2,
+      "melee": 5,
+      "militiaDamagePermille": 1000
+    },
+    {
+      "id": "hauptmann",
+      "hp": 1500,
+      "speedMilliPerTick": 22,
+      "bounty": 150,
+      "keepDamage": 5,
+      "armor": 3,
+      "siege": 20,
+      "melee": 20,
+      "militiaDamagePermille": 1000
     }
   ]
 }

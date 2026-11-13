@@ -187,6 +187,8 @@ export interface RulesData {
   readonly starGold: readonly number[];
   /** Die eigene Stadt verliert erst ab dieser Durchbruchstiefe Vorräte. */
   readonly cityLossMinDepth: number;
+  /** Eine vom Spieler gestartete Verteidigung kostet nur Vorräte, wenn der Burgfried fällt (Nachtangriffe weiter nach Tiefe). */
+  readonly defenseLossOnlyWhenBreached: boolean;
   /** So viele erste Nachtangriffe kosten den Spieler nichts. */
   readonly freeNightRaids: number;
 }
@@ -222,6 +224,38 @@ export interface WaveGroupDef {
 export interface WaveDef {
   readonly id: string;
   readonly groups: readonly WaveGroupDef[];
+}
+
+/** Regeln für die berechneten Wellen nach dem geführten Ablauf (siehe `src/sim/waves.ts`). */
+export interface WaveScalingDef {
+  /** So viele weitere Wellen gibt jede Burgfried-Stufe ab 2 frei; die letzte davon führt der Anführer an. */
+  readonly wavesPerKeepLevel: number;
+  /** Lebenspunkte-Budget von Welle 0 und sein Wachstum je Welle. */
+  readonly budgetBase: number;
+  readonly budgetGrowthPermille: number;
+  /** Faktor auf die Lebenspunkte jedes Angreifers in Welle 0 und sein Wachstum je Welle. */
+  readonly hpBasePermille: number;
+  readonly hpGrowthPermille: number;
+  /** Anteile am Budget; eine Einheit ist ab `fromWave` dabei. */
+  readonly units: readonly { readonly unit: string; readonly fromWave: number; readonly sharePermille: number }[];
+  readonly firstTick: number;
+  readonly windowTicks: number;
+  readonly burstTicks: number;
+  readonly minIntervalTicks: number;
+  readonly maxIntervalTicks: number;
+  readonly jitterTicks: number;
+  readonly boss: { readonly unit: string; readonly startTick: number; readonly extraParSeconds: number };
+  readonly victoryGoldBase: number;
+  readonly victoryGoldGrowthPermille: number;
+  /** Anteil des Sieg- und Sternegolds für eine schon geschlagene Welle. */
+  readonly repeatGoldPermille: number;
+  readonly parSeconds: number;
+  /** Nachtangriff: ab so vielen geschlagenen Wellen kommt statt der festen Nachtwelle die zuletzt geschlagene, mit dieser Stärke. */
+  readonly raidFromWave: number;
+  readonly raidStrengthPermille: number;
+  /** Zähigkeit der Angreifer im Nachtangriff: Faktor in Welle 0 und Wachstum je Welle. */
+  readonly raidHpBasePermille: number;
+  readonly raidHpGrowthPermille: number;
 }
 
 export interface DefenseDef {
@@ -314,7 +348,7 @@ export interface GameData {
   readonly hero: HeroData;
   readonly rules: RulesData;
   readonly camps: { readonly version: number; readonly camps: readonly CampDef[] };
-  readonly waves: { readonly version: number; readonly waves: readonly WaveDef[] };
+  readonly waves: { readonly version: number; readonly waves: readonly WaveDef[]; readonly scaling: WaveScalingDef };
   readonly tutorial: TutorialData;
   readonly alliance: AllianceData;
   readonly goals: { readonly version: number; readonly goals: readonly GoalDef[] };
@@ -322,7 +356,7 @@ export interface GameData {
 
 /** Kennung des Datenstands für Schlachten; steht in jeder Wiederholung. */
 export function dataVersion(data: GameData): string {
-  return [data.game, data.roads, data.city, data.units, data.towers, data.hero, data.rules].map((d) => d.version).join('.');
+  return [data.game, data.roads, data.city, data.units, data.towers, data.hero, data.rules, data.waves].map((d) => d.version).join('.');
 }
 
 export function findById<T extends { readonly id: string }>(list: readonly T[], id: string, what: string): T {

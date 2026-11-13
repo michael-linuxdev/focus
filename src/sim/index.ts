@@ -5,5 +5,6 @@ export * from './road.ts';
 export * from './battle/battle.ts';
 export * from './replay.ts';
 export * from './loot.ts';
+export * from './waves.ts';
 export * from './game.ts';
 export * from './tutorial.ts';

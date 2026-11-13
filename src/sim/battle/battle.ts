@@ -52,6 +52,8 @@ export interface BattleSetup {
   readonly volley?: boolean;
   /** Die Heldin des Verteidigers ist da und kann den Kampfruf geben. */
   readonly rally?: boolean;
+  /** Faktor auf die Lebenspunkte aller Angreifer (fehlt: 1000). */
+  readonly unitHpPermille?: number;
   /** Nach so vielen Ticks endet die Schlacht zugunsten des Verteidigers (0 = keine Grenze). */
   readonly maxTicks: number;
 }
@@ -159,6 +161,11 @@ export type ActionError =
 /** Wie viele Angreifer gefallen sind. */
 export function killedCount(state: BattleState): number {
   return state.fallen.length;
+}
+
+/** Lebenspunkte einer frisch aufgestellten Einheit in dieser Schlacht. */
+export function unitMaxHp(baseHp: number, setup: BattleSetup): number {
+  return setup.unitHpPermille === undefined ? baseHp : Math.max(1, mulDiv(baseHp, setup.unitHpPermille, PERMILLE));
 }
 
 function planWave(wave: BattleWave, startTick: number, rng: RngState): PendingSpawn[] {
@@ -416,7 +423,7 @@ export function stepBattle(state: BattleState, actions: readonly BattleAction[],
     let due = 0;
     while (due < pending.length && pending[due]!.tick <= s.tick) {
       const def = unitDef(pending[due]!.def);
-      spawned.push({ id: nextUnitId++, def: def.id, pos: 0, hp: def.hp });
+      spawned.push({ id: nextUnitId++, def: def.id, pos: 0, hp: unitMaxHp(def.hp, s.setup) });
       due++;
     }
     if (due > 0) pending = pending.slice(due);

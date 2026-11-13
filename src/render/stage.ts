@@ -100,6 +100,8 @@ export interface Scene {
   /** Der Spieler wählt gerade einen Turm als Ziel. */
   readonly targeting: boolean;
   readonly shielded: boolean;
+  /** Faktor auf die Lebenspunkte der Angreifer dieser Schlacht (für die Lebensbalken). */
+  readonly unitHpPermille: number;
   /** Letzter Pfeilhagel: Ort in Milli-Kacheln und Alter in Ticks; `null`, wenn keiner zu zeigen ist. */
   readonly volley: { readonly x: number; readonly y: number; readonly age: number } | null;
   /** Kampfruf aktiv: Türme schießen doppelt so schnell. */
@@ -406,7 +408,8 @@ export function drawStage(canvas: HTMLCanvasElement, scene: Scene, data: GameDat
       ctx.arc(x, y, tile * 0.3, 0, Math.PI * 2);
       ctx.stroke();
     }
-    if (u.hp < def.hp) bar(ctx, x, y - tile * 0.36, tile * 0.5, u.hp / def.hp, COLORS.hp);
+    const maxHp = Math.max(1, Math.floor((def.hp * scene.unitHpPermille) / 1000));
+    if (u.hp < maxHp) bar(ctx, x, y - tile * 0.36, tile * 0.5, u.hp / maxHp, COLORS.hp);
   }
 
   // Effekte
@@ -558,7 +561,10 @@ function pointer(ctx: CanvasRenderingContext2D, cx: number, cy: number, tile: nu
 /** Breite eines Turms in Kacheln, je Art (die Bilder sind unterschiedlich schlank). */
 const TOWER_WIDTH: Readonly<Record<string, number>> = { bogenturm: 0.72, katapult: 0.95, pechnase: 0.82, wachstube: 0.86 };
 /** Einheiten ohne eigenes Bild leihen sich eines und werden in anderer Größe gezeichnet. */
-const UNIT_SPRITE: Readonly<Record<string, { sprite: string; scale: number }>> = { laeufer: { sprite: 'raeuber', scale: 0.8 } };
+/** Einheiten ohne eigenes Bild leihen sich eines und unterscheiden sich in der Größe. Ritter und Hauptmann sind PLATZHALTER, bis es Bilder gibt. */
+export const UNIT_SPRITE: Readonly<Record<string, { sprite: string; scale: number }>> = {
+  laeufer: { sprite: 'raeuber', scale: 0.8 }, ritter: { sprite: 'schildtraeger', scale: 1.25 }, hauptmann: { sprite: 'schildtraeger', scale: 1.8 },
+};
 /** Fahrzeuge werden breiter gezeichnet als Fußtruppen und rütteln statt zu hüpfen. */
 const VEHICLES = new Set(['ramme', 'sturmbock']);
 
@@ -865,6 +871,7 @@ function drawWithSprites(ctx: CanvasRenderingContext2D, scene: Scene, data: Game
     const hop = vehicle ? Math.sin(step * 2) * tile * 0.012 : Math.abs(Math.sin(step)) * tile * 0.07;
     const sprite = UNIT_SPRITE[u.def]?.sprite ?? u.def;
     const scale = UNIT_SPRITE[u.def]?.scale ?? 1;
+    const boss = scale > 1.5;
     const width = (vehicle ? tile * 0.78 : (tile * 0.62) / spriteAspect(sprite)) * scale;
     const height = width * spriteAspect(sprite);
     things.push({ y: y + 2, draw: () => {
@@ -893,7 +900,8 @@ function drawWithSprites(ctx: CanvasRenderingContext2D, scene: Scene, data: Game
         ctx.arc(x, y - height * 0.2, tile * 0.36, 0, Math.PI * 2);
         ctx.stroke();
       }
-      if (u.hp < def.hp) bar(ctx, x, y + tile * 0.26 - height - 7, tile * 0.5, u.hp / def.hp, COLORS.hp);
+      const maxHp = Math.max(1, Math.floor((def.hp * scene.unitHpPermille) / 1000));
+      if (u.hp < maxHp) bar(ctx, x, y + tile * 0.26 - height - 7, tile * (boss ? 0.9 : 0.5), u.hp / maxHp, COLORS.hp);
     });
   }
   for (const id of unitLook.keys()) if (!seen.has(id)) unitLook.delete(id);

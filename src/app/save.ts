@@ -54,6 +54,12 @@ export const migrations: Readonly<Record<number, Migration>> = {
   5: (old) => ({ ...old, version: 6, replays: (Array.isArray(old['replays']) ? (old['replays'] as Record<string, unknown>[]) : []).map((r) => ({ ...r, stars: 0 })) }),
   // 6 -> 7 (M7): Gebäude haben Ausbaustufen.
   6: (old) => ({ ...old, version: 7, buildings: (Array.isArray(old['buildings']) ? (old['buildings'] as Record<string, unknown>[]) : []).map((b) => ({ ...b, level: 1, upgradeDoneAt: null })) }),
+  // 7 -> 8 (M8): Zähler der berechneten Wellen. Wer schon weitergespielt hat, steigt bei den Wellen seiner Burgfried-Stufe ein.
+  7: (old, data) => {
+    const extra = Math.max(0, num(old['defensesWon'], 0) - data.tutorial.defenses.length);
+    const unlockedWaves = Math.max(0, num(old['keepLevel'], 1) - 1) * data.waves.scaling.wavesPerKeepLevel;
+    return { ...old, version: 8, wavesCleared: Math.min(extra, Math.max(0, unlockedWaves - 1)) };
+  },
 };
 
 function num(value: unknown, fallback: number): number {
