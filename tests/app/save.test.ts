@@ -34,7 +34,7 @@ describe('Speicherstand', () => {
       towers: [{ slot: 's1', def: 'bogenturm', level: 2 }, { slot: 's2', def: 'bogenturm', level: 1 }] };
     store.setItem(SAVE_KEY, JSON.stringify(m1));
     const loaded = loadGame(store, data)!;
-    expect(loaded.version).toBe(4);
+    expect(loaded.version).toBe(5);
     expect(loaded.resources).toEqual({ gold: 120, wood: 0, stone: 0 });
     expect(loaded.towers).toEqual(m1.towers);
     expect(loaded.defensesWon).toBe(3);
@@ -55,11 +55,12 @@ describe('Speicherstand', () => {
     };
     store.setItem(SAVE_KEY, JSON.stringify(m3));
     const loaded = loadGame(store, data)!;
-    expect(loaded.version).toBe(4);
+    expect(loaded.version).toBe(5);
     expect(loaded.resources).toEqual(m3.resources);
     expect(loaded.roadId).toBe('westschleife');
     expect(loaded.army.ready).toEqual(m3.army.ready);
     expect(loaded.buildings[0]).toMatchObject({ def: 'holzfaeller', helpRequestedAt: null, helpsReceived: 0 });
+    expect(loaded.raidsResolved).toBe(0);
     expect(loaded.shieldUntil).toBe(now + data.rules.newPlayerShieldHours * 3_600_000);
     expect(loaded.daily.counters).toEqual({ defenses: 0, attacks: 0, built: 0, trained: 0 });
     // Der Ablauf geht dort weiter, wo M3 endete: bei der Weltkarte.

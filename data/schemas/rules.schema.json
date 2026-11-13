@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Schlacht- und Beuteregeln. lootMaxPermille ist die feste Verlustgrenze: höchster Anteil der ungeschützten Vorräte. depthLootPermille: Anteil davon je Durchbruchstiefe 0 bis 3. Schild: newPlayerShieldHours für neue Spieler, defeatShieldHours nach einer Niederlage. Nachtangriff: frühestens nightRaidAfterHours nach der Ankündigung",
+  "title": "Schlacht- und Beuteregeln. lootMaxPermille ist die feste Verlustgrenze: höchster Anteil der ungeschützten Vorräte. depthLootPermille: Anteil davon je Durchbruchstiefe 0 bis 3. Schild: newPlayerShieldHours für neue Spieler, defeatShieldHours nach einer Niederlage. Nachtangriff: frühestens nightRaidAfterHours nach der Ankündigung. cityLossMinDepth: Die eigene Stadt verliert erst ab dieser Durchbruchstiefe Vorräte. freeNightRaids: So viele erste Nachtangriffe kosten nichts",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -19,7 +19,9 @@
     "newPlayerShieldHours",
     "defeatShieldHours",
     "nightRaidAfterHours",
-    "nightRaidWave"
+    "nightRaidWave",
+    "cityLossMinDepth",
+    "freeNightRaids"
   ],
   "properties": {
     "version": {
@@ -92,6 +94,15 @@
     "nightRaidWave": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "cityLossMinDepth": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 3
+    },
+    "freeNightRaids": {
+      "type": "integer",
+      "minimum": 0
     }
   }
 }

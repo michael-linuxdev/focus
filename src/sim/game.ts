@@ -16,7 +16,7 @@ import { makeReplay, runBattle, type Replay } from './replay.ts';
  * Schlachten werden nicht "gemeldet", sondern nachgerechnet: `ResolveDefense` und `ResolveAttack`
  * bekommen nur die Eingaben des Spielers; Startzustand und Startwert stammen aus dem Spielzustand.
  */
-export const STATE_VERSION = 4;
+export const STATE_VERSION = 5;
 
 export interface Building {
   readonly plot: string;
@@ -108,6 +108,8 @@ export interface GameState {
   readonly raidAcknowledged: boolean;
   /** Kennung der Wiederholung eines Nachtangriffs, den der Spieler noch nicht gesehen hat. */
   readonly raidReport: number | null;
+  /** Zahl der bisher berechneten Nachtangriffe. */
+  readonly raidsResolved: number;
 }
 
 export type Lineup = readonly (readonly UnitCount[])[];
@@ -180,6 +182,7 @@ export function createGame(seed: number, now: number, data: GameData): GameState
     raidDueAt: null,
     raidAcknowledged: false,
     raidReport: null,
+    raidsResolved: 0,
   };
 }
 
@@ -435,10 +438,12 @@ function count(state: GameState, counter: GoalCounter, n: number): GameState {
 }
 
 /** Verlust der Stadt nach einer Verteidigung: Beute der Angreifer innerhalb der Verlustgrenze, Schild nach einer Niederlage. */
-function cityLoss(state: GameState, final: BattleState, data: GameData): { resources: Resources; loot: Resources; shieldUntil: number } {
+function cityLoss(state: GameState, final: BattleState, data: GameData, free = false): { resources: Resources; loot: Resources; shieldUntil: number } {
   // Vorräte nach der Schlacht (Gold kann sich durch Kopfgeld und Turmbau geändert haben).
   const stock: Resources = { ...state.resources, gold: final.gold };
-  const loot = final.setup.unlosable ? NO_RESOURCES : computeLoot(stock, protectedStock(state, data), final.depth, data.rules);
+  // Kein Verlust bei unverlierbaren Wellen, bei kostenlosen Nachtangriffen und solange die Angreifer nicht tief genug kamen.
+  const spared = final.setup.unlosable || free || final.depth < data.rules.cityLossMinDepth;
+  const loot = spared ? NO_RESOURCES : computeLoot(stock, protectedStock(state, data), final.depth, data.rules);
   const shieldUntil = final.result === 'breached' ? Math.max(state.shieldUntil, state.now + data.rules.defeatShieldHours * HOUR_MS) : state.shieldUntil;
   return { resources: addResources(stock, loot, -1), loot, shieldUntil };
 }
@@ -583,9 +588,10 @@ function apply(state: GameState, action: GameAction, data: GameData): GameState 
       const setup = raidSetup(state, data);
       const final = runBattle(setup, state.nextSeed, [], data);
       if (final.result === 'running') return 'battle_not_finished';
-      const loss = cityLoss(state, final, data);
+      const loss = cityLoss(state, final, data, state.raidsResolved < data.rules.freeNightRaids);
       const s: GameState = {
         ...state,
+        raidsResolved: state.raidsResolved + 1,
         nextSeed: nextSeed(state.nextSeed),
         resources: loss.resources,
         shieldUntil: loss.shieldUntil,

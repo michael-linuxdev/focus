@@ -93,7 +93,8 @@ der Verteidiger baut Türme (`BuildTower`, `UpgradeTower`), der Angreifer löst 
 - **Beute (`computeLoot`):** je Rohstoff `ungeschützt = max(0, Vorrat - Grundstock)`, davon höchstens `lootMaxPermille`,
   davon der Anteil der Durchbruchstiefe. Jede Stufe schneidet ab. Das ist die Verlustgrenze, und sie gilt in beide Richtungen.
 - **Verlust der eigenen Stadt (`cityLoss`):** Nach jeder verlierbaren Verteidigung und nach dem Nachtangriff nehmen die
-  Angreifer `computeLoot(Vorräte nach der Schlacht, Grundstock der Speicher, Durchbruchstiefe)` mit. Bei `breached` gilt ein
+  Angreifer `computeLoot(Vorräte nach der Schlacht, Grundstock der Speicher, Durchbruchstiefe)` mit, aber erst ab
+  Durchbruchstiefe `cityLossMinDepth` (Marktplatz). Die ersten `freeNightRaids` Nachtangriffe kosten nichts (`raidsResolved` zählt mit). Bei `breached` gilt ein
   Schild bis `max(bisheriger Schild, jetzt + defeatShieldHours)`. Neue Spieler starten mit `newPlayerShieldHours`.
   Der Schild betrifft nur Nachbarstädte; Räuber greifen trotzdem an.
 - **Nachtangriff:** Mit dem Tutorial-Schritt `announcesRaid` wird `raidDueAt = jetzt + nightRaidAfterHours` gesetzt.
@@ -136,7 +137,7 @@ Die Oberfläche spielt sie über dieselbe `stepBattle`-Funktion ab und vergleich
   `doneAt`, `producedUntil`), `keepLevel`, `keepDoneAt`, `roadId`, `roadChoicePending`, `hero` (beigetreten, Abschnitt),
   `army` (`ready` je Einheit, `training`, `hospital[]`), `defensesWon`, `attacksDone`, `tutorialStep`, `replays[]`, `lastAttack`,
   `shieldUntil`, `worldSeen`, `allianceJoined`, `daily` (Tag, Zähler, abgeholte Ziele), `goalsClaimed`, `raidDueAt`,
-  `raidAcknowledged`, `raidReport`; Gebäude tragen zusätzlich `helpRequestedAt` und `helpsReceived`
+  `raidAcknowledged`, `raidReport`, `raidsResolved`; Gebäude tragen zusätzlich `helpRequestedAt` und `helpsReceived`
 - `BattleState`: `tick`, `rng`, `setup`, `releasedWaves`, `pending[]`, `units[]`, `towers[]`, `gold`, `keepHp`, `gateHp`,
   `depth`, `shieldUntil`, `abilityReadyAt[]`, `fallen[]`, `leaked`, `result`; Türme tragen `kills`, `militiaHp`,
   `militiaRespawnAt`, `militiaPos`

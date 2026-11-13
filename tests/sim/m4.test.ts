@@ -141,6 +141,40 @@ describe('Schild und Verluste der eigenen Stadt', () => {
     expect(g.shieldUntil).toBe(long);
   });
 
+  it('Vorräte gehen erst ab der eingestellten Durchbruchstiefe verloren (Marktplatz), ein genommenes Tor allein kostet nichts', () => {
+    expect(data.rules.cityLossMinDepth).toBe(2);
+    let g = grown();
+    g = act({ ...g, towers: [], shieldUntil: 0, resources: { gold: 1000, wood: 800, stone: 600 } }, at(g, 1));
+    // Dieselbe verlorene Schlacht (Tiefe 3), einmal mit der echten Schwelle, einmal mit einer unerreichbaren.
+    const real = reduceGame(g, { type: 'ResolveDefense', inputs: [] }, data).state;
+    const never = reduceGame(g, { type: 'ResolveDefense', inputs: [] }, { ...data, rules: { ...data.rules, cityLossMinDepth: 4 } }).state;
+    expect(real.resources.wood).toBeLessThan(g.resources.wood);
+    expect(never.resources.wood).toBe(g.resources.wood);
+    expect(never.replays[never.replays.length - 1]!.loot).toEqual({ gold: 0, wood: 0, stone: 0 });
+    // Schwelle genau auf der erreichten Tiefe: Verlust wie mit der echten Schwelle.
+    const exact = reduceGame(g, { type: 'ResolveDefense', inputs: [] }, { ...data, rules: { ...data.rules, cityLossMinDepth: 3 } }).state;
+    expect(exact.resources).toEqual(real.resources);
+  });
+
+  it('der erste Nachtangriff kostet nichts, der zweite nach der normalen Regel', () => {
+    let g = grown();
+    g = act({ ...g, towers: [], resources: { gold: 1000, wood: 800, stone: 600 } }, at(g, 5 * 3600));
+    const before = g.resources;
+    g = act(g, { type: 'ResolveNightRaid' });
+    const first = g.replays[g.replays.length - 1]!;
+    expect(first.result).toBe('breached');
+    expect(first.loot).toEqual({ gold: 0, wood: 0, stone: 0 });
+    expect(g.resources.wood).toBe(before.wood);
+    expect(g.resources.gold).toBeGreaterThanOrEqual(before.gold);
+    expect(g.raidsResolved).toBe(1);
+    // Der Schild nach der Niederlage gilt trotzdem.
+    expect(g.shieldUntil).toBeGreaterThan(g.now);
+    g = act(g, { type: 'DismissRaidReport' }, at(g, 5 * 3600), { type: 'ResolveNightRaid' });
+    const second = g.replays[g.replays.length - 1]!;
+    expect(second.loot.wood).toBeGreaterThan(0);
+    expect(g.raidsResolved).toBe(2);
+  });
+
   it('wird die Welle schon am Tor gestoppt, geht nichts verloren', () => {
     const g = grown();
     const s = runBattle({ ...defenseSetup(g, data), waves: [{ groups: [{ unit: 'raeuber', count: 1, startTick: 0, intervalTicks: 0, jitterTicks: 0 }] }] }, 1, [], data);
@@ -154,7 +188,7 @@ describe('Schild und Verluste der eigenen Stadt', () => {
     for (let i = 0; i < 40; i++) {
       const towers = base.towers.filter(() => rngInt(rng, 2) === 0);
       const resources = { gold: rngInt(rng, 5000), wood: rngInt(rng, 5000), stone: rngInt(rng, 5000) };
-      let g: GameState = { ...base, towers, resources, nextSeed: rngInt(rng, 1 << 30) };
+      let g: GameState = { ...base, towers, resources, nextSeed: rngInt(rng, 1 << 30), raidsResolved: i % 3 };
       g = act(g, at(g, 5 * 3600));
       const prot = protectedStock(g, data);
       const before = g.resources;

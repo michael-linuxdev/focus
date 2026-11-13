@@ -164,6 +164,10 @@ export interface RulesData {
   readonly defeatShieldHours: number;
   readonly nightRaidAfterHours: number;
   readonly nightRaidWave: string;
+  /** Die eigene Stadt verliert erst ab dieser Durchbruchstiefe Vorräte. */
+  readonly cityLossMinDepth: number;
+  /** So viele erste Nachtangriffe kosten den Spieler nichts. */
+  readonly freeNightRaids: number;
 }
 
 export interface CityTowerRef {

@@ -48,6 +48,8 @@ export const migrations: Readonly<Record<number, Migration>> = {
       raidReport: null,
     };
   },
+  // 4 -> 5: Zähler der Nachtangriffe (der erste kostet nichts). Wer schon einen Bericht gesehen hat, hatte seinen ersten.
+  4: (old) => ({ ...old, version: 5, raidsResolved: Array.isArray(old['replays']) && old['replays'].some((r) => (r as Record<string, unknown>)['kind'] === 'raid') ? 1 : 0 }),
 };
 
 function num(value: unknown, fallback: number): number {

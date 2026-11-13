@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "preliminary": true,
   "gateMilli": 1000,
   "marketPermille": 500,
@@ -19,5 +19,7 @@
   "newPlayerShieldHours": 72,
   "defeatShieldHours": 8,
   "nightRaidAfterHours": 4,
-  "nightRaidWave": "nacht"
+  "nightRaidWave": "nacht",
+  "cityLossMinDepth": 2,
+  "freeNightRaids": 1
 }
