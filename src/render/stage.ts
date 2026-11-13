@@ -471,6 +471,24 @@ function cost(ctx: CanvasRenderingContext2D, cx: number, cy: number, tile: numbe
   ctx.fillText(text, cx + tile * 0.1, cy + 1);
 }
 
+/** Preis auf einem dunklen Schild mit Münze; rot gedämpft, wenn das Gold nicht reicht. */
+function priceTag(ctx: CanvasRenderingContext2D, cx: number, cy: number, tile: number, text: string, affordable: boolean): void {
+  ctx.font = `700 ${Math.round(tile * 0.3)}px system-ui, sans-serif`;
+  const textW = ctx.measureText(text).width;
+  const w = textW + tile * 0.42;
+  const h = tile * 0.38;
+  ctx.fillStyle = 'rgba(20, 16, 12, 0.82)';
+  ctx.beginPath();
+  ctx.roundRect(cx - w / 2, cy - h / 2, w, h, h / 2);
+  ctx.fill();
+  ctx.fillStyle = COLORS.gold;
+  ctx.beginPath();
+  ctx.arc(cx - w / 2 + tile * 0.17, cy, tile * 0.1, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = affordable ? '#fff4c8' : '#c98a80';
+  ctx.fillText(text, cx + tile * 0.1, cy + 1);
+}
+
 /** Hinweis: pulsierender Ring und tippender Finger. */
 function pointer(ctx: CanvasRenderingContext2D, cx: number, cy: number, tile: number, timeMs: number): void {
   const phase = (timeMs % 1000) / 1000;
@@ -649,10 +667,29 @@ function drawWithSprites(ctx: CanvasRenderingContext2D, scene: Scene, data: Game
       if (scene.buildGold === null || slot.keepLevel > scene.keepLevel) continue;
       const dim = scene.buildGold < scene.cheapestTower || (scene.hint !== null && !hinted);
       const price = String(hinted && scene.hint?.cost ? scene.hint.cost : scene.cheapestTower);
+      const affordable = scene.buildGold >= scene.cheapestTower;
       things.push({ y: cy - tile, draw: () => {
-        ctx.globalAlpha = dim ? 0.6 : 1;
-        drawSprite(ctx, 'turmplatz', cx, cy + tile * 0.36, tile * 1.02);
-        cost(ctx, cx, cy + tile * 0.02, tile, price);
+        // Leerer Turmplatz: heller Schein und gestrichelte Raute, damit er sich vom Boden abhebt;
+        // bezahlbare Plätze pulsieren leicht, der Preis steht auf einem dunklen Schild.
+        const pulse = affordable && !dim ? 0.5 + 0.5 * Math.sin(timeMs / 350 + slot.x) : 0;
+        ctx.globalAlpha = dim ? 0.75 : 1;
+        ctx.fillStyle = `rgba(255, 244, 200, ${0.1 + pulse * 0.12})`;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy + tile * 0.08, tile * 0.56, tile * 0.34, 0, 0, Math.PI * 2);
+        ctx.fill();
+        drawSprite(ctx, 'turmplatz', cx, cy + tile * 0.4, tile * 1.08);
+        ctx.setLineDash([tile * 0.1, tile * 0.07]);
+        ctx.strokeStyle = affordable ? `rgba(255, 244, 200, ${0.65 + pulse * 0.35})` : 'rgba(255, 244, 200, 0.35)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - tile * 0.28);
+        ctx.lineTo(cx + tile * 0.6, cy + tile * 0.08);
+        ctx.lineTo(cx, cy + tile * 0.44);
+        ctx.lineTo(cx - tile * 0.6, cy + tile * 0.08);
+        ctx.closePath();
+        ctx.stroke();
+        ctx.setLineDash([]);
+        priceTag(ctx, cx, cy + tile * 0.06, tile, price, affordable);
         ctx.globalAlpha = 1;
       } });
       continue;
