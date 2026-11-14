@@ -1,6 +1,6 @@
 # Mittelalter-Königreich (Arbeitstitel)
 
-PWA-Prototyp der ersten 30 Spielminuten. Regeln, Befehle und Arbeitsweise stehen in [CLAUDE.md](CLAUDE.md),
+PWA-Prototyp des ersten Spielmonats. Regeln, Befehle und Arbeitsweise stehen in [CLAUDE.md](CLAUDE.md),
 der spätere Umzug nach Unity in [docs/PORTING.md](docs/PORTING.md).
 
 ```

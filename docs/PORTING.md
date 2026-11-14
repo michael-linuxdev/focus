@@ -154,6 +154,47 @@ der Verteidiger baut Türme (`BuildTower`, `UpgradeTower`), der Angreifer löst 
   fällt. Für den Nachtangriff gilt weiter die Durchbruchstiefe ab `cityLossMinDepth`. Die Verlustgrenze selbst ist unverändert.
 - `dataVersion` enthält jetzt auch die Version von `waves.json`.
 
+## Tagesrhythmus (M9)
+
+- **Tagesziele** (`goals.json`): Die ersten `dailyFixed` Ziele gelten jeden Tag, dazu `dailyRotating` aus dem Rest:
+  `rest[(Tagesnummer + k) % Anzahl]`. `activeGoals` liefert die Liste; ein anderes Ziel abzuholen ergibt `goal_not_active`.
+  Zähler: `defenses`, `attacks`, `built`, `trained`, `stars` (Sterne aus Verteidigungen), `towers` (jeder Bau und jeder Ausbau, in der
+  Stadt wie in der Schlacht).
+- **Wochenziel:** `weekly[Wochennummer % Anzahl]`, Woche = Tagesnummer / 7. Eigene Zähler in `GameState.weekly`, die mit denselben
+  Ereignissen hochzählen und nur beim Wochenwechsel zurückgesetzt werden. Aktion `ClaimWeeklyGoal`.
+- **Rückkehr:** `ClaimLoginReward` einmal je Tag; die Belohnung ist `login[bisherige Abholungen % Anzahl]`. Ein verpasster Tag
+  setzt nichts zurück.
+- **Belohnungen wachsen mit:** Jede Belohnung wird mit `rewardPermilleByKeepLevel[Burgfried - 1]` multipliziert (`scaledReward`).
+- Tag und Woche zählen in UTC ab Epoche; ein Server sollte die Zeitzone des Spielers oder eine feste Umschaltzeit wählen.
+
+## Welt (M10, Attrappe)
+
+- **Ringe.** Jedes Ziel in `camps.json` trägt `ring`: angreifbar ab dieser Burgfried-Stufe des Spielers, sonst `target_locked`.
+  Ringe 3 bis 8 haben je ein Räuberlager und eine Stadt mit fester Verteidigung. Die Oberfläche zeigt die Ringe Burgfried - 1 bis + 1.
+- **Beute wächst nach.** `GameState.campRaids` merkt je Ziel den letzten Angriff. `campStockPermille` = verstrichene Zeit geteilt durch
+  `campRegenHours`, höchstens 1000; die Beute nach `computeLoot` wird damit multipliziert (abschneidend). Der erste Angriff trifft volle Vorräte.
+- **Heer.** Die Kaserne hat Stufen mit `armyCap` und `troopHpPermille`. Ausgebildet wird nur, solange bereit + in Ausbildung + im Lazarett
+  die Grenze nicht übersteigt (`army_full`); das Gefolge der Heldin darf darüber liegen. Im Angriff gilt `unitHpPermille` der Kaserne
+  für die eigenen Truppen (auf Stufe 1 nicht gesetzt).
+- **Städte schlagen zurück.** Ein Angriff auf ein Ziel der Art `city` beendet den eigenen Schild sofort und setzt `revenge`
+  (`camp`, `dueAt` = jetzt + `revengeAfterHours`; ein schon angekündigter bleibt). `ResolveRevenge` gilt, sobald `dueAt` erreicht ist
+  und kein Schild mehr läuft: dieselbe Schlacht wie der Nachtangriff, ohne Eingaben, Verlust nach Tiefe, nie kostenlos. Die
+  Wiederholung trägt `from`. Der Anfängerschutz (`beginnerUntil`) fällt dabei nicht: `shieldUntil = min(shieldUntil, max(jetzt, beginnerUntil))`. Mit echten Spielern ersetzt das der Angriff des Nachbarn; die Regeln zu Schild und Verlust bleiben.
+
+## Monatsbogen (M11)
+
+- **Chronik** (`chronicle.json`): Kapitel in fester Reihenfolge. `GameState.chapter` zählt die abgeschlossenen; `chapterProgress`
+  misst das offene Kapitel (Burgfried-Stufe, geschlagene berechnete Wellen, Zahl eroberter Städte, Gebäudestufe, eine bestimmte
+  Stadt). `ClaimChapter` gilt, wenn das Ziel erreicht ist, und gibt die Belohnung (mit `scaledReward`). Mit dem letzten Kapitel wird
+  `crownedAt` gesetzt. Schon erreichte Ziele zählen sofort, abgeholt wird trotzdem der Reihe nach.
+- **Eroberungen:** `campsTaken` merkt jedes Ziel, das einmal bis zum Burgfried genommen wurde (Tiefe 3).
+- **Kennzahlen des Monats** (`summarize`, `aggregate`): letzter aktiver Tag, „noch dabei an Tag 7 / Tag 30“ (an diesem Tag oder
+  später geöffnet; Quote nur über Exporte, die alt genug sind), höchste Burgfried-Stufe, höchste geschlagene Welle, Kapitel,
+  Tag der Krönung, Testberichte, Programmfehler. Neue Ereignisse: `keep_level`, `chapter_claimed`, `crowned`; `battle_end` trägt
+  bei Verteidigungen `wave`, `repeat`, `boss`, bei Angriffen `target`.
+- **Abgleich:** `npm run month` spielt beide Spielertypen mit allen Systemen (Bau, Wellen, Ziele, Angriffe, Chronik);
+  `tests/sim/month.test.ts` hält den Rahmen fest, darunter den Tag der Krönung.
+
 ## Wiederholungsformat
 
 ```json
@@ -174,7 +215,7 @@ die eine Schlacht beeinflussen (game, roads, city, units, towers, hero, rules). 
 und alte Wiederholungen gelten nur gegen den alten Datenstand. Der Spielzustand bewahrt die letzten `maxReplays` Schlachten auf.
 Die Oberfläche spielt sie über dieselbe `stepBattle`-Funktion ab und vergleicht am Ende Tick und Prüfsumme.
 
-## Zustandsmodell (Stand M7)
+## Zustandsmodell (Stand M11)
 
 - `GameState`: `version`, `now`, `nextSeed`, `resources` (Gold, Holz, Stein), `towers[]`, `buildings[]` (Bauplatz, Gebäude,
   `doneAt`, `producedUntil`), `keepLevel`, `keepDoneAt`, `roadId`, `roadChoicePending`, `hero` (beigetreten, Abschnitt),
@@ -186,7 +227,7 @@ Die Oberfläche spielt sie über dieselbe `stepBattle`-Funktion ab und vergleich
   `militiaRespawnAt`, `militiaPos`
 - `army.ready` ist eine Zuordnung Einheit → Anzahl. Gelesen wird sie immer in der Reihenfolge von `data/troops.json`.
 
-## Aktionen (Stand M7)
+## Aktionen (Stand M11)
 
 | Aktion | Ebene | Prüfung |
 | --- | --- | --- |
@@ -200,6 +241,9 @@ Die Oberfläche spielt sie über dieselbe `stepBattle`-Funktion ab und vergleich
 | `AssignHero { section }` | Spiel | Heldin beigetreten, Abschnitt bekannt |
 | `TrainTroops { unit, count }` | Spiel | Kaserne fertig, keine Ausbildung läuft, Vorräte reichen |
 | `ResolveDefense { inputs }` | Spiel | Rechnet die Verteidigung aus eigenem Startzustand, eigenem Startwert und den Eingaben nach; lehnt unfertige Schlachten ab |
+| `ClaimChapter` | Spiel | offenes Kapitel der Chronik, Ziel erreicht |
+| `ResolveRevenge` | Spiel | Gegenangriff angekündigt und fällig, kein Schild mehr |
+| `ClaimWeeklyGoal` / `ClaimLoginReward` | Spiel | Wochenziel erreicht und noch nicht abgeholt / heute noch keine Belohnung für die Rückkehr |
 | `ResolveAttack { camp, lineup, inputs }` | Spiel | Aufstellung hat die richtige Wellenzahl, nur eigene bereite Truppen, mindestens eine Einheit, Ziel nicht unter Schild; dann wie oben nachgerechnet. Beute und Lazarett stammen aus dem Ergebnis |
 | `ResolveNightRaid` | Spiel | Angriff angekündigt und fällig; rechnet ohne Eingaben |
 | `DismissRaidReport`, `AcknowledgeRaid`, `OpenWorldMap` | Spiel | nur Merker für Oberfläche und Tutorial |

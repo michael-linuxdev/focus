@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "preliminary": true,
   "start": {
     "resources": {
@@ -244,9 +244,9 @@
     {
       "level": 6,
       "cost": {
-        "gold": 70000,
-        "wood": 210000,
-        "stone": 210000
+        "gold": 90000,
+        "wood": 260000,
+        "stone": 260000
       },
       "buildSeconds": 36000,
       "roads": [
@@ -266,9 +266,9 @@
     {
       "level": 7,
       "cost": {
-        "gold": 120000,
-        "wood": 290000,
-        "stone": 290000
+        "gold": 160000,
+        "wood": 420000,
+        "stone": 420000
       },
       "buildSeconds": 72000,
       "roads": [
@@ -288,9 +288,9 @@
     {
       "level": 8,
       "cost": {
-        "gold": 200000,
-        "wood": 400000,
-        "stone": 400000
+        "gold": 260000,
+        "wood": 620000,
+        "stone": 620000
       },
       "buildSeconds": 129600,
       "roads": [

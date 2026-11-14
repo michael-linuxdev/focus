@@ -62,7 +62,7 @@ describe('Speicherstand', () => {
     expect(loaded.buildings[0]).toMatchObject({ def: 'holzfaeller', helpRequestedAt: null, helpsReceived: 0, level: 1, upgradeDoneAt: null });
     expect(loaded.raidsResolved).toBe(0);
     expect(loaded.shieldUntil).toBe(now + data.rules.newPlayerShieldHours * 3_600_000);
-    expect(loaded.daily.counters).toEqual({ defenses: 0, attacks: 0, built: 0, trained: 0 });
+    expect(loaded.daily.counters).toEqual({ defenses: 0, attacks: 0, built: 0, trained: 0, stars: 0, towers: 0 });
     // Der Ablauf geht dort weiter, wo M3 endete: bei der Weltkarte.
     expect(data.tutorial.steps[loaded.tutorialStep]!.id).toBe('weltkarte');
   });

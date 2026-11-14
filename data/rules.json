@@ -1,5 +1,5 @@
 {
-  "version": 6,
+  "version": 7,
   "preliminary": true,
   "gateMilli": 1000,
   "marketPermille": 500,
@@ -33,5 +33,7 @@
     10,
     25
   ],
-  "defenseLossOnlyWhenBreached": true
+  "defenseLossOnlyWhenBreached": true,
+  "campRegenHours": 24,
+  "revengeAfterHours": 6
 }

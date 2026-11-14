@@ -78,6 +78,10 @@ export interface BuildingLevelDef {
   readonly healTimePermille: number;
   /** Nötige Burgfried-Stufe. */
   readonly keepLevel: number;
+  /** Kaserne: größtes Heer (bereit, in Ausbildung und im Lazarett zusammen); sonst 0. */
+  readonly armyCap: number;
+  /** Kaserne: Faktor auf die Lebenspunkte der eigenen Truppen im Angriff; sonst 1000. */
+  readonly troopHpPermille: number;
 }
 
 export interface BuildingDef {
@@ -189,6 +193,10 @@ export interface RulesData {
   readonly cityLossMinDepth: number;
   /** Eine vom Spieler gestartete Verteidigung kostet nur Vorräte, wenn der Burgfried fällt (Nachtangriffe weiter nach Tiefe). */
   readonly defenseLossOnlyWhenBreached: boolean;
+  /** Nach einem Angriff wachsen die Vorräte eines Ziels über diese Zeit wieder auf den vollen Stand. */
+  readonly campRegenHours: number;
+  /** So lange nach einem Angriff auf eine Stadt kommt ihr Gegenangriff (frühestens, wenn kein Schild mehr schützt). */
+  readonly revengeAfterHours: number;
   /** So viele erste Nachtangriffe kosten den Spieler nichts. */
   readonly freeNightRaids: number;
 }
@@ -204,6 +212,8 @@ export interface CampDef {
   readonly kind: 'camp' | 'city';
   /** Durch einen Schild geschützt: nicht angreifbar. */
   readonly shielded: boolean;
+  /** Ab dieser Burgfried-Stufe des Spielers angreifbar. */
+  readonly ring: number;
   readonly map: { readonly x: number; readonly y: number };
   readonly roadId: string;
   readonly keepLevel: number;
@@ -328,12 +338,28 @@ export interface AllianceData {
   readonly maxHelps: number;
 }
 
-export type GoalCounter = 'defenses' | 'attacks' | 'built' | 'trained';
+export type GoalCounter = 'defenses' | 'attacks' | 'built' | 'trained' | 'stars' | 'towers';
 
 export interface GoalDef {
   readonly id: string;
   readonly counter: GoalCounter;
   readonly count: number;
+  readonly reward: Resources;
+}
+
+/** Ziel eines Kapitels der Chronik. */
+export type ChapterGoalDef =
+  | { readonly type: 'keepLevel'; readonly level: number }
+  /** So viele berechnete Wellen geschlagen. */
+  | { readonly type: 'wavesCleared'; readonly count: number }
+  /** So viele verschiedene Städte bis zum Burgfried erobert. */
+  | { readonly type: 'citiesTaken'; readonly count: number }
+  | { readonly type: 'buildingLevel'; readonly building: string; readonly level: number }
+  | { readonly type: 'cityTaken'; readonly city: string };
+
+export interface ChapterDef {
+  readonly id: string;
+  readonly goal: ChapterGoalDef;
   readonly reward: Resources;
 }
 
@@ -351,7 +377,21 @@ export interface GameData {
   readonly waves: { readonly version: number; readonly waves: readonly WaveDef[]; readonly scaling: WaveScalingDef };
   readonly tutorial: TutorialData;
   readonly alliance: AllianceData;
-  readonly goals: { readonly version: number; readonly goals: readonly GoalDef[] };
+  /** Chronik des ersten Spielmonats: Kapitel in fester Reihenfolge, das letzte ist die Krönung. */
+  readonly chronicle: { readonly version: number; readonly chapters: readonly ChapterDef[] };
+  readonly goals: {
+    readonly version: number;
+    /** Tagesziele: die ersten `dailyFixed` gelten jeden Tag, dazu `dailyRotating` aus dem Rest, reihum nach Tagesnummer. */
+    readonly goals: readonly GoalDef[];
+    readonly dailyFixed: number;
+    readonly dailyRotating: number;
+    /** Faktor auf alle Belohnungen (Ziele und Rückkehr) je Burgfried-Stufe; Stufe n an Stelle n - 1. */
+    readonly rewardPermilleByKeepLevel: readonly number[];
+    /** Ein Wochenziel je Woche, reihum nach Wochennummer. */
+    readonly weekly: readonly GoalDef[];
+    /** Belohnung für die Rückkehr: einmal je Tag, reihum. */
+    readonly login: readonly Resources[];
+  };
 }
 
 /** Kennung des Datenstands für Schlachten; steht in jeder Wiederholung. */

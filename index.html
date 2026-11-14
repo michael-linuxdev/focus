@@ -50,6 +50,9 @@
                        user-select: text; -webkit-user-select: text; resize: vertical; }
       .corner { pointer-events: auto; position: absolute; right: 10px; top: calc(env(safe-area-inset-top) + 44px); min-height: 44px; min-width: 44px; border: 0; border-radius: 22px; background: rgba(26,36,28,0.85);
                 color: #f1ead6; font: 600 13px system-ui, sans-serif; padding: 0 14px; }
+      .goal-line { pointer-events: auto; position: absolute; left: 10px; max-width: 40%; min-height: 44px; border: 0; border-radius: 14px; background: rgba(26,36,28,0.85);
+                   color: #f1ead6; font: 600 12px system-ui, sans-serif; padding: 4px 12px; text-align: left; line-height: 1.25; }
+      .goal-line.pulse { background: #d9a441; color: #1d2a1f; }
       @keyframes pulse { 0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,255,255,0.7); } 50% { transform: scale(1.03); box-shadow: 0 0 0 10px rgba(255,255,255,0); } }
       .pulse { animation: pulse 1s infinite; }
       @keyframes pop { 0% { transform: scale(0.6); opacity: 0; } 20% { transform: scale(1.1); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }

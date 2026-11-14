@@ -1,0 +1,163 @@
+{
+  "version": 1,
+  "preliminary": true,
+  "chapters": [
+    {
+      "id": "mauern",
+      "goal": {
+        "type": "keepLevel",
+        "level": 3
+      },
+      "reward": {
+        "gold": 100,
+        "wood": 100,
+        "stone": 100
+      }
+    },
+    {
+      "id": "hauptmann",
+      "goal": {
+        "type": "wavesCleared",
+        "count": 6
+      },
+      "reward": {
+        "gold": 150,
+        "wood": 60,
+        "stone": 60
+      }
+    },
+    {
+      "id": "festung",
+      "goal": {
+        "type": "keepLevel",
+        "level": 4
+      },
+      "reward": {
+        "gold": 100,
+        "wood": 150,
+        "stone": 150
+      }
+    },
+    {
+      "id": "eroberung",
+      "goal": {
+        "type": "citiesTaken",
+        "count": 1
+      },
+      "reward": {
+        "gold": 200,
+        "wood": 100,
+        "stone": 100
+      }
+    },
+    {
+      "id": "heer",
+      "goal": {
+        "type": "buildingLevel",
+        "building": "kaserne",
+        "level": 4
+      },
+      "reward": {
+        "gold": 150,
+        "wood": 150,
+        "stone": 150
+      }
+    },
+    {
+      "id": "bollwerk",
+      "goal": {
+        "type": "keepLevel",
+        "level": 5
+      },
+      "reward": {
+        "gold": 150,
+        "wood": 200,
+        "stone": 200
+      }
+    },
+    {
+      "id": "ritterschlag",
+      "goal": {
+        "type": "wavesCleared",
+        "count": 24
+      },
+      "reward": {
+        "gold": 250,
+        "wood": 100,
+        "stone": 100
+      }
+    },
+    {
+      "id": "herzogtum",
+      "goal": {
+        "type": "keepLevel",
+        "level": 6
+      },
+      "reward": {
+        "gold": 200,
+        "wood": 250,
+        "stone": 250
+      }
+    },
+    {
+      "id": "feldzug",
+      "goal": {
+        "type": "citiesTaken",
+        "count": 2
+      },
+      "reward": {
+        "gold": 300,
+        "wood": 150,
+        "stone": 150
+      }
+    },
+    {
+      "id": "grenzmark",
+      "goal": {
+        "type": "keepLevel",
+        "level": 7
+      },
+      "reward": {
+        "gold": 250,
+        "wood": 300,
+        "stone": 300
+      }
+    },
+    {
+      "id": "koenigsburg",
+      "goal": {
+        "type": "keepLevel",
+        "level": 8
+      },
+      "reward": {
+        "gold": 300,
+        "wood": 350,
+        "stone": 350
+      }
+    },
+    {
+      "id": "letzter_hauptmann",
+      "goal": {
+        "type": "wavesCleared",
+        "count": 42
+      },
+      "reward": {
+        "gold": 400,
+        "wood": 200,
+        "stone": 200
+      }
+    },
+    {
+      "id": "krone",
+      "goal": {
+        "type": "cityTaken",
+        "city": "grauwacht"
+      },
+      "reward": {
+        "gold": 600,
+        "wood": 600,
+        "stone": 600
+      }
+    }
+  ]
+}

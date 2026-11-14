@@ -1,5 +1,5 @@
 import {
-  attackSetup, cityHint, createBattle, defaultLineup, defenseSetup, reduceGame, roadPointMilli, stepBattle, tutorialStep, validateBattleAction,
+  activeGoals, attackSetup, cityHint, createBattle, defaultLineup, defenseSetup, reduceGame, roadPointMilli, stepBattle, tutorialStep, validateBattleAction,
   type BattleAction, type BattleInput, type BattleSetup, type BattleState, type GameAction, type GameData, type GameState,
 } from '../../src/sim/index.ts';
 
@@ -155,7 +155,7 @@ export function playTutorial(start: GameState, data: GameData, untilStep: string
       else if (hint.button === 'attack') attack();
       else if (hint.button === 'world') act({ type: 'OpenWorldMap' });
       else if (hint.button === 'alliance') act({ type: 'JoinAlliance' });
-      else if (!data.goals.goals.some((g) => act({ type: 'ClaimDailyGoal', goal: g.id }))) defend();
+      else if (!activeGoals(game, data).some((g) => act({ type: 'ClaimDailyGoal', goal: g.id }))) defend();
     } else if (hint.type === 'slot') {
       const occupied = game.towers.some((t) => t.slot === hint.slot);
       // Fehlt das Gold für den Turm, verdient der Bot es mit einer Verteidigung.

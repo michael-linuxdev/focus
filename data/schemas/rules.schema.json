@@ -24,7 +24,9 @@
     "freeNightRaids",
     "volley",
     "starGold",
-    "defenseLossOnlyWhenBreached"
+    "defenseLossOnlyWhenBreached",
+    "campRegenHours",
+    "revengeAfterHours"
   ],
   "properties": {
     "version": {
@@ -141,6 +143,14 @@
     },
     "defenseLossOnlyWhenBreached": {
       "type": "boolean"
+    },
+    "campRegenHours": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "revengeAfterHours": {
+      "type": "integer",
+      "minimum": 1
     }
   }
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  createBattle, createGame, defenseSetup, killedCount, militiaPosition, protectedStock, raidSetup, reduceGame, rngFromSeed, rngInt, runBattle, stepBattle, verifyReplay, weakSection,
+  activeGoals, scaledReward, createBattle, createGame, defenseSetup, killedCount, militiaPosition, protectedStock, raidSetup, reduceGame, rngFromSeed, rngInt, runBattle, stepBattle, verifyReplay, weakSection,
   type BattleSetup, type GameAction, type GameState,
 } from '../../src/sim/index.ts';
 import { playTutorial } from './bot.ts';
@@ -286,13 +286,13 @@ describe('Weltkarte, Allianz (Platzhalter) und Tagesziele', () => {
     expect(err(g, { type: 'ClaimDailyGoal', goal: 'faulenzen' })).toBe('unknown_goal');
     expect(g.daily.counters.attacks).toBe(1);
     const gold = g.resources.gold;
-    const open = data.goals.goals.find((goal) => !g.daily.claimed.includes(goal.id) && g.daily.counters[goal.counter] >= goal.count)!;
+    const open = activeGoals(g, data).find((goal) => !g.daily.claimed.includes(goal.id) && g.daily.counters[goal.counter] >= goal.count)!;
     g = act(g, { type: 'ClaimDailyGoal', goal: open.id });
-    expect(g.resources.gold).toBe(gold + open.reward.gold);
+    expect(g.resources.gold).toBe(gold + scaledReward(open.reward, g, data).gold);
     expect(err(g, { type: 'ClaimDailyGoal', goal: open.id })).toBe('goal_already_claimed');
     g = act(g, at(g, 24 * 3600));
     expect(g.daily.claimed).toEqual([]);
-    expect(g.daily.counters).toEqual({ defenses: 0, attacks: 0, built: 0, trained: 0 });
-    expect(err(g, { type: 'ClaimDailyGoal', goal: open.id })).toBe('goal_not_reached');
+    expect(g.daily.counters).toEqual({ defenses: 0, attacks: 0, built: 0, trained: 0, stars: 0, towers: 0 });
+    expect(['goal_not_reached', 'goal_not_active']).toContain(err(g, { type: 'ClaimDailyGoal', goal: open.id }));
   });
 });

@@ -3,7 +3,8 @@ import {
   type BattleTower, type Building, type CityTower, type GameData, type RoadDef, type Unit,
 } from '../sim/index.ts';
 
-import { drawSprite, groundPattern, setPixelRatio, spriteAspect, spritesReady } from './sprites.ts';
+import { FORECOURT, shownPoint, unitPlaces } from './forecourt.ts';
+import { drawSprite, groundPattern, setPixelRatio, spriteAspect, spritesReady, levelSprite, unitSprite } from './sprites.ts';
 
 /**
  * Darstellung des Spielfelds. Liest den Zustand, ändert ihn nie.
@@ -23,16 +24,19 @@ const COLORS = {
 const TOP = 56;
 
 export interface Layout {
+  /** Kachelreihen des Vorfelds oberhalb des Spielfelds (nur in Schlachten, sonst 0). */
+  readonly forecourt: number;
   readonly tile: number;
   readonly ox: number;
   readonly oy: number;
 }
 
-export function computeLayout(width: number, height: number, bottom: number, data: GameData): Layout {
+export function computeLayout(width: number, height: number, bottom: number, data: GameData, forecourt = 0): Layout {
   const { cols, rows } = data.roads.grid;
-  const tile = Math.min(width / cols, (height - TOP - bottom) / rows);
-  return { tile, ox: (width - tile * cols) / 2, oy: TOP + (height - TOP - bottom - tile * rows) / 2 };
+  const tile = Math.min(width / cols, (height - TOP - bottom) / (rows + forecourt));
+  return { forecourt, tile, ox: (width - tile * cols) / 2, oy: TOP + (height - TOP - bottom - tile * (rows + forecourt)) / 2 + tile * forecourt };
 }
+
 
 /** Mitte einer Kachel in CSS-Pixeln relativ zum Canvas. */
 export function tileCenter(layout: Layout, x: number, y: number): { x: number; y: number } {
@@ -123,7 +127,8 @@ export function drawStage(canvas: HTMLCanvasElement, scene: Scene, data: GameDat
     canvas.width = Math.round(w * dpr);
     canvas.height = Math.round(h * dpr);
   }
-  const layout = computeLayout(w, h, scene.bottomInset, data);
+  // Das Vorfeld gibt es nur in Schlachten; die Stadtansicht behält die volle Kartengröße.
+  const layout = computeLayout(w, h, scene.bottomInset, data, scene.tick >= 0 ? FORECOURT : 0);
   const ctx = canvas.getContext('2d');
   if (!ctx) return layout;
   const { cols, rows } = data.roads.grid;
@@ -131,6 +136,9 @@ export function drawStage(canvas: HTMLCanvasElement, scene: Scene, data: GameDat
   const px = (milli: number): number => (milli / MILLI + 0.5) * tile;
   const road = findById(data.roads.roads, scene.roadId, 'Straße');
   const length = roadLengthMilli(road);
+  const gateShut = scene.gate !== null && scene.gate.hp > 0;
+  const places = unitPlaces(scene.units, road, gateShut, data);
+  const shot = (tw: { readonly targetX?: number | undefined; readonly targetY?: number | undefined }): readonly [number, number] => shownPoint(tw.targetX ?? 0, tw.targetY ?? 0, road, gateShut, data);
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   const groundEl = document.getElementById('ground') as HTMLCanvasElement | null;
@@ -147,7 +155,9 @@ export function drawStage(canvas: HTMLCanvasElement, scene: Scene, data: GameDat
   ctx.fillRect(0, 0, w, h);
   ctx.translate(layout.ox, layout.oy);
   ctx.fillStyle = scene.enemyCity ? '#3a3528' : COLORS.ground;
-  ctx.fillRect(0, 0, tile * cols, tile * rows);
+  ctx.fillRect(0, -tile * layout.forecourt, tile * cols, tile * (rows + layout.forecourt));
+  ctx.fillStyle = 'rgba(0,0,0,0.2)';
+  ctx.fillRect(0, -tile * layout.forecourt, tile * cols, tile * layout.forecourt);
   ctx.strokeStyle = scene.enemyCity ? '#443e2f' : COLORS.grid;
   ctx.lineWidth = 1;
   ctx.beginPath();
@@ -355,7 +365,7 @@ export function drawStage(canvas: HTMLCanvasElement, scene: Scene, data: GameDat
       if (def.kind === 'shot') {
         ctx.beginPath();
         ctx.moveTo(cx, cy);
-        ctx.lineTo(px(tower.targetX), px(tower.targetY));
+        ctx.lineTo(px(shot(tower)[0]), px(shot(tower)[1]));
         ctx.stroke();
       } else if (def.kind === 'slow') {
         ctx.strokeStyle = COLORS.pitch;
@@ -365,12 +375,12 @@ export function drawStage(canvas: HTMLCanvasElement, scene: Scene, data: GameDat
         ctx.stroke();
       } else {
         ctx.beginPath();
-        ctx.arc(px(tower.targetX), px(tower.targetY), tile * 0.3, 0, Math.PI * 2);
+        ctx.arc(px(shot(tower)[0]), px(shot(tower)[1]), tile * 0.3, 0, Math.PI * 2);
         ctx.stroke();
       }
       if (def.splashMilli > 0) {
         ctx.beginPath();
-        ctx.arc(px(tower.targetX), px(tower.targetY), (def.splashMilli / MILLI) * tile * (0.5 + age * 0.5), 0, Math.PI * 2);
+        ctx.arc(px(shot(tower)[0]), px(shot(tower)[1]), (def.splashMilli / MILLI) * tile * (0.5 + age * 0.5), 0, Math.PI * 2);
         ctx.stroke();
       }
       ctx.globalAlpha = 1;
@@ -379,7 +389,7 @@ export function drawStage(canvas: HTMLCanvasElement, scene: Scene, data: GameDat
 
   // Einheiten
   for (const u of scene.units) {
-    const [ux, uy] = roadPointMilli(road, u.pos);
+    const [ux, uy] = places.get(u.id) ?? roadPointMilli(road, u.pos);
     const x = px(ux);
     const y = px(uy);
     const def = findById(data.units.units, u.def, 'Einheit');
@@ -561,10 +571,7 @@ function pointer(ctx: CanvasRenderingContext2D, cx: number, cy: number, tile: nu
 /** Breite eines Turms in Kacheln, je Art (die Bilder sind unterschiedlich schlank). */
 const TOWER_WIDTH: Readonly<Record<string, number>> = { bogenturm: 0.72, katapult: 0.95, pechnase: 0.82, wachstube: 0.86 };
 /** Einheiten ohne eigenes Bild leihen sich eines und werden in anderer Größe gezeichnet. */
-/** Einheiten ohne eigenes Bild leihen sich eines und unterscheiden sich in der Größe. Ritter und Hauptmann sind PLATZHALTER, bis es Bilder gibt. */
-export const UNIT_SPRITE: Readonly<Record<string, { sprite: string; scale: number }>> = {
-  laeufer: { sprite: 'raeuber', scale: 0.8 }, ritter: { sprite: 'schildtraeger', scale: 1.25 }, hauptmann: { sprite: 'schildtraeger', scale: 1.8 },
-};
+
 /** Fahrzeuge werden breiter gezeichnet als Fußtruppen und rütteln statt zu hüpfen. */
 const VEHICLES = new Set(['ramme', 'sturmbock']);
 
@@ -582,6 +589,9 @@ function drawWithSprites(ctx: CanvasRenderingContext2D, scene: Scene, data: Game
   const px = (milli: number): number => (milli / MILLI + 0.5) * tile;
   const road = findById(data.roads.roads, scene.roadId, 'Straße');
   const length = roadLengthMilli(road);
+  const gateShut = scene.gate !== null && scene.gate.hp > 0;
+  const places = unitPlaces(scene.units, road, gateShut, data);
+  const shot = (tw: { readonly targetX?: number | undefined; readonly targetY?: number | undefined }): readonly [number, number] => shownPoint(tw.targetX ?? 0, tw.targetY ?? 0, road, gateShut, data);
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   if (scene.tick < lastTick) unitLook.clear();
@@ -589,13 +599,14 @@ function drawWithSprites(ctx: CanvasRenderingContext2D, scene: Scene, data: Game
 
   // Boden, Straße, Marktplatz: aus dem Zwischenspeicher, neu gezeichnet nur bei anderer Straße oder Größe.
   const fieldW = tile * cols;
-  const fieldH = tile * rows;
-  const key = `${scene.roadId}|${scene.enemyCity}|${scene.showMarket}|${Math.round(tile * 100)}|${dpr}|${Math.round(layout.ox)}|${Math.round(layout.oy)}`;
+  const front = layout.forecourt;
+  const fieldH = tile * (rows + front);
+  const key = `${scene.roadId}|${scene.enemyCity}|${scene.showMarket}|${Math.round(tile * 100)}|${dpr}|${Math.round(layout.ox)}|${Math.round(layout.oy)}|${front}`;
   if (groundKey !== key) {
     canvas.width = Math.round(fieldW * dpr);
     canvas.height = Math.round(fieldH * dpr);
     canvas.style.left = `${layout.ox}px`;
-    canvas.style.top = `${layout.oy}px`;
+    canvas.style.top = `${layout.oy - tile * front}px`;
     canvas.style.width = `${fieldW}px`;
     canvas.style.height = `${fieldH}px`;
     canvas.style.display = 'block';
@@ -604,13 +615,20 @@ function drawWithSprites(ctx: CanvasRenderingContext2D, scene: Scene, data: Game
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
       g.fillStyle = groundPattern(g, scene.enemyCity ? 'lager' : 'wiese', tile * 3) ?? COLORS.ground;
       g.fillRect(0, 0, fieldW, fieldH);
+      // Das Vorfeld liegt vor der Stadt: etwas dunkler, mit weichem Übergang, die Straße kommt vom oberen Rand herein.
+      if (front > 0) {
+        const shade = g.createLinearGradient(0, 0, 0, tile * (front + 0.4));
+        shade.addColorStop(0, 'rgba(0,0,0,0.38)');
+        shade.addColorStop(0.75, 'rgba(0,0,0,0.2)');
+        shade.addColorStop(1, 'rgba(0,0,0,0)');
+        g.fillStyle = shade;
+        g.fillRect(0, 0, fieldW, tile * (front + 0.4));
+      }
+      g.translate(0, tile * front);
       const path = (): void => {
         g.beginPath();
-        road.waypoints.forEach((p, i) => {
-          const x = ((p[0] ?? 0) + 0.5) * tile;
-          const y = ((p[1] ?? 0) + 0.5) * tile;
-          if (i === 0) g.moveTo(x, y); else g.lineTo(x, y);
-        });
+        g.moveTo(((road.waypoints[0]?.[0] ?? 0) + 0.5) * tile, front > 0 ? -tile * (front + 1) : ((road.waypoints[0]?.[1] ?? 0) + 0.5) * tile);
+        road.waypoints.forEach((p) => g.lineTo(((p[0] ?? 0) + 0.5) * tile, ((p[1] ?? 0) + 0.5) * tile));
       };
       g.lineJoin = 'round';
       g.lineCap = 'round';
@@ -645,6 +663,9 @@ function drawWithSprites(ctx: CanvasRenderingContext2D, scene: Scene, data: Game
     if (scene.gate && scene.gate.hp > 0) {
       const gate = scene.gate;
       overlays.push(() => bar(ctx, px(gx), px(gy) + tile * 0.56, tile, gate.hp / gate.max, COLORS.bar));
+      // Wie viele vor dem Tor stehen: ab einer Handvoll als Zahl, weil die hinteren Reihen sich überdecken.
+      const waiting = scene.units.filter((u) => u.pos <= data.rules.gateMilli && u.pos >= data.rules.gateMilli - 150).length;
+      if (waiting >= 8) overlays.push(() => label(ctx, px(gx) + tile * 1.05, px(gy) + tile * 0.2, tile * 1.1, `×${waiting}`, COLORS.hint));
     }
   }
 
@@ -652,7 +673,7 @@ function drawWithSprites(ctx: CanvasRenderingContext2D, scene: Scene, data: Game
   {
     const [kx, ky] = roadPointMilli(road, length);
     const width = tile * (scene.keepLevel >= 2 ? 1.45 : 1.25);
-    const name = scene.keepLevel >= 2 ? 'burgfried_2' : 'burgfried_1';
+    const name = levelSprite('burgfried', scene.keepLevel, 'burgfried_1');
     things.push({ y: px(ky) + tile * 0.2, draw: () => void drawSprite(ctx, name, px(kx), px(ky) + tile * 0.5, width) });
     const top = px(ky) + tile * 0.5 - width * spriteAspect(name);
     if (scene.keep && scene.keep.hp < scene.keep.max) {
@@ -677,7 +698,7 @@ function drawWithSprites(ctx: CanvasRenderingContext2D, scene: Scene, data: Game
         continue;
       }
       const remaining = Math.ceil((b.doneAt - info.now) / 1000);
-      const name = remaining > 0 ? 'baustelle' : b.def;
+      const name = remaining > 0 ? 'baustelle' : levelSprite(b.def, b.level, b.def);
       const width = tile * 0.96;
       things.push({ y: cy, draw: () => void drawSprite(ctx, name, cx, cy + tile * 0.42, width) });
       if (remaining > 0) {
@@ -746,7 +767,7 @@ function drawWithSprites(ctx: CanvasRenderingContext2D, scene: Scene, data: Game
     }
     const def = findById(data.towers.towers, tower.def, 'Turm');
     const level = towerLevel(tower, data);
-    const name = `${tower.def}_${Math.min(tower.level, 2)}`;
+    const name = levelSprite(tower.def, tower.level, `${tower.def}_1`);
     const width = tile * (TOWER_WIDTH[tower.def] ?? 0.8) * (tower.level >= 2 ? 1.08 : 1);
     const base = cy + tile * 0.4;
     const height = width * spriteAspect(name);
@@ -823,11 +844,11 @@ function drawWithSprites(ctx: CanvasRenderingContext2D, scene: Scene, data: Game
         if (def.kind === 'shot') {
           ctx.beginPath();
           ctx.moveTo(cx, base - height * 0.7);
-          ctx.lineTo(px(tower.targetX), px(tower.targetY));
+          ctx.lineTo(px(shot(tower)[0]), px(shot(tower)[1]));
           ctx.stroke();
           if (def.splashMilli > 0) {
             ctx.beginPath();
-            ctx.arc(px(tower.targetX), px(tower.targetY), (def.splashMilli / MILLI) * tile * (0.5 + age * 0.5), 0, Math.PI * 2);
+            ctx.arc(px(shot(tower)[0]), px(shot(tower)[1]), (def.splashMilli / MILLI) * tile * (0.5 + age * 0.5), 0, Math.PI * 2);
             ctx.stroke();
           }
         } else if (def.kind === 'slow') {
@@ -838,7 +859,7 @@ function drawWithSprites(ctx: CanvasRenderingContext2D, scene: Scene, data: Game
           ctx.stroke();
         } else {
           ctx.beginPath();
-          ctx.arc(px(tower.targetX), px(tower.targetY), tile * 0.3, 0, Math.PI * 2);
+          ctx.arc(px(shot(tower)[0]), px(shot(tower)[1]), tile * 0.3, 0, Math.PI * 2);
           ctx.stroke();
         }
         ctx.globalAlpha = 1;
@@ -850,7 +871,7 @@ function drawWithSprites(ctx: CanvasRenderingContext2D, scene: Scene, data: Game
   const seen = new Set<number>();
   for (const u of scene.units) {
     seen.add(u.id);
-    const [ux, uy] = roadPointMilli(road, u.pos);
+    const [ux, uy] = places.get(u.id) ?? roadPointMilli(road, u.pos);
     const [ax] = roadPointMilli(road, u.pos + 300);
     const def = findById(data.units.units, u.def, 'Einheit');
     const vehicle = VEHICLES.has(u.def);
@@ -869,8 +890,7 @@ function drawWithSprites(ctx: CanvasRenderingContext2D, scene: Scene, data: Game
     const y = px(uy);
     const step = timeMs / (vehicle ? 70 : def.speedMilliPerTick > 60 ? 70 : 110) + u.id * 1.7;
     const hop = vehicle ? Math.sin(step * 2) * tile * 0.012 : Math.abs(Math.sin(step)) * tile * 0.07;
-    const sprite = UNIT_SPRITE[u.def]?.sprite ?? u.def;
-    const scale = UNIT_SPRITE[u.def]?.scale ?? 1;
+    const { sprite, scale } = unitSprite(u.def);
     const boss = scale > 1.5;
     const width = (vehicle ? tile * 0.78 : (tile * 0.62) / spriteAspect(sprite)) * scale;
     const height = width * spriteAspect(sprite);
@@ -946,3 +966,5 @@ function drawWithSprites(ctx: CanvasRenderingContext2D, scene: Scene, data: Game
 
   if (scene.hint) pointer(ctx, (scene.hint.x + 0.5) * tile, (scene.hint.y + 0.5) * tile, tile, timeMs);
 }
+
+export { FORECOURT, forecourtToRoad, shownPoint, unitPlaces } from './forecourt.ts';

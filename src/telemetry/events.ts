@@ -27,7 +27,8 @@ export type EventType =
   | 'battle_start' | 'battle_end'
   | 'action_cancelled' | 'ability_used'
   | 'alliance_joined' | 'help_requested' | 'goal_claimed' | 'raid_report'
-  | 'install_hint' | 'report_sent' | 'error';
+  | 'install_hint' | 'report_sent' | 'error'
+  | 'keep_level' | 'chapter_claimed' | 'crowned';
 
 /**
  * Sendestelle. Der Prototyp sendet nichts (`noSink`). Später kann hier ein eigener Empfänger

@@ -60,6 +60,18 @@ export const migrations: Readonly<Record<number, Migration>> = {
     const unlockedWaves = Math.max(0, num(old['keepLevel'], 1) - 1) * data.waves.scaling.wavesPerKeepLevel;
     return { ...old, version: 8, wavesCleared: Math.min(extra, Math.max(0, unlockedWaves - 1)) };
   },
+  // 8 -> 9 (M9): Wochenziel, Belohnung für die Rückkehr, zwei weitere Zähler.
+  8: (old, data) => {
+    const fresh = createGame(1, num(old['now'], 0), data);
+    const daily = (old['daily'] ?? fresh.daily) as { counters?: Record<string, number> };
+    return { ...old, version: 9, daily: { ...fresh.daily, ...daily, counters: { ...fresh.daily.counters, ...daily.counters } }, weekly: fresh.weekly, login: fresh.login };
+  },
+  // 9 -> 10 (M10): Vorräte der Ziele wachsen nach, Städte schlagen zurück.
+  9: (old) => ({ ...old, version: 10, campRaids: {}, revenge: null }),
+  // 10 -> 11 (M11): Chronik. Schon vorhandener Fortschritt zählt, die Kapitel holt der Spieler nacheinander ab.
+  10: (old) => ({ ...old, version: 11, campsTaken: [], chapter: 0, crownedAt: null }),
+  // 11 -> 12: Ende des Anfängerschutzes als eigener Wert. Für alte Stände gilt ein noch laufender Schild als Anfängerschutz.
+  11: (old) => ({ ...old, version: 12, beginnerUntil: num(old['shieldUntil'], 0) }),
 };
 
 function num(value: unknown, fallback: number): number {

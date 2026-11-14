@@ -27,6 +27,15 @@ SHEETS = {
     "symbole": ["gold", "holz", "stein", "schild", "angriff", "turm", "karte", "allianz", "ziele"],
     "heldin": ["alruna"],
 }
+# Einzelbilder: art/roh/einzeln/<name>.png (oder .jpg) enthält genau ein Motiv; der Dateiname ist der Name im Spiel.
+# Die Art bestimmt die Größe im Atlas. Stufenbilder heißen <name>_<stufe>: das Spiel nimmt für eine Stufe das Bild
+# mit der höchsten vorhandenen Stufe darunter, es müssen also nicht alle Stufen da sein.
+SINGLES = {
+    "einheiten": ["laeufer", "ritter", "hauptmann"],
+    "tuerme": [f"{t}_{n}" for t in ("bogenturm", "katapult", "pechnase", "wachstube") for n in (3, 4, 5)],
+    "stadt": ["burgfried_3", "burgfried_5", "burgfried_7"],
+    "gebaeude": [f"{b}_4" for b in ("holzfaeller", "steinbruch", "kaserne", "hof", "speicher", "lazarett")],
+}
 # Längste Kante eines gespeicherten Sprites in Pixeln (im Spiel wird weiter verkleinert).
 MAX_SIDE = 192
 OUTLINE = np.array([42.0, 36.0, 32.0], dtype=np.float32)
@@ -149,6 +158,50 @@ def cut(sheet: str, names: list) -> list:
     return written
 
 
+def cut_singles() -> dict:
+    """Schneidet die Einzelbilder aus art/roh/einzeln/ und liefert sie nach Art sortiert."""
+    folder = RAW / "einzeln"
+    found = {}
+    if not folder.exists():
+        return found
+    kinds = {name: kind for kind, names in SINGLES.items() for name in names}
+    for path in sorted(folder.iterdir()):
+        if path.suffix.lower() not in (".png", ".jpg", ".jpeg"):
+            continue
+        kind = kinds.get(path.stem)
+        if kind is None:
+            print(f"  WARNUNG einzeln/{path.name}: unbekannter Name, erwartet einer von {sorted(kinds)}")
+            continue
+        rgb = np.asarray(Image.open(path).convert("RGB"), dtype=np.float32)
+        alpha, key = background_distance(rgb)
+        solid = alpha > 0.5
+        if not solid.any():
+            print(f"  WARNUNG einzeln/{path.name}: kein Motiv gefunden (Hintergrund nicht Magenta?)")
+            continue
+        # Ein Motiv je Bild: alles, was nicht Hintergrund ist, gehört dazu (auch lose Teile wie eine Fahne).
+        ys, xs = np.nonzero(solid)
+        l, t, r, b = max(0, xs.min() - 2), max(0, ys.min() - 2), min(rgb.shape[1], xs.max() + 3), min(rgb.shape[0], ys.max() + 3)
+        a = alpha[t:b, l:r]
+        c = rgb[t:b, l:r].copy()
+        transparent = a < 0.05
+        near_edge = transparent.copy()
+        for dy in range(-3, 4):
+            for dx in range(-3, 4):
+                near_edge |= np.roll(np.roll(transparent, dy, axis=0), dx, axis=1)
+        pinkish = (np.minimum(c[..., 0], c[..., 2]) - c[..., 1] > 28) & (c[..., 0] > 110)
+        c[near_edge & pinkish] = OUTLINE
+        img = Image.fromarray(np.dstack([np.clip(c, 0, 255), a * 255]).astype(np.uint8), "RGBA")
+        scale = MAX_SIDE / max(img.size)
+        if scale < 1:
+            img = img.resize((max(1, round(img.width * scale)), max(1, round(img.height * scale))), Image.LANCZOS)
+        (OUT / "einzeln").mkdir(parents=True, exist_ok=True)
+        img.save(OUT / "einzeln" / f"{path.stem}.png")
+        found.setdefault(kind, []).append({"name": path.stem, "file": f"einzeln/{path.stem}.png", "w": img.width, "h": img.height})
+    if found:
+        print(f"  einzeln: {sum(len(v) for v in found.values())} Einzelbilder ({', '.join(e['name'] for v in found.values() for e in v)})")
+    return found
+
+
 def build_game_assets(index: dict) -> None:
     """Bildatlas, Symbole, Porträt und nahtlose Bodenkacheln für das Spiel nach public/sprites/."""
     GAME.mkdir(parents=True, exist_ok=True)
@@ -215,5 +268,7 @@ if __name__ == "__main__":
         if done:
             index[sheet] = done
     if not only:
+        for kind, entries in cut_singles().items():
+            index.setdefault(kind, []).extend(entries)
         (OUT / "index.json").write_text(json.dumps(index, indent=1) + "\n")
         build_game_assets(index)

@@ -15,10 +15,10 @@ if (paths.length === 0) {
 }
 let files = paths.map((p) => JSON.parse(readFileSync(p, 'utf8')) as ExportFile);
 const yes = (b: boolean): string => (b ? 'ja' : 'nein');
-console.log('Installation   Minute 10   Allianz   nächster Tag   weitester Schritt     Sitzungen  Zeitraffer');
+console.log('Installation   Minute 10   Allianz   nächster Tag   weitester Schritt     Sitzungen  Zeitraffer  letzter Tag  Burgfried  Welle  Kapitel  Krönung  Fehler');
 for (const f of files) {
   const s = summarize(f.events, f.minute10Step);
-  console.log(`${f.install.padEnd(15)}${yes(s.reachedMinute10).padEnd(12)}${yes(s.joinedAlliance).padEnd(10)}${yes(s.returnedNextDay).padEnd(15)}${(s.lastStep ?? '-').padEnd(22)}${String(s.sessions).padEnd(11)}${yes(s.usedTimeLapse)}`);
+  console.log(`${f.install.padEnd(15)}${yes(s.reachedMinute10).padEnd(12)}${yes(s.joinedAlliance).padEnd(10)}${yes(s.returnedNextDay).padEnd(15)}${(s.lastStep ?? '-').padEnd(22)}${String(s.sessions).padEnd(11)}${yes(s.usedTimeLapse).padEnd(12)}${String(s.lastActiveDay).padEnd(13)}${String(s.maxKeepLevel).padEnd(11)}${String(s.maxWave).padEnd(7)}${String(s.chaptersClaimed).padEnd(9)}${(s.crownedOnDay === null ? '-' : `Tag ${s.crownedOnDay}`).padEnd(9)}${s.errors}`);
 }
 if (strict) files = files.filter((f) => !summarize(f.events, f.minute10Step).usedTimeLapse);
 const a = aggregate(files);
@@ -26,4 +26,9 @@ console.log(`\nSpieler: ${a.players}${strict ? ' (ohne Zeitraffer)' : ''}`);
 console.log(`Minute 10 erreicht:        ${a.minute10} %`);
 console.log(`Allianz beigetreten:       ${a.alliance} %`);
 console.log(`Rückkehr am nächsten Tag:  ${a.nextDay} %`);
+const pct = (v: number | null, n: number): string => (v === null ? 'noch kein Export alt genug' : `${v} % (von ${n} Exporten, die alt genug sind)`);
+console.log(`Noch dabei an Tag 7:       ${pct(a.day7, a.oldEnough7)}`);
+console.log(`Noch dabei an Tag 30:      ${pct(a.day30, a.oldEnough30)}`);
+console.log(`Gekrönt:                   ${a.crowned} %`);
+console.log(`Burgfried (Median):        Stufe ${a.medianKeepLevel}`);
 if (a.withTimeLapse > 0) console.log(`Hinweis: ${a.withTimeLapse} Export(e) enthalten Zeitraffer und taugen nicht für echte Quoten.`);

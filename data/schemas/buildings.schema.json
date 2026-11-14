@@ -44,7 +44,9 @@
                 "protect",
                 "healTimePermille",
                 "capacity",
-                "keepLevel"
+                "keepLevel",
+                "armyCap",
+                "troopHpPermille"
               ],
               "properties": {
                 "cost": {
@@ -148,6 +150,14 @@
                   }
                 },
                 "keepLevel": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "armyCap": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "troopHpPermille": {
                   "type": "integer",
                   "minimum": 1
                 }

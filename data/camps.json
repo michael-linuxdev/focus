@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "preliminary": true,
   "camps": [
     {
@@ -39,7 +39,8 @@
         "gold": 100,
         "wood": 50,
         "stone": 50
-      }
+      },
+      "ring": 1
     },
     {
       "id": "raeuberlager_2",
@@ -83,7 +84,8 @@
         "gold": 200,
         "wood": 100,
         "stone": 100
-      }
+      },
+      "ring": 2
     },
     {
       "id": "falkenried",
@@ -132,7 +134,8 @@
         "gold": 400,
         "wood": 300,
         "stone": 300
-      }
+      },
+      "ring": 2
     },
     {
       "id": "eschenfurt",
@@ -166,7 +169,8 @@
         "gold": 500,
         "wood": 400,
         "stone": 400
-      }
+      },
+      "ring": 2
     },
     {
       "id": "dornhag",
@@ -200,6 +204,757 @@
         "gold": 300,
         "wood": 200,
         "stone": 200
+      },
+      "ring": 2
+    },
+    {
+      "id": "wolfsschlucht",
+      "kind": "camp",
+      "shielded": false,
+      "ring": 3,
+      "map": {
+        "x": 50,
+        "y": 13
+      },
+      "roadId": "ostbogen",
+      "keepLevel": 3,
+      "gateHp": 8400,
+      "towers": [
+        {
+          "slot": "s1",
+          "def": "bogenturm",
+          "level": 2
+        },
+        {
+          "slot": "s2",
+          "def": "katapult",
+          "level": 2
+        },
+        {
+          "slot": "s3",
+          "def": "bogenturm",
+          "level": 2
+        },
+        {
+          "slot": "s4",
+          "def": "pechnase",
+          "level": 2
+        },
+        {
+          "slot": "s5",
+          "def": "bogenturm",
+          "level": 2
+        }
+      ],
+      "stock": {
+        "gold": 700,
+        "wood": 2000,
+        "stone": 2000
+      },
+      "protected": {
+        "gold": 100,
+        "wood": 200,
+        "stone": 200
+      }
+    },
+    {
+      "id": "weidenbruch",
+      "kind": "city",
+      "shielded": false,
+      "ring": 3,
+      "map": {
+        "x": 20,
+        "y": 42
+      },
+      "roadId": "westschleife",
+      "keepLevel": 3,
+      "gateHp": 14000,
+      "towers": [
+        {
+          "slot": "s1",
+          "def": "bogenturm",
+          "level": 3
+        },
+        {
+          "slot": "s2",
+          "def": "katapult",
+          "level": 3
+        },
+        {
+          "slot": "s3",
+          "def": "bogenturm",
+          "level": 3
+        },
+        {
+          "slot": "s4",
+          "def": "pechnase",
+          "level": 3
+        },
+        {
+          "slot": "s5",
+          "def": "bogenturm",
+          "level": 3
+        },
+        {
+          "slot": "s6",
+          "def": "wachstube",
+          "level": 3
+        },
+        {
+          "slot": "s7",
+          "def": "katapult",
+          "level": 3
+        }
+      ],
+      "stock": {
+        "gold": 1300,
+        "wood": 3800,
+        "stone": 3800
+      },
+      "protected": {
+        "gold": 100,
+        "wood": 300,
+        "stone": 300
+      }
+    },
+    {
+      "id": "kraehennest",
+      "kind": "camp",
+      "shielded": false,
+      "ring": 4,
+      "map": {
+        "x": 80,
+        "y": 52
+      },
+      "roadId": "ostbogen",
+      "keepLevel": 4,
+      "gateHp": 13200,
+      "towers": [
+        {
+          "slot": "s1",
+          "def": "bogenturm",
+          "level": 2
+        },
+        {
+          "slot": "s2",
+          "def": "katapult",
+          "level": 2
+        },
+        {
+          "slot": "s3",
+          "def": "bogenturm",
+          "level": 2
+        },
+        {
+          "slot": "s4",
+          "def": "pechnase",
+          "level": 2
+        },
+        {
+          "slot": "s5",
+          "def": "bogenturm",
+          "level": 2
+        }
+      ],
+      "stock": {
+        "gold": 2000,
+        "wood": 7200,
+        "stone": 7200
+      },
+      "protected": {
+        "gold": 200,
+        "wood": 600,
+        "stone": 600
+      }
+    },
+    {
+      "id": "kaltenfels",
+      "kind": "city",
+      "shielded": false,
+      "ring": 4,
+      "map": {
+        "x": 22,
+        "y": 76
+      },
+      "roadId": "westschleife",
+      "keepLevel": 4,
+      "gateHp": 22000,
+      "towers": [
+        {
+          "slot": "s1",
+          "def": "bogenturm",
+          "level": 3
+        },
+        {
+          "slot": "s2",
+          "def": "katapult",
+          "level": 3
+        },
+        {
+          "slot": "s3",
+          "def": "bogenturm",
+          "level": 3
+        },
+        {
+          "slot": "s4",
+          "def": "pechnase",
+          "level": 3
+        },
+        {
+          "slot": "s5",
+          "def": "bogenturm",
+          "level": 3
+        },
+        {
+          "slot": "s6",
+          "def": "wachstube",
+          "level": 3
+        },
+        {
+          "slot": "s7",
+          "def": "katapult",
+          "level": 3
+        },
+        {
+          "slot": "s8",
+          "def": "bogenturm",
+          "level": 3
+        }
+      ],
+      "stock": {
+        "gold": 3800,
+        "wood": 14000,
+        "stone": 14000
+      },
+      "protected": {
+        "gold": 300,
+        "wood": 1200,
+        "stone": 1200
+      }
+    },
+    {
+      "id": "schwarzmoor",
+      "kind": "camp",
+      "shielded": false,
+      "ring": 5,
+      "map": {
+        "x": 72,
+        "y": 72
+      },
+      "roadId": "westschleife",
+      "keepLevel": 5,
+      "gateHp": 20400,
+      "towers": [
+        {
+          "slot": "s1",
+          "def": "bogenturm",
+          "level": 3
+        },
+        {
+          "slot": "s2",
+          "def": "katapult",
+          "level": 3
+        },
+        {
+          "slot": "s3",
+          "def": "bogenturm",
+          "level": 3
+        },
+        {
+          "slot": "s4",
+          "def": "pechnase",
+          "level": 3
+        },
+        {
+          "slot": "s5",
+          "def": "bogenturm",
+          "level": 3
+        },
+        {
+          "slot": "s6",
+          "def": "wachstube",
+          "level": 3
+        }
+      ],
+      "stock": {
+        "gold": 4600,
+        "wood": 13700,
+        "stone": 13700
+      },
+      "protected": {
+        "gold": 400,
+        "wood": 1100,
+        "stone": 1100
+      }
+    },
+    {
+      "id": "rabenhorst",
+      "kind": "city",
+      "shielded": false,
+      "ring": 5,
+      "map": {
+        "x": 26,
+        "y": 22
+      },
+      "roadId": "doppelkehre",
+      "keepLevel": 5,
+      "gateHp": 34000,
+      "towers": [
+        {
+          "slot": "s1",
+          "def": "bogenturm",
+          "level": 4
+        },
+        {
+          "slot": "s2",
+          "def": "katapult",
+          "level": 4
+        },
+        {
+          "slot": "s3",
+          "def": "bogenturm",
+          "level": 4
+        },
+        {
+          "slot": "s4",
+          "def": "pechnase",
+          "level": 4
+        },
+        {
+          "slot": "s5",
+          "def": "bogenturm",
+          "level": 4
+        },
+        {
+          "slot": "s6",
+          "def": "wachstube",
+          "level": 4
+        },
+        {
+          "slot": "s7",
+          "def": "katapult",
+          "level": 4
+        },
+        {
+          "slot": "s8",
+          "def": "bogenturm",
+          "level": 4
+        },
+        {
+          "slot": "s9",
+          "def": "katapult",
+          "level": 4
+        }
+      ],
+      "stock": {
+        "gold": 8900,
+        "wood": 26700,
+        "stone": 26700
+      },
+      "protected": {
+        "gold": 700,
+        "wood": 2200,
+        "stone": 2200
+      }
+    },
+    {
+      "id": "dornenpass",
+      "kind": "camp",
+      "shielded": false,
+      "ring": 6,
+      "map": {
+        "x": 50,
+        "y": 13
+      },
+      "roadId": "westschleife",
+      "keepLevel": 6,
+      "gateHp": 30000,
+      "towers": [
+        {
+          "slot": "s1",
+          "def": "bogenturm",
+          "level": 3
+        },
+        {
+          "slot": "s2",
+          "def": "katapult",
+          "level": 3
+        },
+        {
+          "slot": "s3",
+          "def": "bogenturm",
+          "level": 3
+        },
+        {
+          "slot": "s4",
+          "def": "pechnase",
+          "level": 3
+        },
+        {
+          "slot": "s5",
+          "def": "bogenturm",
+          "level": 3
+        },
+        {
+          "slot": "s6",
+          "def": "wachstube",
+          "level": 3
+        },
+        {
+          "slot": "s7",
+          "def": "katapult",
+          "level": 3
+        }
+      ],
+      "stock": {
+        "gold": 7800,
+        "wood": 19000,
+        "stone": 19000
+      },
+      "protected": {
+        "gold": 600,
+        "wood": 1600,
+        "stone": 1600
+      }
+    },
+    {
+      "id": "steinach",
+      "kind": "city",
+      "shielded": false,
+      "ring": 6,
+      "map": {
+        "x": 20,
+        "y": 42
+      },
+      "roadId": "doppelkehre",
+      "keepLevel": 6,
+      "gateHp": 50000,
+      "towers": [
+        {
+          "slot": "s1",
+          "def": "bogenturm",
+          "level": 4
+        },
+        {
+          "slot": "s2",
+          "def": "katapult",
+          "level": 4
+        },
+        {
+          "slot": "s3",
+          "def": "bogenturm",
+          "level": 4
+        },
+        {
+          "slot": "s4",
+          "def": "pechnase",
+          "level": 4
+        },
+        {
+          "slot": "s5",
+          "def": "bogenturm",
+          "level": 4
+        },
+        {
+          "slot": "s6",
+          "def": "wachstube",
+          "level": 4
+        },
+        {
+          "slot": "s7",
+          "def": "katapult",
+          "level": 4
+        },
+        {
+          "slot": "s8",
+          "def": "bogenturm",
+          "level": 4
+        },
+        {
+          "slot": "s9",
+          "def": "katapult",
+          "level": 4
+        }
+      ],
+      "stock": {
+        "gold": 15300,
+        "wood": 36800,
+        "stone": 36800
+      },
+      "protected": {
+        "gold": 1300,
+        "wood": 3000,
+        "stone": 3000
+      }
+    },
+    {
+      "id": "nebelgrund",
+      "kind": "camp",
+      "shielded": false,
+      "ring": 7,
+      "map": {
+        "x": 80,
+        "y": 52
+      },
+      "roadId": "doppelkehre",
+      "keepLevel": 7,
+      "gateHp": 43200,
+      "towers": [
+        {
+          "slot": "s1",
+          "def": "bogenturm",
+          "level": 4
+        },
+        {
+          "slot": "s2",
+          "def": "katapult",
+          "level": 4
+        },
+        {
+          "slot": "s3",
+          "def": "bogenturm",
+          "level": 4
+        },
+        {
+          "slot": "s4",
+          "def": "pechnase",
+          "level": 4
+        },
+        {
+          "slot": "s5",
+          "def": "bogenturm",
+          "level": 4
+        },
+        {
+          "slot": "s6",
+          "def": "wachstube",
+          "level": 4
+        },
+        {
+          "slot": "s7",
+          "def": "katapult",
+          "level": 4
+        }
+      ],
+      "stock": {
+        "gold": 13100,
+        "wood": 26200,
+        "stone": 26200
+      },
+      "protected": {
+        "gold": 1100,
+        "wood": 2200,
+        "stone": 2200
+      }
+    },
+    {
+      "id": "hohenwart",
+      "kind": "city",
+      "shielded": false,
+      "ring": 7,
+      "map": {
+        "x": 22,
+        "y": 76
+      },
+      "roadId": "schlangenweg",
+      "keepLevel": 7,
+      "gateHp": 72000,
+      "towers": [
+        {
+          "slot": "s1",
+          "def": "bogenturm",
+          "level": 5
+        },
+        {
+          "slot": "s2",
+          "def": "katapult",
+          "level": 5
+        },
+        {
+          "slot": "s3",
+          "def": "bogenturm",
+          "level": 5
+        },
+        {
+          "slot": "s4",
+          "def": "pechnase",
+          "level": 5
+        },
+        {
+          "slot": "s5",
+          "def": "bogenturm",
+          "level": 5
+        },
+        {
+          "slot": "s6",
+          "def": "wachstube",
+          "level": 5
+        },
+        {
+          "slot": "s7",
+          "def": "katapult",
+          "level": 5
+        },
+        {
+          "slot": "s8",
+          "def": "bogenturm",
+          "level": 5
+        },
+        {
+          "slot": "s9",
+          "def": "katapult",
+          "level": 5
+        },
+        {
+          "slot": "s10",
+          "def": "bogenturm",
+          "level": 5
+        }
+      ],
+      "stock": {
+        "gold": 25400,
+        "wood": 50900,
+        "stone": 50900
+      },
+      "protected": {
+        "gold": 2100,
+        "wood": 4200,
+        "stone": 4200
+      }
+    },
+    {
+      "id": "eisenklamm",
+      "kind": "camp",
+      "shielded": false,
+      "ring": 8,
+      "map": {
+        "x": 72,
+        "y": 72
+      },
+      "roadId": "schlangenweg",
+      "keepLevel": 8,
+      "gateHp": 60000,
+      "towers": [
+        {
+          "slot": "s1",
+          "def": "bogenturm",
+          "level": 4
+        },
+        {
+          "slot": "s2",
+          "def": "katapult",
+          "level": 4
+        },
+        {
+          "slot": "s3",
+          "def": "bogenturm",
+          "level": 4
+        },
+        {
+          "slot": "s4",
+          "def": "pechnase",
+          "level": 4
+        },
+        {
+          "slot": "s5",
+          "def": "bogenturm",
+          "level": 4
+        },
+        {
+          "slot": "s6",
+          "def": "wachstube",
+          "level": 4
+        },
+        {
+          "slot": "s7",
+          "def": "katapult",
+          "level": 4
+        },
+        {
+          "slot": "s8",
+          "def": "bogenturm",
+          "level": 4
+        }
+      ],
+      "stock": {
+        "gold": 18300,
+        "wood": 36600,
+        "stone": 36600
+      },
+      "protected": {
+        "gold": 1500,
+        "wood": 3000,
+        "stone": 3000
+      }
+    },
+    {
+      "id": "grauwacht",
+      "kind": "city",
+      "shielded": false,
+      "ring": 8,
+      "map": {
+        "x": 26,
+        "y": 22
+      },
+      "roadId": "grosse_runde",
+      "keepLevel": 8,
+      "gateHp": 100000,
+      "towers": [
+        {
+          "slot": "s1",
+          "def": "bogenturm",
+          "level": 4
+        },
+        {
+          "slot": "s2",
+          "def": "katapult",
+          "level": 4
+        },
+        {
+          "slot": "s3",
+          "def": "bogenturm",
+          "level": 4
+        },
+        {
+          "slot": "s4",
+          "def": "pechnase",
+          "level": 4
+        },
+        {
+          "slot": "s5",
+          "def": "bogenturm",
+          "level": 4
+        },
+        {
+          "slot": "s6",
+          "def": "wachstube",
+          "level": 4
+        },
+        {
+          "slot": "s7",
+          "def": "katapult",
+          "level": 4
+        },
+        {
+          "slot": "s8",
+          "def": "bogenturm",
+          "level": 4
+        },
+        {
+          "slot": "s9",
+          "def": "katapult",
+          "level": 4
+        }
+      ],
+      "stock": {
+        "gold": 35600,
+        "wood": 71200,
+        "stone": 71200
+      },
+      "protected": {
+        "gold": 2900,
+        "wood": 5900,
+        "stone": 5900
       }
     }
   ]

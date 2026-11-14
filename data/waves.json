@@ -289,7 +289,7 @@
     "raidFromWave": 3,
     "raidStrengthPermille": 600,
     "hpBasePermille": 2700,
-    "raidHpBasePermille": 2300,
-    "raidHpGrowthPermille": 1030
+    "raidHpBasePermille": 2500,
+    "raidHpGrowthPermille": 1031
   }
 }

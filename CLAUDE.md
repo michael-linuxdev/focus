@@ -1,6 +1,6 @@
 # Mittelalter-Königreich (Arbeitstitel) – PWA-Prototyp
 
-Spielbarer Prototyp eines Mobile-Strategiespiels. Stand: die ersten 30 Spielminuten; Ziel: der erste Spielmonat,
+Spielbarer Prototyp eines Mobile-Strategiespiels: der erste Spielmonat, von der ersten Welle bis zur Krönung,
 mit Testern gespielt. Macht das Spaß, folgt die Neuumsetzung in Unity 6 / C# mit Metaplay; deshalb zählt
 portierbare Spiellogik mehr als alles andere.
 Der Name steht nur in `data/game.json`.
@@ -20,7 +20,7 @@ die der Spieler selbst baut. Dieselbe Mechanik trägt Einstieg, Stadtausbau und 
 | Gebauten Stand ansehen | `npm run preview` |
 | Ablauf des Tutorial-Bots ausgeben | `FLOW_LOG=flow.txt npm test` |
 | Balance: Schlachten massenhaft durchrechnen, Siegquoten ausgeben | `npm run balance` (optional `-- 500` Startwerte) |
-| Spielmonat durchrechnen: an welchem Tag welche Burgfried-Stufe erreicht wird | `npm run month` (optional `-- eifrig`) |
+| Spielmonat durchrechnen: Burgfried, Wellen, Nachtangriffe, Angriffe und Chronik nach Tagen | `npm run month` (optional `-- eifrig`) |
 | Kennzahlen aus Exportdateien (eine je Spieler) | `npm run metrics -- a.json b.json` |
 | Leistung mit gedrosselter CPU und langsamem Netz (nach dem Bauen) | `npm run perf` |
 | Speicherstand am Ende des Ablaufs erzeugen | `node scripts/make-save.ts > stand.json` |
@@ -67,12 +67,19 @@ Verlierbare Verteidigungen und der Nachtangriff kosten Vorräte nach Durchbruchs
 aber erst ab dem Marktplatz (ein genommenes Tor allein kostet nichts). Der erste Nachtangriff kostet nichts.
 Der erste Angriff auf das Räuberlager bleibt leicht: mit der vorgeschlagenen Aufstellung soll er fast immer gelingen.
 Nach jedem Nachtangriff ist der nächste angekündigt.
+Oberfläche: Die ersten beiden Turmstufen entstehen mit einem Tipp; ab Stufe 3 fragt ein Blatt mit den Werten nach, weil der Ausbau
+ein Vielfaches kostet. Ist ein Ausbau gesperrt, sagt ein kurzer Text am Turm, welcher Burgfried fehlt. Nach dem geführten Ablauf zeigt
+eine Zeile oben links das offene Kapitel der Chronik.
+Seit M10: Wer eine Nachbarstadt angreift, verliert seinen Schild sofort; ihr Gegenangriff kommt nach einigen Stunden und wartet, solange ein Schild läuft.
+Ausgenommen ist der Anfängerschutz (bestätigt): Er läuft weiter, der Gegenangriff kommt erst nach seinem Ende.
+Darstellung: Oberhalb des Spielfelds liegt ein Vorfeld (`FORECOURT` in `src/render/stage.ts`). Wer vor dem geschlossenen Tor wartet, wird dort
+in Reihen gezeichnet, obwohl er nach den Regeln auf einem Punkt steht; Tipps und Treffer werden entsprechend umgerechnet.
 Nur Rammböcke brechen Tore (Leichte und Gepanzerte haben Belagerungswert 0).
 Eingreifen in der Verteidigung (nach dem ersten Spieltest ergänzt, steht nicht im ursprünglichen Auftrag): Ein Tipp ins
 Feld ruft einen Pfeilhagel auf den Punkt, ab der Heldin gibt es den Kampfruf. Jede Verteidigung endet mit ein bis drei
 Sternen und Bonusgold. Ab Welle 2 sind die Wellen so eng, dass ohne Eingreifen Räuber durchkommen; verlierbar werden
 die ersten fünf Wellen dadurch nicht. Fehlt für den nächsten Tutorial-Schritt nur Gold, zeigt der Hinweis auf „Verteidigen“.
-Seit M8 (vom Auftraggeber noch zu bestätigen): Eine selbst gestartete Verteidigung kostet nur Vorräte, wenn der Burgfried fällt
+Seit M8 (bestätigt): Eine selbst gestartete Verteidigung kostet nur Vorräte, wenn der Burgfried fällt
 (`defenseLossOnlyWhenBreached`); für den Nachtangriff gilt weiter die Durchbruchstiefe ab dem Marktplatz. Ohne das kostete jeder
 durchgekommene Räuber bis zu 30 % der ungeschützten Vorräte, bei vielen Verteidigungen am Tag.
 
@@ -104,6 +111,7 @@ durchgekommene Räuber bis zu 30 % der ungeschützten Vorräte, bei vielen Verte
   Browsertests setzen `mk.gate`, um den Hinweis zu überspringen.
 - Sendestelle: `EventSink` in `src/telemetry/events.ts`; der Prototyp nutzt `noSink`.
 - Neue Messpunkte nur über `record(...)` in `src/app/main.tsx`; neue Arten in `EventType` eintragen.
+- Kennzahlen des Monats aus den Exporten: noch dabei an Tag 7 und Tag 30, höchste Burgfried-Stufe, höchste Welle, Kapitel, Tag der Krönung.
 - „Minute 10 erreicht“ heißt: Tutorial-Schritt `minute10Step` aus `data/tutorial.json` erreicht.
 - Balance-Werte nie nach Gefühl ändern: erst `npm run balance`, dann Daten ändern, dann wieder laufen lassen.
 - Kosten und Bauzeiten des Monats ebenso: erst `npm run month`, dann Daten ändern, dann wieder laufen lassen. Dasselbe gilt für `waves.scaling`.
@@ -119,8 +127,13 @@ durchgekommene Räuber bis zu 30 % der ungeschützten Vorräte, bei vielen Verte
   Rohbilder liegen in `art/roh/`, `python3 scripts/sprites.py` stellt frei und erzeugt `public/sprites/` und
   `src/render/atlas.json`. Je Figur ein Bild; Bewegung (Hüpfen, Spiegeln, Aufblitzen) kommt aus `src/render/stage.ts`.
 - Nicht im Umfang: Server, Konten, Chat, Käufe, Werbung, fremde Tracking-Dienste, Unity-Umsetzung.
+- Fehlende Bilder für den Spielmonat (Läufer, Ritter, Hauptmann, Turmstufen 3 bis 5, Burgfried, ausgebaute Gebäude): je Bild ein
+  eigener Prompt in `docs/SPRITES.md` („Einzelbilder“), Ablage unter `art/roh/einzeln/<name>.png`. Das Spiel nimmt für eine Stufe
+  das Bild der höchsten vorhandenen Stufe darunter (`levelSprite`), fehlende Bilder brechen nichts.
 - Bot-Allianz und Weltkarte sind Attrappen und im Code als Platzhalter zu markieren.
 - Arbeit in Meilensteinen; nach jedem anhalten und Bericht geben. M0 bis M5: die ersten 30 Minuten. M6: Testpaket.
   M7: Wachstum (Burgfried bis 8, Ausbaustufen, Lagerplatz). M8: Gegner (berechnete Wellen, Ritter, Hauptmann, Nachtangriff wächst mit).
-  Offen: M9 Tagesrhythmus, M10 Welt, M11 Monatsbogen.
+  M9: Tagesrhythmus (wechselnde Tagesziele, Wochenziel, Belohnung für die Rückkehr). M10: Welt (Ringe je Burgfried-Stufe,
+  Beute wächst nach, Heeresgröße über die Kaserne, Städte schlagen zurück). M11: Monatsbogen (Chronik bis zur Krönung, Kennzahlen für Tag 7 und 30,
+  Abgleich des Tempos über den Monat). Der Spielmonat ist damit durchgängig spielbar; offen sind Feinschliff und eigene Bilder.
 - Veröffentlichung: Push auf `main` baut und veröffentlicht nach `focus.micana.de` (GitHub Pages).
