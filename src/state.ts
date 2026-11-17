@@ -1,5 +1,5 @@
 // Geladene Daten, von allen Ansichten geteilt.
-import type { Catalog, Facts, IndicatorData } from "./lib/types.ts";
+import type { Catalog, CohortData, Facts, IndicatorData, PriceItems } from "./lib/types.ts";
 
 export const store: { catalog: Catalog } = { catalog: { fetchedAt: "", themes: [], indicators: [] } };
 
@@ -17,15 +17,24 @@ export function loadData(id: string): Promise<IndicatorData> {
   return pending;
 }
 
-let factsPending: Promise<Facts> | null = null;
+const fileCache = new Map<string, Promise<unknown>>();
 
-export function loadFacts(): Promise<Facts> {
-  factsPending ??= fetch("./data/facts.json").then((res) => {
-    if (!res.ok) throw new Error(`Querschnittsdaten nicht ladbar (HTTP ${res.status})`);
-    return res.json() as Promise<Facts>;
-  });
-  return factsPending;
+function loadFile<T>(name: string, what: string): Promise<T> {
+  if (!fileCache.has(name)) {
+    fileCache.set(
+      name,
+      fetch(`./data/${name}`).then((res) => {
+        if (!res.ok) throw new Error(`${what} nicht ladbar (HTTP ${res.status})`);
+        return res.json() as Promise<unknown>;
+      }),
+    );
+  }
+  return fileCache.get(name) as Promise<T>;
 }
+
+export const loadFacts = (): Promise<Facts> => loadFile<Facts>("facts.json", "Querschnittsdaten");
+export const loadPrices = (): Promise<PriceItems> => loadFile<PriceItems>("prices.json", "Preispositionen");
+export const loadCohorts = (): Promise<CohortData> => loadFile<CohortData>("cohorts.json", "Jahrgangsdaten");
 
 /** Zeitreihe einer Reihe, gesucht über den Namen; leerer Name = erste Reihe. Null, wenn Indikator oder Reihe fehlen. */
 export async function loadSeries(indicatorId: string, seriesName = ""): Promise<IndicatorData["series"][number] | null> {

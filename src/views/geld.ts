@@ -309,7 +309,7 @@ export function viewGeld(): HTMLElement {
 
       set(
         body,
-        h("div", { class: "filters" }, h("label", { class: "field" }, "Seit", yearSelect), h("label", { class: "field" }, "Branche", sectorSelect)),
+        h("div", { class: "filters" }, h("label", { class: "field" }, "Seit", yearSelect), h("label", { class: "field" }, "Branche", sectorSelect), h("a", { href: "#/preise" }, "Einzelne Preise ansehen →")),
         h(
           "details",
           { class: "panel", open: stored !== null },

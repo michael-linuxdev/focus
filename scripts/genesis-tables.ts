@@ -84,5 +84,12 @@ export const TABLES: TableSpec[] = [
   { code: "12621-0004", id: "genesis_12621-0004_m", title: "Lebenserwartung der Männer nach Bundesländern", themes: ["laender"], startyear: 2002, where: { GES: "GESM" }, intro: "Lebenserwartung bei Geburt in Jahren, Sterbetafel über drei Jahre", decimals: 1 },
 ];
 
-/** Tabellen ohne Zeitreihe; aus ihnen entsteht public/data/facts.json. */
-export const FACT_TABLES = { weights: "61111-0007", earnings: "62361-0031" } as const;
+/** Tabellen für die Zusatzdateien facts.json, prices.json und cohorts.json; Parameter wie bei den Indikatoren oben, damit jeder Abruf nur einmal läuft. */
+export const EXTRA_TABLES = {
+  weights: { code: "61111-0007", params: {} },
+  earnings: { code: "62361-0031", params: {} },
+  priceItems: { code: "61111-0003", params: { startyear: "2000" } },
+  ages: { code: "12411-0005", params: { startyear: "1970" } },
+  births: { code: "12612-0001", params: {} },
+  lifeTables: { code: "12621-0002", params: {} },
+} as const;

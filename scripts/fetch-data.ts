@@ -4,12 +4,13 @@
 // ohne Zugangsdaten bleiben die zuletzt gespeicherten GENESIS-Reihen erhalten.
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { isRate } from "../src/lib/catalog.ts";
-import { earningsFromRows, weightsFromRows } from "../src/lib/genesis-facts.ts";
+import { cohortsFromRows } from "../src/lib/cohort.ts";
+import { earningsFromRows, priceItemsFromRows, weightsFromRows } from "../src/lib/genesis-facts.ts";
 import { parseFlatCsv, specId, tableToIndicator } from "../src/lib/genesis-table.ts";
 import { findExtreme } from "../src/lib/stats.ts";
 import { normalizeIndicator, normalizeThemes } from "../src/lib/normalize.ts";
 import type { Catalog, Facts, IndicatorData, IndicatorMeta, Theme } from "../src/lib/types.ts";
-import { FACT_TABLES, NEW_THEMES, TABLES } from "./genesis-tables.ts";
+import { EXTRA_TABLES, NEW_THEMES, TABLES } from "./genesis-tables.ts";
 import { authFromEnv, fetchTableCsv } from "./lib/genesis.ts";
 
 const API = "https://www.dashboard-deutschland.de/api";
@@ -108,16 +109,28 @@ for (const spec of TABLES) {
 }
 
 if (auth) {
-  try {
-    const facts: Facts = {
-      ...weightsFromRows(parseFlatCsv(await tableCsv(FACT_TABLES.weights, {}))),
-      ...earningsFromRows(parseFlatCsv(await tableCsv(FACT_TABLES.earnings, {}))),
-    };
-    if (facts.weights.length === 0 || facts.earnings.length === 0) throw new Error("Gewichte oder Verdienste leer");
-    await writeFile(new URL("facts.json", OUT), JSON.stringify(facts));
-  } catch (error) {
-    genesisFailed.push(`Querschnittsdaten: ${String(error).slice(0, 200)}`);
-  }
+  const extra = (key: keyof typeof EXTRA_TABLES) => tableCsv(EXTRA_TABLES[key].code, EXTRA_TABLES[key].params).then(parseFlatCsv);
+  const write = async (file: string, build: () => Promise<{ ok: boolean; data: unknown }>): Promise<void> => {
+    try {
+      const { ok, data } = await build();
+      if (!ok) throw new Error("Ergebnis leer");
+      await writeFile(new URL(file, OUT), JSON.stringify(data));
+    } catch (error) {
+      genesisFailed.push(`${file}: ${String(error).slice(0, 200)}`);
+    }
+  };
+  await write("facts.json", async () => {
+    const facts: Facts = { ...weightsFromRows(await extra("weights")), ...earningsFromRows(await extra("earnings")) };
+    return { ok: facts.weights.length > 0 && facts.earnings.length > 0, data: facts };
+  });
+  await write("prices.json", async () => {
+    const prices = priceItemsFromRows(await extra("priceItems"), await extra("weights"));
+    return { ok: prices.items.length > 50, data: prices };
+  });
+  await write("cohorts.json", async () => {
+    const cohorts = cohortsFromRows(await extra("ages"), await extra("births"), await extra("lifeTables"));
+    return { ok: cohorts.years.length > 10 && cohorts.births.length > 10 && cohorts.remaining.male.length > 50, data: cohorts };
+  });
 }
 
 // Amtliche Tabellen stehen in ihrem Thema vorn, in der Reihenfolge der Liste; neue Themen stehen vor den übrigen.
