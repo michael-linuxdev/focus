@@ -1,11 +1,12 @@
 // Prüft, was ein GENESIS-Konto liefert: Anmeldung und einige Tabellenabrufe, mit Status und den ersten Zeilen.
 // Zugangsdaten aus GENESIS_USER und GENESIS_PASSWORD; ohne sie läuft der Gastzugang (nur zum Vergleich).
+// Mit API-Token: Token in GENESIS_USER, GENESIS_PASSWORD weglassen (das Passwortfeld bleibt dann leer).
 // Aufruf: node scripts/genesis-probe.ts [Tabellencode …]
 export {};
 
 const BASE = "https://genesis.destatis.de/genesisWS/rest/2020";
 const username = process.env.GENESIS_USER || "GAST";
-const password = process.env.GENESIS_PASSWORD || "GAST";
+const password = process.env.GENESIS_PASSWORD || (process.env.GENESIS_USER ? "" : "GAST");
 const tables = process.argv.slice(2).length ? process.argv.slice(2) : ["12411-0001", "61111-0002", "62361-0001", "12411-0010"];
 
 async function call(path: string, params: Record<string, string>): Promise<{ status: number; type: string; text: string }> {
@@ -17,7 +18,7 @@ async function call(path: string, params: Record<string, string>): Promise<{ sta
   return { status: res.status, type: res.headers.get("content-type") ?? "", text: await res.text() };
 }
 
-console.log(`Konto: ${username === "GAST" ? "Gastzugang" : "eigenes Konto"}`);
+console.log(`Konto: ${username === "GAST" ? "Gastzugang" : password ? "eigenes Konto mit Passwort" : "API-Token ohne Passwort"}`);
 const login = await call("helloworld/logincheck", {});
 console.log(`Anmeldung: HTTP ${login.status} ${login.text.slice(0, 200).replace(/\s+/g, " ")}`);
 
