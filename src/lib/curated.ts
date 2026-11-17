@@ -36,6 +36,15 @@ export interface Preset {
 
 export const PRESETS: Preset[] = [
   {
+    title: "Geburten und Sterbefälle",
+    question: "Seit wann sterben mehr Menschen, als geboren werden?",
+    years: 0,
+    series: [
+      { indicator: "genesis_12612-0001", series: "" },
+      { indicator: "genesis_12613-0001", series: "" },
+    ],
+  },
+  {
     title: "Löhne und Preise",
     question: "Steigen die Löhne schneller als die Verbraucherpreise?",
     years: 5,

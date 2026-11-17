@@ -1,4 +1,5 @@
 import type { SeriesRef } from "./curated.ts";
+import { formatDate, formatSigned, formatValue } from "./format.ts";
 import type { Catalog, IndicatorMeta, SeriesMeta } from "./types.ts";
 
 /** Reihen, deren Werte selbst schon Veränderungsraten oder Anteile sind. */
@@ -57,4 +58,68 @@ export function staleDays(indicator: IndicatorMeta, fetchedAt: string): number |
   const newest = Math.max(...indicator.series.map((sr) => sr.last[0]));
   const days = Math.floor((Date.parse(fetchedAt) - newest) / DAY);
   return days > STALE_AFTER_DAYS[indicator.frequency] ? days : null;
+}
+
+export interface Notable {
+  indicator: IndicatorMeta;
+  series: SeriesMeta;
+  /** Fertiger Satzteil, z. B. „stärkster Anstieg zum Vorjahr seit März 2011“. */
+  text: string;
+  value: string;
+}
+
+function sinceText(indicator: IndicatorMeta, series: SeriesMeta): string {
+  const extreme = series.extreme!;
+  if (extreme.since === null) return `im gesamten Zeitraum der Reihe (ab ${new Date(series.first[0]).getUTCFullYear()})`;
+  return `seit ${formatDate(extreme.since, indicator.frequency)}`;
+}
+
+/** Beschreibt den auffälligen Wert einer Reihe in Worten. */
+export function describeExtreme(indicator: IndicatorMeta, series: SeriesMeta): Notable | null {
+  const extreme = series.extreme;
+  if (!extreme) return null;
+  const since = sinceText(indicator, series);
+  if (isRate(indicator)) {
+    return {
+      indicator,
+      series,
+      text: `${extreme.dir === "high" ? "höchster" : "niedrigster"} Stand ${since}`,
+      value: formatValue(extreme.value, indicator.decimals, indicator.unit),
+    };
+  }
+  const rising = extreme.value >= 0;
+  const text =
+    extreme.dir === "high"
+      ? rising
+        ? `stärkster Anstieg zum Vorjahr ${since}`
+        : `geringster Rückgang zum Vorjahr ${since}`
+      : rising
+        ? `schwächster Anstieg zum Vorjahr ${since}`
+        : `stärkster Rückgang zum Vorjahr ${since}`;
+  return { indicator, series, text, value: `${formatSigned(extreme.value, 1)} %` };
+}
+
+/**
+ * Die auffälligsten Reihen des Katalogs: je Indikator höchstens eine, sortiert nach der Länge des Zeitraums
+ * ohne vergleichbaren Wert. Veraltete Reihen und Ländertabellen bleiben außen vor.
+ */
+export function notable(catalog: Catalog, limit: number): Notable[] {
+  const found: Notable[] = [];
+  for (const indicator of catalog.indicators) {
+    if (indicator.region || staleDays(indicator, catalog.fetchedAt) !== null) continue;
+    const best = indicator.series.filter((sr) => sr.extreme).sort((a, b) => b.extreme!.years - a.extreme!.years)[0];
+    const described = best ? describeExtreme(indicator, best) : null;
+    if (described) found.push(described);
+  }
+  return found.sort((a, b) => b.series.extreme!.years - a.series.extreme!.years).slice(0, limit);
+}
+
+/** Geldbeträge, die sich preisbereinigen und je Einwohner umrechnen lassen; liefert den Faktor auf Euro. */
+export function euroScale(indicator: IndicatorMeta): number | null {
+  const text = `${indicator.intro} ${indicator.unit}`;
+  if (!/Euro|€/.test(text) || /Index|preisbereinigt|je Einwohner|pro Liter|pro Megawatt|je Barrel|Prozent/i.test(text)) return null;
+  if (/Mrd\./.test(text)) return 1e9;
+  if (/Mio\./.test(text)) return 1e6;
+  if (/Tsd\.|Tausend/.test(text)) return 1e3;
+  return 1;
 }

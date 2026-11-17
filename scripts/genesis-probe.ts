@@ -13,21 +13,24 @@ console.log(`Anmeldung: HTTP ${login.status} ${(await login.text()).slice(0, 200
 
 let failed = 0;
 for (const spec of tables) {
-  const [name = "", startyear] = spec.split(":");
+  // Form: Code[:Startjahr[:weitere Parameter als a=b&c=d]]
+  const [name = "", startyear, extra = ""] = spec.split(":");
+  const params: Record<string, string> = Object.fromEntries(new URLSearchParams(extra));
+  if (startyear) params.startyear = startyear;
   const started = Date.now();
   try {
-    const csv = await fetchTableCsv(auth, name, startyear ? { startyear } : {});
+    const csv = await fetchTableCsv(auth, name, params);
     const lines = csv.split(/\r?\n/).filter(Boolean);
     const rows = parseFlatCsv(csv);
     console.log(`\n== ${spec}: ${csv.length} Zeichen, ${rows.length} Zeilen, ${Date.now() - started} ms`);
-    console.log(lines.slice(0, 3).join("\n"));
+    console.log(lines.slice(1, 2).join("\n"));
     const times = rows.map(rowTime).filter((t) => t !== null).sort((a, b) => a - b);
     const day = (t: number | undefined): string => (t === undefined ? "?" : new Date(t).toISOString().slice(0, 10));
     console.log(`Zeitraum: ${day(times[0])} bis ${day(times[times.length - 1])}`);
     const count = (key: (row: Record<string, string>) => string): string => {
       const seen = new Map<string, number>();
       for (const row of rows) seen.set(key(row), (seen.get(key(row)) ?? 0) + 1);
-      return [...seen.entries()].slice(0, 25).map(([k, n]) => `${k} (${n})`).join(" · ") + (seen.size > 25 ? ` · … insgesamt ${seen.size}` : "");
+      return [...seen.entries()].slice(0, 130).map(([k, n]) => `${k} (${n})`).join(" · ") + (seen.size > 130 ? ` · … insgesamt ${seen.size}` : "");
     };
     console.log(`Merkmale: ${count((row) => `${row.value_variable_code} „${row.value_variable_label}“ [${row.value_unit}]`)}`);
     for (let n = 1; rows[0]?.[`${n}_variable_code`] !== undefined; n++) {

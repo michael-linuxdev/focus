@@ -20,7 +20,7 @@ In Cloud-Sitzungen braucht Node für Abrufe `NODE_USE_ENV_PROXY=1`, und die Host
 `genesis.destatis.de` müssen in der Umgebung freigegeben sein.
 
 Kein Commit mit fehlschlagenden Tests. Vor jeder Fertigmeldung: `npm test && npm run build`, danach die geänderten
-Ansichten im Browser ansehen.
+Ansichten im Browser ansehen (Desktop und 390 px Breite, ohne waagerechtes Scrollen).
 
 ## Aufbau
 
@@ -31,7 +31,15 @@ Ansichten im Browser ansehen.
 - `scripts/lib/genesis.ts` Abruf bei GENESIS-Online, `src/lib/genesis-table.ts` Aufbereitung der Tabellen,
   `scripts/genesis-tables.ts` Auswahl der Tabellen. GENESIS-Indikatoren heißen `genesis_<Tabellencode>`.
 - `src/lib/curated.ts` redaktionelle Auswahl: Kacheln im Überblick und vorbereitete Vergleiche.
-- `src/ui/` Diagramm und DOM-Hilfen, `src/main.ts` Ansichten und Navigation über den Adress-Anker.
+- `src/ui/` Diagramm, Balkenliste und DOM-Hilfen, `src/state.ts` geladene Daten, `src/main.ts` Überblick, Themen,
+  Indikator, Vergleich und Navigation über den Adress-Anker.
+- `src/views/geld.ts` Bereich „Mein Geld“ (Rechenwege in `src/lib/money.ts`): persönliche Teuerung mit eigenem Warenkorb,
+  Verdienste gegen Preise, Arbeitszeit je Ausgabengruppe, Erschwinglichkeit von Wohneigentum.
+  Braucht `public/data/facts.json` (Wägungsschema, Verdienste im Stichmonat).
+- `src/views/laender.ts` Ländervergleich (Rechenwege in `src/lib/regions.ts`): Rangliste, Veränderung, Schere; die
+  Kennzahlen samt abgeleiteter Größen stehen in der Liste `METRICS`.
+- Auffällige Werte: `findExtreme` in `src/lib/stats.ts` vermerkt beim Datenabruf je Reihe, ob der jüngste Wert seit
+  mindestens fünf Jahren nicht erreicht wurde; der Überblick zeigt die auffälligsten.
 
 ## Regeln
 
@@ -39,6 +47,9 @@ Ansichten im Browser ansehen.
 - Texte aus der Schnittstelle nie als HTML einsetzen (nur über `h()` aus `src/ui/dom.ts`).
 - Diagramme: eine Achse je Diagramm, nie zwei Skalen. Verschiedene Einheiten werden indexiert oder getrennt gezeigt.
   Farbplätze gehören fest zur Reihe; höchstens acht gleichzeitig. Jede Zahl ist auch über die Tabelle erreichbar.
+- Indizes (Preise, Mieten, Verdienste) zeigen nur Entwicklungen. Nie als Rangliste von Ständen ausgeben und nie zwischen
+  Ländern als Niveau vergleichen.
+- Abgeleitete Zahlen nennen ihre Annahmen direkt an der Zahl (z. B. Zinsnäherung, brutto statt netto).
 - Keine Zugangsdaten im Repository. Ein GENESIS-Konto käme als Geheimnis in GitHub Actions.
 - Bezeichner englisch, Oberflächentexte und Dokumente deutsch.
 - Veröffentlichung: Push auf `main` baut und veröffentlicht nach `focus.micana.de` (GitHub Pages), dazu täglich per Zeitplan.
