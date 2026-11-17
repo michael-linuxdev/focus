@@ -7,7 +7,7 @@ import { authFromEnv, fetchTableCsv, genesisPost, SOURCES, type Source } from ".
 // PROBE_SOURCE=regional prüft die Regionaldatenbank, PROBE_GUEST=true erzwingt den Gastzugang.
 // Ein Eintrag „find=Begriff“ sucht Tabellen, statt eine abzurufen.
 const source: Source = process.env.PROBE_SOURCE === "regional" ? "regional" : "destatis";
-const auth = (process.env.PROBE_GUEST === "true" ? null : authFromEnv()) ?? { username: "GAST", password: "GAST" };
+const auth = (process.env.PROBE_GUEST === "true" ? null : authFromEnv(source)) ?? { username: "GAST", password: "GAST" };
 console.log(`Datenbank: ${SOURCES[source]}`);
 const tables = process.argv.slice(2).length ? process.argv.slice(2) : ["12411-0001", "61111-0002", "62361-0001", "12411-0010"];
 

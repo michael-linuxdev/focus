@@ -94,3 +94,20 @@ export const EXTRA_TABLES = {
   births: { code: "12612-0001", params: {} },
   lifeTables: { code: "12621-0002", params: {} },
 } as const;
+
+const YEAR = new Date().getUTCFullYear();
+
+/**
+ * Kreistabellen aus GENESIS-Online für kreise.json. Gebraucht wird jeweils nur der jüngste Stand; das Startjahr
+ * hält die Abrufe klein (die Pkw-Tabelle nach Kraftstoffarten hat je Jahr rund zehn Megabyte).
+ */
+export const KREIS_TABLES = {
+  population: { code: "12411-0015", params: { startyear: "2011" } },
+  area: { code: "11111-0002", params: { startyear: String(YEAR - 4) } },
+  ages: { code: "12411-0017", params: { startyear: String(YEAR - 2) } },
+  foreigners: { code: "12521-0040", params: { startyear: String(YEAR - 2) } },
+  housing: { code: "31231-0020", params: { startyear: String(YEAR - 3) } },
+  vehicles: { code: "46251-0020", params: { startyear: String(YEAR - 1) } },
+  carsByFuel: { code: "46251-0021", params: { startyear: String(YEAR - 1) } },
+  fathers: { code: "22922-0042", params: { startyear: String(YEAR - 4) } },
+} as const;

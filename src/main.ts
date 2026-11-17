@@ -9,6 +9,7 @@ import { h, set } from "./ui/dom.ts";
 import { YEAR, dataTable, rangeControl, sourcesLine } from "./ui/parts.ts";
 import { viewGeld } from "./views/geld.ts";
 import { viewJahrgang } from "./views/jahrgang.ts";
+import { viewKreis } from "./views/kreis.ts";
 import { viewLaender } from "./views/laender.ts";
 import { viewPreise } from "./views/preise.ts";
 
@@ -153,6 +154,9 @@ function viewHome(): HTMLElement {
         : null,
       catalog.indicators.some((i) => i.id === "genesis_12612-0001")
         ? h("a", { class: "card", href: "#/jahrgang" }, h("h3", {}, "Mein Jahrgang"), h("div", { class: "desc" }, "Wie groß war dein Geburtsjahrgang, wie groß ist er heute, und welche Lebenserwartung nennt die Statistik für dein Alter?"))
+        : null,
+      catalog.indicators.some((i) => i.region)
+        ? h("a", { class: "card", href: "#/kreis" }, h("h3", {}, "Mein Landkreis"), h("div", { class: "desc" }, "Einwohner, Altersstruktur, Wohnfläche, Autos und mehr für deinen Kreis – mit Platz unter allen Kreisen und im eigenen Bundesland."))
         : null,
       catalog.indicators.some((i) => i.region)
         ? h("a", { class: "card", href: "#/laender" }, h("h3", {}, "Bundesländer im Vergleich"), h("div", { class: "desc" }, "Einkommen, Kaufkraft, Mieten, Arbeitslosigkeit und Lebenserwartung: Wo steht dein Land, und geht die Schere auf oder zu?"))
@@ -663,6 +667,7 @@ function render(): void {
   else if (parts[0] === "geld") view = viewGeld();
   else if (parts[0] === "preise") view = viewPreise();
   else if (parts[0] === "jahrgang") view = viewJahrgang(params);
+  else if (parts[0] === "kreis") view = viewKreis(params);
   else if (parts[0] === "laender") view = viewLaender(params);
   else if (parts[0] === "suche") view = viewSearch(params.get("q") ?? "");
   else view = viewMissing();
@@ -695,7 +700,7 @@ function render(): void {
         "div",
         { class: "bar" },
         h("a", { class: "brand", href: "#/" }, "Lagebild Deutschland"),
-        h("nav", {}, navLink("#/", "Überblick", parts.length === 0), navLink("#/geld", "Mein Geld", parts[0] === "geld" || parts[0] === "preise"), navLink("#/jahrgang", "Mein Jahrgang", parts[0] === "jahrgang"), navLink("#/laender", "Länder", parts[0] === "laender"), navLink("#/vergleich", "Vergleichen", parts[0] === "vergleich")),
+        h("nav", {}, navLink("#/", "Überblick", parts.length === 0), navLink("#/geld", "Mein Geld", parts[0] === "geld" || parts[0] === "preise"), navLink("#/jahrgang", "Mein Jahrgang", parts[0] === "jahrgang"), navLink("#/kreis", "Mein Landkreis", parts[0] === "kreis"), navLink("#/laender", "Länder", parts[0] === "laender"), navLink("#/vergleich", "Vergleichen", parts[0] === "vergleich")),
         form,
       ),
     ),
@@ -710,7 +715,7 @@ function render(): void {
       `, Statistisches Bundesamt (Destatis); die Quelle jedes Indikators steht auf seiner Seite. Abgerufen am ${formatShortDate(catalog.fetchedAt)}. Kein amtliches Angebot.`,
     ),
   );
-  if (parts[0] !== "vergleich" && parts[0] !== "laender") window.scrollTo(0, 0);
+  if (parts[0] !== "vergleich" && parts[0] !== "laender" && parts[0] !== "kreis") window.scrollTo(0, 0);
 }
 
 fetch("./data/catalog.json")

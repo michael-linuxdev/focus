@@ -7,10 +7,11 @@ import { isRate } from "../src/lib/catalog.ts";
 import { cohortsFromRows } from "../src/lib/cohort.ts";
 import { earningsFromRows, priceItemsFromRows, weightsFromRows } from "../src/lib/genesis-facts.ts";
 import { parseFlatCsv, specId, tableToIndicator } from "../src/lib/genesis-table.ts";
+import { kreiseFromTables, type KreisTables } from "../src/lib/kreise.ts";
 import { findExtreme } from "../src/lib/stats.ts";
 import { normalizeIndicator, normalizeThemes } from "../src/lib/normalize.ts";
 import type { Catalog, Facts, IndicatorData, IndicatorMeta, Theme } from "../src/lib/types.ts";
-import { EXTRA_TABLES, NEW_THEMES, TABLES } from "./genesis-tables.ts";
+import { EXTRA_TABLES, KREIS_TABLES, NEW_THEMES, TABLES } from "./genesis-tables.ts";
 import { authFromEnv, fetchTableCsv } from "./lib/genesis.ts";
 
 const API = "https://www.dashboard-deutschland.de/api";
@@ -126,6 +127,14 @@ if (auth) {
   await write("prices.json", async () => {
     const prices = priceItemsFromRows(await extra("priceItems"), await extra("weights"));
     return { ok: prices.items.length > 50, data: prices };
+  });
+  await write("kreise.json", async () => {
+    const tables = {} as KreisTables;
+    for (const key of Object.keys(KREIS_TABLES) as (keyof typeof KREIS_TABLES)[]) {
+      tables[key] = parseFlatCsv(await tableCsv(KREIS_TABLES[key].code, KREIS_TABLES[key].params));
+    }
+    const kreise = kreiseFromTables(tables);
+    return { ok: kreise.kreise.length > 300, data: kreise };
   });
   await write("cohorts.json", async () => {
     const cohorts = cohortsFromRows(await extra("ages"), await extra("births"), await extra("lifeTables"));

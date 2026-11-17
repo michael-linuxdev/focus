@@ -109,3 +109,31 @@ export interface CohortData {
   /** Lebenserwartung bei Geburt über die Zeit: [Endjahr der Sterbetafel, Jahre]. */
   atBirth: { male: [number, number][]; female: [number, number][] };
 }
+
+/** Rohwerte je Kreis für „Mein Landkreis“. Fehlende Angaben bleiben weg. */
+export interface Kreis {
+  /** Fünfstelliger amtlicher Kreisschlüssel; die ersten zwei Stellen sind das Bundesland. */
+  code: string;
+  name: string;
+  /** Einwohner je Stichtagsjahr (31. Dezember). */
+  population: [number, number][];
+  areaKm2?: number;
+  under18?: number;
+  over65?: number;
+  /** Einwohner des Jahres, auf das sich `under18` und `over65` beziehen. */
+  agesTotal?: number;
+  foreigners?: number;
+  flats?: number;
+  /** Wohnfläche in Quadratmetern. */
+  livingAreaM2?: number;
+  cars?: number;
+  electricCars?: number;
+  /** Anteil der Väter, die Elterngeld beziehen, in Prozent. */
+  fathersShare?: number;
+}
+
+export interface KreisData {
+  kreise: Kreis[];
+  /** Datenstand je Angabe, z. B. „31.12.2025“. */
+  stand: Record<string, string>;
+}

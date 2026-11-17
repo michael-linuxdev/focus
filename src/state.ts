@@ -1,5 +1,5 @@
 // Geladene Daten, von allen Ansichten geteilt.
-import type { Catalog, CohortData, Facts, IndicatorData, PriceItems } from "./lib/types.ts";
+import type { Catalog, CohortData, Facts, IndicatorData, KreisData, PriceItems } from "./lib/types.ts";
 
 export const store: { catalog: Catalog } = { catalog: { fetchedAt: "", themes: [], indicators: [] } };
 
@@ -34,6 +34,7 @@ function loadFile<T>(name: string, what: string): Promise<T> {
 
 export const loadFacts = (): Promise<Facts> => loadFile<Facts>("facts.json", "Querschnittsdaten");
 export const loadPrices = (): Promise<PriceItems> => loadFile<PriceItems>("prices.json", "Preispositionen");
+export const loadKreise = (): Promise<KreisData> => loadFile<KreisData>("kreise.json", "Kreisdaten");
 export const loadCohorts = (): Promise<CohortData> => loadFile<CohortData>("cohorts.json", "Jahrgangsdaten");
 
 /** Zeitreihe einer Reihe, gesucht über den Namen; leerer Name = erste Reihe. Null, wenn Indikator oder Reihe fehlen. */

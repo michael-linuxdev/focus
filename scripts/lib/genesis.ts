@@ -15,9 +15,15 @@ export interface GenesisAuth {
   password: string;
 }
 
-export function authFromEnv(): GenesisAuth | null {
-  const username = process.env.GENESIS_USER;
-  return username ? { username, password: process.env.GENESIS_PASSWORD ?? "" } : null;
+/**
+ * Zugangsdaten aus der Umgebung. GENESIS-Online: GENESIS_USER (Benutzername oder API-Token), GENESIS_PASSWORD.
+ * Die Regionaldatenbank braucht ein eigenes Konto: REGIONAL_USER und REGIONAL_PASSWORD; der Token von
+ * GENESIS-Online gilt dort nicht.
+ */
+export function authFromEnv(source: Source = "destatis"): GenesisAuth | null {
+  const prefix = source === "regional" ? "REGIONAL" : "GENESIS";
+  const username = process.env[`${prefix}_USER`];
+  return username ? { username, password: process.env[`${prefix}_PASSWORD`] ?? "" } : null;
 }
 
 export async function genesisPost(auth: GenesisAuth, path: string, params: Record<string, string>, source: Source = "destatis"): Promise<Response> {

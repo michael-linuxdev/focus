@@ -617,3 +617,49 @@ button.bar-button[aria-pressed="true"] {
 button.bar-button[aria-pressed="true"]::before {
   content: "✓ ";
 }
+
+.rankbar {
+  position: relative;
+  height: 6px;
+  margin: 8px 0 6px;
+  border-radius: 3px;
+  background: var(--grid);
+}
+.rankbar-mid {
+  position: absolute;
+  left: 50%;
+  top: -3px;
+  bottom: -3px;
+  width: 1px;
+  background: var(--axis);
+}
+.rankbar-dot {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  background: var(--s1);
+  border: 2px solid var(--surface);
+}
+a.card.current {
+  border-color: var(--accent);
+}
+a.chip-link {
+  display: inline-block;
+  padding: 3px 10px;
+  border: 1px solid var(--axis);
+  border-radius: 999px;
+  font-size: 0.9rem;
+  text-decoration: none;
+  color: var(--ink);
+  background: var(--surface);
+}
+a.chip-link:hover {
+  border-color: var(--accent);
+}
+.bar-row.highlight .bar-button {
+  color: var(--ink);
+  font-weight: 650;
+}

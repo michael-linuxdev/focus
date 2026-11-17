@@ -37,6 +37,8 @@ jobs:
         env:
           GENESIS_USER: ${{ secrets.GENESIS_USER }}
           GENESIS_PASSWORD: ${{ secrets.GENESIS_PASSWORD }}
+          REGIONAL_USER: ${{ secrets.REGIONAL_USER }}
+          REGIONAL_PASSWORD: ${{ secrets.REGIONAL_PASSWORD }}
           TABLES: ${{ inputs.tables }}
           PROBE_SOURCE: ${{ inputs.source }}
           PROBE_GUEST: ${{ inputs.guest }}
