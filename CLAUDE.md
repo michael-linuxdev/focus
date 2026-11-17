@@ -40,3 +40,9 @@ Ansichten im Browser ansehen.
 - Keine Zugangsdaten im Repository. Ein GENESIS-Konto käme als Geheimnis in GitHub Actions.
 - Bezeichner englisch, Oberflächentexte und Dokumente deutsch.
 - Veröffentlichung: Push auf `main` baut und veröffentlicht nach `focus.micana.de` (GitHub Pages), dazu täglich per Zeitplan.
+
+## Offen
+
+- GENESIS-Konto: Der Auftraggeber legt ein kostenloses Konto bei GENESIS-Online an (`genesis.destatis.de`). Solange hier
+  keines vermerkt ist, zu Beginn einer Sitzung daran erinnern. Danach: Zugangsdaten als Geheimnis in GitHub Actions,
+  Tabellenabruf in `scripts/` ergänzen (Bevölkerung, Reallohnindex, Regionaldaten) und `docs/API-BEFUND.md` nachziehen.
