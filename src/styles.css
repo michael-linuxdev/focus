@@ -470,3 +470,126 @@ details summary {
 .selected button {
   padding: 2px 9px;
 }
+
+.bars {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+.bar-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 38%) 1fr minmax(64px, auto);
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
+}
+.bar-row:hover .bar-fill {
+  filter: brightness(1.12);
+}
+.bar-row.highlight .bar-label {
+  font-weight: 650;
+}
+.bar-label {
+  overflow-wrap: anywhere;
+}
+.bar-track {
+  position: relative;
+  height: 14px;
+}
+.bar-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--c);
+}
+.bar-fill.pos {
+  border-radius: 0 4px 4px 0;
+}
+.bar-fill.neg {
+  border-radius: 4px 0 0 4px;
+}
+.bar-zero {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 1px;
+  background: var(--axis);
+}
+.bar-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.cols {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
+  align-items: start;
+}
+.panel h3 {
+  margin-bottom: 4px;
+}
+.panel > .muted.small {
+  margin-bottom: 10px;
+}
+.big {
+  font-size: 2rem;
+  font-weight: 650;
+  line-height: 1.15;
+}
+.field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95rem;
+  min-width: 0;
+  max-width: 100%;
+}
+.field select {
+  min-width: 0;
+  max-width: 100%;
+  text-overflow: ellipsis;
+}
+.cols > * {
+  min-width: 0;
+}
+select,
+input[type="number"] {
+  font: inherit;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--axis);
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+input[type="number"] {
+  width: 5.5rem;
+}
+.weights {
+  display: grid;
+  gap: 6px 14px;
+  grid-template-columns: repeat(auto-fill, minmax(min(250px, 100%), 1fr));
+}
+.weights label {
+  display: grid;
+  grid-template-columns: 1fr 4.2rem;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+.weights input {
+  width: 100%;
+  text-align: right;
+}
+.badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  border: 1px solid var(--axis);
+  border-radius: 999px;
+  padding: 0 8px;
+  color: var(--ink-2);
+  margin-left: 6px;
+  vertical-align: middle;
+}

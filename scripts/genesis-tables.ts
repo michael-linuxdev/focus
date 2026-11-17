@@ -61,7 +61,8 @@ export const TABLES: TableSpec[] = [
     title: "Bruttomonatsverdienste nach Branchen",
     themes: ["verdienste"],
     startyear: 2007,
-    where: { WZ08B6: "/^WZ08-([A-S]|A-S)$/" },
+    // Einzelne Wirtschaftsabschnitte sowie die beiden Gesamtgrößen; „B-S“ reicht weiter zurück als „A-S“.
+    where: { WZ08B6: "/^WZ08-([A-S]|A-S|B-S)$/" },
     decimals: 1,
   },
   // Bundesländer

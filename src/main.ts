@@ -1,31 +1,20 @@
-import { isRate, resolve, search, staleDays, yearChange, type Resolved } from "./lib/catalog.ts";
+import { euroScale, isRate, notable, resolve, search, staleDays, yearChange, type Resolved } from "./lib/catalog.ts";
 import { HEADLINES, PRESETS, type SeriesRef } from "./lib/curated.ts";
 import { formatDate, formatNumber, formatShortDate, formatSigned, formatValue } from "./lib/format.ts";
-import { clip, comovement, describeComovement, indexTo100 } from "./lib/stats.ts";
-import type { Catalog, Frequency, IndicatorData, IndicatorMeta, Point } from "./lib/types.ts";
+import { clip, comovement, deflate, describeComovement, indexTo100, leadLag, perCapita } from "./lib/stats.ts";
+import type { Catalog, Frequency, IndicatorMeta } from "./lib/types.ts";
 import { legend, lineChart, sparkline, type ChartSeries } from "./ui/chart.ts";
+import { loadData, loadSeries, store } from "./state.ts";
 import { h, set } from "./ui/dom.ts";
+import { YEAR, dataTable, rangeControl, sourcesLine } from "./ui/parts.ts";
+import { viewGeld } from "./views/geld.ts";
+import { viewLaender } from "./views/laender.ts";
 
-const YEAR = 365.25 * 86_400_000;
 const MAX_COMPARE = 6;
 const FREQUENCY_ORDER: Frequency[] = ["täglich", "wöchentlich", "monatlich", "vierteljährlich", "jährlich"];
 
 const app = document.getElementById("app")!;
 let catalog: Catalog;
-const dataCache = new Map<string, Promise<IndicatorData>>();
-
-function loadData(id: string): Promise<IndicatorData> {
-  let pending = dataCache.get(id);
-  if (!pending) {
-    pending = fetch(`./data/series/${encodeURIComponent(id)}.json`).then((res) => {
-      if (!res.ok) throw new Error(`Daten für ${id} nicht ladbar (HTTP ${res.status})`);
-      return res.json() as Promise<IndicatorData>;
-    });
-    dataCache.set(id, pending);
-  }
-  return pending;
-}
-
 // ---------- Vergleichsauswahl in der Adresse ----------
 
 interface Pick {
@@ -48,11 +37,12 @@ function parsePicks(value: string | null): Pick[] {
   return picks.slice(0, MAX_COMPARE);
 }
 
-function compareHref(picks: Pick[], years: number, mode?: string): string {
+function compareHref(picks: Pick[], years: number, mode?: string, transforms: string[] = []): string {
   const params = new URLSearchParams();
   if (picks.length) params.set("s", picks.map((p) => `${p.indicator}~${p.index}~${p.slot}`).join(","));
   params.set("r", String(years));
   if (mode) params.set("m", mode);
+  if (transforms.length) params.set("t", transforms.join(","));
   return `#/vergleich?${params.toString()}`;
 }
 
@@ -120,66 +110,6 @@ function indicatorCard(indicator: IndicatorMeta): HTMLElement {
   );
 }
 
-function rangeControl(years: number, spanYears: number, onPick: (years: number) => void): HTMLElement {
-  const options: [string, number][] = [
-    ["1 Jahr", 1],
-    ["5 Jahre", 5],
-    ["10 Jahre", 10],
-    ["Alles", 0],
-  ];
-  return h(
-    "div",
-    { class: "seg", role: "group", "aria-label": "Zeitraum" },
-    ...options
-      .filter(([, value]) => value === 0 || value < spanYears + 0.5)
-      .map(([text, value]) => h("button", { type: "button", "aria-pressed": String(value === years), onclick: () => onPick(value) }, text)),
-  );
-}
-
-function dataTable(columns: { name: string; data: Point[] }[], frequency: Frequency, decimals: number): HTMLElement {
-  const times = [...new Set(columns.flatMap((c) => c.data.map((p) => p[0])))].sort((a, b) => b - a);
-  const limit = 60;
-  const lookups = columns.map((c) => new Map(c.data));
-  const table = h(
-    "table",
-    {},
-    h("thead", {}, h("tr", {}, h("th", { scope: "col" }, "Zeitpunkt"), ...columns.map((c) => h("th", { scope: "col" }, c.name)))),
-    h(
-      "tbody",
-      {},
-      ...times.slice(0, limit).map((time) =>
-        h(
-          "tr",
-          {},
-          h("td", {}, formatDate(time, frequency)),
-          ...lookups.map((lookup) => {
-            const value = lookup.get(time);
-            return h("td", {}, value === undefined ? "–" : formatNumber(value, decimals));
-          }),
-        ),
-      ),
-    ),
-  );
-  return h(
-    "details",
-    {},
-    h("summary", {}, "Werte als Tabelle"),
-    h("div", { class: "table-wrap" }, table),
-    times.length > limit ? h("p", { class: "muted small" }, `Gezeigt sind die jüngsten ${limit} von ${times.length} Zeitpunkten.`) : null,
-  );
-}
-
-function sourcesLine(indicator: IndicatorMeta): HTMLElement {
-  const p = h("p", { class: "muted small" }, "Quelle: ");
-  indicator.sources.forEach((source, i) => {
-    if (i) p.append(", ");
-    p.append(/^https?:\/\//.test(source.link) ? h("a", { href: source.link, rel: "noopener", target: "_blank" }, source.name) : source.name);
-  });
-  if (indicator.sources.length === 0) p.append("Dashboard Deutschland");
-  p.append(` · Datenstand ${indicator.stand || "unbekannt"} · ${indicator.frequency}`);
-  return p;
-}
-
 // ---------- Ansichten ----------
 
 function viewHome(): HTMLElement {
@@ -187,6 +117,7 @@ function viewHome(): HTMLElement {
     const found = resolve(catalog, hl) ?? (hl.fallback ? resolve(catalog, hl.fallback) : null);
     return found ? headlineTile(hl.label, found) : null;
   });
+  const unusual = notable(catalog, 6);
   const presets = PRESETS.map((preset) => {
     const picks = refsToPicks(preset.series);
     if (picks.length < 2) return null;
@@ -208,6 +139,37 @@ function viewHome(): HTMLElement {
     ),
     h("h2", {}, "Auf einen Blick"),
     h("div", { class: "grid" }, ...tiles),
+    h("h2", {}, "Für dich gerechnet"),
+    h(
+      "div",
+      { class: "grid wide" },
+      catalog.indicators.some((i) => i.id === "genesis_61111-0003")
+        ? h("a", { class: "card", href: "#/geld" }, h("h3", {}, "Mein Geld"), h("div", { class: "desc" }, "Deine persönliche Teuerung mit eigenem Warenkorb, Lohn gegen Preise in deiner Branche, Arbeitszeit statt Euro und die Erschwinglichkeit von Wohneigentum."))
+        : null,
+      catalog.indicators.some((i) => i.region)
+        ? h("a", { class: "card", href: "#/laender" }, h("h3", {}, "Bundesländer im Vergleich"), h("div", { class: "desc" }, "Einkommen, Kaufkraft, Mieten, Arbeitslosigkeit und Lebenserwartung: Wo steht dein Land, und geht die Schere auf oder zu?"))
+        : null,
+    ),
+    ...(unusual.length
+      ? [
+          h("h2", {}, "Gerade auffällig"),
+          h("p", { class: "muted small", style: "margin-bottom:10px" }, "Reihen, deren jüngster Wert seit mindestens fünf Jahren nicht so hoch oder so niedrig war. Automatisch aus allen Reihen ermittelt; veraltete Reihen sind ausgenommen."),
+          h(
+            "div",
+            { class: "grid wide" },
+            ...unusual.map((n) =>
+              h(
+                "a",
+                { class: "card", href: `#/i/${n.indicator.id}` },
+                h("h3", {}, n.series.name === n.indicator.title || n.indicator.series.length === 1 ? n.indicator.title : `${n.series.name}`),
+                n.indicator.series.length > 1 && n.series.name !== n.indicator.title ? h("div", { class: "meta", style: "margin-top:0" }, n.indicator.title) : null,
+                h("div", { class: "desc" }, h("strong", {}, n.value), ` – ${n.text}`),
+                h("div", { class: "meta" }, `Stand ${formatDate(n.series.last[0], n.indicator.frequency)}`),
+              ),
+            ),
+          ),
+        ]
+      : []),
     h("h2", {}, "Zusammenhänge"),
     h("p", { class: "muted small", style: "margin-bottom:10px" }, "Vorbereitete Vergleiche über Themengrenzen hinweg. Jeder lässt sich um weitere Reihen ergänzen."),
     h("div", { class: "grid wide" }, ...presets),
@@ -368,6 +330,8 @@ function viewCompare(params: URLSearchParams): HTMLElement {
   const picks = parsePicks(params.get("s"));
   const years = Number(params.get("r") ?? 10) || 0;
   const requestedMode = params.get("m");
+  const transforms = (params.get("t") ?? "").split(",").filter((t) => t === "real" || t === "kopf");
+  const href = (p: Pick[] = picks, y: number = years, m: string | undefined = requestedMode ?? undefined, t: string[] = transforms): string => compareHref(p, y, m, t);
   const resolved = picks.map((p) => {
     const indicator = catalog.indicators.find((i) => i.id === p.indicator)!;
     return { pick: p, indicator, series: indicator.series[p.index]! };
@@ -403,7 +367,7 @@ function viewCompare(params: URLSearchParams): HTMLElement {
                     type: "button",
                     disabled: taken || picks.length >= MAX_COMPARE,
                     onclick: () => {
-                      location.hash = compareHref([...picks, { indicator: indicator.id, index, slot: freeSlot(picks) }], years);
+                      location.hash = href([...picks, { indicator: indicator.id, index, slot: freeSlot(picks) }]);
                     },
                   },
                   taken ? `✓ ${sr.name}` : `+ ${sr.name}`,
@@ -443,7 +407,7 @@ function viewCompare(params: URLSearchParams): HTMLElement {
                   type: "button",
                   "aria-label": `${r.series.name} entfernen`,
                   onclick: () => {
-                    location.hash = compareHref(picks.filter((p) => p !== r.pick), years, requestedMode ?? undefined);
+                    location.hash = href(picks.filter((p) => p !== r.pick));
                   },
                 },
                 "×",
@@ -467,9 +431,39 @@ function viewCompare(params: URLSearchParams): HTMLElement {
   );
   if (picks.length === 0) return root;
 
-  Promise.all(resolved.map((r) => loadData(r.indicator.id))).then(
-    (loaded) => {
-      const full = resolved.map((r, i) => loaded[i]!.series[r.pick.index]!.data);
+  const scales = resolved.map((r) => euroScale(r.indicator));
+  const convertible = scales.some((scale) => scale !== null);
+  Promise.all([
+    Promise.all(resolved.map((r) => loadData(r.indicator.id))),
+    convertible ? loadSeries("genesis_61111-0002") : null,
+    convertible ? loadSeries("genesis_12411-0001") : null,
+  ]).then(
+    ([loaded, cpi, population]) => {
+      const real = transforms.includes("real") && cpi !== null;
+      const perHead = transforms.includes("kopf") && population !== null;
+      // Anzeige je Reihe: Umrechnungen ändern Einheit und Beschreibung.
+      const shown = resolved.map((r) => ({ unit: r.indicator.unit, decimals: r.indicator.decimals, intro: r.indicator.intro }));
+      const full = resolved.map((r, i) => {
+        let data = loaded[i]!.series[r.pick.index]!.data;
+        const scale = scales[i];
+        if (scale === null || scale === undefined) return data;
+        const notes: string[] = [];
+        if (real) {
+          data = deflate(data, cpi.data);
+          notes.push(`in Preisen von ${formatDate(cpi.data[cpi.data.length - 1]![0], "monatlich")}`);
+        }
+        if (perHead) {
+          // Bevölkerung liegt in Mio. vor, das Ergebnis sind Euro je Einwohner.
+          data = perCapita(data, population.data, scale / 1e6);
+          shown[i] = { unit: "€", decimals: 0, intro: "in Euro je Einwohner" };
+        }
+        if (notes.length) shown[i]!.intro = [shown[i]!.intro, ...notes].filter(Boolean).join(", ");
+        return data;
+      });
+      if (full.some((d) => d.length === 0)) {
+        set(output, h("p", { class: "note" }, "Für diese Umrechnung fehlen Vergleichswerte im Zeitraum der Reihe. ", h("a", { href: href(picks, years, undefined, []) }, "Umrechnung zurücknehmen")));
+        return;
+      }
       const start = Math.max(...full.map((d) => d[0]![0]));
       const end = Math.max(...full.map((d) => d[d.length - 1]![0]));
       const from = years ? Math.max(start, end - years * YEAR) : start;
@@ -501,9 +495,9 @@ function viewCompare(params: URLSearchParams): HTMLElement {
           h(
             "div",
             { class: "panel" },
-            h("p", { class: "muted small", style: "margin-bottom:6px" }, indicator.intro),
+            h("p", { class: "muted small", style: "margin-bottom:6px" }, shown[0]!.intro),
             series.length > 1 ? legend(series) : null,
-            lineChart({ series, frequency: indicator.frequency, decimals: indicator.decimals, unit: indicator.unit, label: `${indicator.title}: ${series.map((sr) => sr.name).join(", ")}` }),
+            lineChart({ series, frequency: indicator.frequency, decimals: shown[0]!.decimals, unit: shown[0]!.unit, label: `${indicator.title}: ${series.map((sr) => sr.name).join(", ")}` }),
           ),
         );
       } else {
@@ -515,8 +509,8 @@ function viewCompare(params: URLSearchParams): HTMLElement {
               "div",
               { class: "panel" },
               legend(series),
-              h("p", { class: "muted small", style: "margin-bottom:6px" }, r.indicator.intro),
-              lineChart({ series, frequency: r.indicator.frequency, decimals: r.indicator.decimals, unit: r.indicator.unit, height: 200, label: label(r) }),
+              h("p", { class: "muted small", style: "margin-bottom:6px" }, shown[i]!.intro),
+              lineChart({ series, frequency: r.indicator.frequency, decimals: shown[i]!.decimals, unit: shown[i]!.unit, height: 200, label: label(r) }),
             ),
           );
         });
@@ -539,13 +533,13 @@ function viewCompare(params: URLSearchParams): HTMLElement {
             const last = data[data.length - 1];
             if (!first || !last) return h("tr", {}, h("td", {}, label(r)), h("td", {}, "–"), h("td", {}, "–"), h("td", {}, "–"));
             const rate = isRate(r.indicator) || first[1] <= 0 || last[1] <= 0;
-            const change = rate ? `${formatSigned(last[1] - first[1], r.indicator.decimals)} Punkte` : `${formatSigned((last[1] / first[1] - 1) * 100, 1)} %`;
+            const change = rate ? `${formatSigned(last[1] - first[1], shown[i]!.decimals)} Punkte` : `${formatSigned((last[1] / first[1] - 1) * 100, 1)} %`;
             return h(
               "tr",
               {},
               h("td", {}, h("span", { class: `key slot-${r.pick.slot}`, style: "margin-right:6px;vertical-align:middle" }), label(r)),
-              h("td", {}, `${formatValue(first[1], r.indicator.decimals, r.indicator.unit)} (${formatDate(first[0], r.indicator.frequency)})`),
-              h("td", {}, `${formatValue(last[1], r.indicator.decimals, r.indicator.unit)} (${formatDate(last[0], r.indicator.frequency)})`),
+              h("td", {}, `${formatValue(first[1], shown[i]!.decimals, shown[i]!.unit)} (${formatDate(first[0], r.indicator.frequency)})`),
+              h("td", {}, `${formatValue(last[1], shown[i]!.decimals, shown[i]!.unit)} (${formatDate(last[0], r.indicator.frequency)})`),
               h("td", {}, change),
             );
           }),
@@ -557,6 +551,8 @@ function viewCompare(params: URLSearchParams): HTMLElement {
         for (let b = a + 1; b < resolved.length && pairs.length < 6; b++) {
           const co = comovement(clipped[a]!, clipped[b]!);
           if (!co) continue;
+          const shift = leadLag(clipped[a]!, clipped[b]!);
+          const leader = shift ? (shift.lead > 0 ? resolved[a]! : resolved[b]!) : null;
           pairs.push(
             h(
               "li",
@@ -564,6 +560,15 @@ function viewCompare(params: URLSearchParams): HTMLElement {
               `${label(resolved[a]!)} und ${label(resolved[b]!)}: `,
               h("strong", {}, describeComovement(co.r)),
               ` (r = ${formatSigned(co.r, 2)}, ${co.steps} gemeinsame Zeitschritte)`,
+              shift && leader
+                ? h(
+                    "span",
+                    {},
+                    ". ",
+                    h("strong", {}, `${label(leader)} läuft ${Math.abs(shift.lead)} ${Math.abs(shift.lead) === 1 ? "Monat" : "Monate"} voraus`),
+                    `: Um diese Zeit verschoben ist der Zusammenhang am stärksten (r = ${formatSigned(shift.r, 2)})`,
+                  )
+                : null,
             ),
           );
         }
@@ -574,15 +579,39 @@ function viewCompare(params: URLSearchParams): HTMLElement {
           "div",
           { class: "filters" },
           rangeControl(years, spanYears, (value) => {
-            location.hash = compareHref(picks, value, requestedMode ?? undefined);
+            location.hash = href(picks, value);
           }),
           h(
             "div",
             { class: "seg", role: "group", "aria-label": "Darstellung" },
-            h("button", { type: "button", "aria-pressed": String(mode === "index"), disabled: !indexable, onclick: () => (location.hash = compareHref(picks, years, "index")) }, "Index (Start = 100)"),
-            h("button", { type: "button", "aria-pressed": String(mode === "original"), onclick: () => (location.hash = compareHref(picks, years, "original")) }, "Originalwerte"),
+            h("button", { type: "button", "aria-pressed": String(mode === "index"), disabled: !indexable, onclick: () => (location.hash = href(picks, years, "index")) }, "Index (Start = 100)"),
+            h("button", { type: "button", "aria-pressed": String(mode === "original"), onclick: () => (location.hash = href(picks, years, "original")) }, "Originalwerte"),
           ),
+          convertible && cpi && population
+            ? h(
+                "ul",
+                { class: "chips", style: "margin:0", "aria-label": "Umrechnung der Geldbeträge" },
+                ...([["real", "preisbereinigt"], ["kopf", "je Einwohner"]] as const).map(([key, text]) =>
+                  h(
+                    "li",
+                    {},
+                    h(
+                      "button",
+                      {
+                        type: "button",
+                        "aria-pressed": String(transforms.includes(key)),
+                        onclick: () => (location.hash = href(picks, years, requestedMode ?? undefined, transforms.includes(key) ? transforms.filter((t) => t !== key) : [...transforms, key])),
+                      },
+                      text,
+                    ),
+                  ),
+                ),
+              )
+            : null,
         ),
+        (real || perHead) && scales.some((scale) => scale === null)
+          ? h("p", { class: "note" }, `Umgerechnet werden nur Geldbeträge: ${resolved.filter((_, i) => scales[i] !== null).map(label).join(", ")}. Indizes, Quoten und Mengen bleiben unverändert.`)
+          : null,
         !indexable ? h("p", { class: "note" }, "Mindestens eine Reihe ist eine Veränderungsrate oder hat Werte bis null. Eine Umrechnung auf 100 wäre irreführend, deshalb stehen hier die Originalwerte.") : null,
         ...charts,
         h("h2", {}, "Im gewählten Zeitraum"),
@@ -596,7 +625,7 @@ function viewCompare(params: URLSearchParams): HTMLElement {
               h(
                 "p",
                 { class: "note" },
-                "Gemessen wird, ob sich die Reihen von einem gemeinsamen Zeitpunkt zum nächsten in dieselbe Richtung bewegen (Korrelation der Veränderungen, Monats- oder Quartalsschritte). Das zeigt einen statistischen Zusammenhang, keine Ursache, und erfasst keine zeitlich versetzten Wirkungen.",
+                "Gemessen wird, ob sich die Reihen von einem gemeinsamen Zeitpunkt zum nächsten in dieselbe Richtung bewegen (Korrelation der Veränderungen, Monats- oder Quartalsschritte). Für lückenlose Monatsreihen wird zusätzlich geprüft, ob der Zusammenhang stärker wird, wenn man eine Reihe um bis zu zwölf Monate verschiebt. Beides zeigt einen statistischen Zusammenhang, keine Ursache.",
               ),
             )
           : null,
@@ -623,6 +652,8 @@ function render(): void {
   else if (parts[0] === "thema" && parts[1]) view = viewTheme(parts[1]);
   else if (parts[0] === "i" && parts[1]) view = viewIndicator(parts[1]);
   else if (parts[0] === "vergleich") view = viewCompare(params);
+  else if (parts[0] === "geld") view = viewGeld();
+  else if (parts[0] === "laender") view = viewLaender(params);
   else if (parts[0] === "suche") view = viewSearch(params.get("q") ?? "");
   else view = viewMissing();
 
@@ -654,7 +685,7 @@ function render(): void {
         "div",
         { class: "bar" },
         h("a", { class: "brand", href: "#/" }, "Lagebild Deutschland"),
-        h("nav", {}, navLink("#/", "Überblick", parts.length === 0), navLink("#/vergleich", "Vergleichen", parts[0] === "vergleich")),
+        h("nav", {}, navLink("#/", "Überblick", parts.length === 0), navLink("#/geld", "Mein Geld", parts[0] === "geld"), navLink("#/laender", "Länder", parts[0] === "laender"), navLink("#/vergleich", "Vergleichen", parts[0] === "vergleich")),
         form,
       ),
     ),
@@ -669,7 +700,7 @@ function render(): void {
       `, Statistisches Bundesamt (Destatis); die Quelle jedes Indikators steht auf seiner Seite. Abgerufen am ${formatShortDate(catalog.fetchedAt)}. Kein amtliches Angebot.`,
     ),
   );
-  if (parts[0] !== "vergleich") window.scrollTo(0, 0);
+  if (parts[0] !== "vergleich" && parts[0] !== "laender") window.scrollTo(0, 0);
 }
 
 fetch("./data/catalog.json")
@@ -679,6 +710,7 @@ fetch("./data/catalog.json")
   })
   .then((loaded) => {
     catalog = loaded;
+    store.catalog = loaded;
     window.addEventListener("hashchange", render);
     render();
   })
