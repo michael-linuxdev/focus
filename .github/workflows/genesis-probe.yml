@@ -8,9 +8,13 @@ on:
         description: Tabellencodes, durch Leerzeichen getrennt (leer = Standardauswahl)
         required: false
         default: ""
+      refresh:
+        description: Stattdessen alle Daten neu holen und auf diesen Branch committen (nicht auf main)
+        type: boolean
+        default: false
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   probe:
@@ -21,8 +25,21 @@ jobs:
         with:
           node-version: 22
       - name: Abrufe testen
+        if: ${{ !inputs.refresh }}
         env:
           GENESIS_USER: ${{ secrets.GENESIS_USER }}
           GENESIS_PASSWORD: ${{ secrets.GENESIS_PASSWORD }}
           TABLES: ${{ inputs.tables }}
         run: node scripts/genesis-probe.ts $TABLES
+      - name: Daten neu holen und committen
+        if: ${{ inputs.refresh && github.ref != 'refs/heads/main' }}
+        env:
+          GENESIS_USER: ${{ secrets.GENESIS_USER }}
+          GENESIS_PASSWORD: ${{ secrets.GENESIS_PASSWORD }}
+        run: |
+          node scripts/fetch-data.ts
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/data
+          git commit -m "Datenstand aktualisiert" || echo "Keine Änderung"
+          git push
