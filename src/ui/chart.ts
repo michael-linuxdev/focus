@@ -211,7 +211,7 @@ export function legend(series: { name: string; slot: number }[]): HTMLElement {
   );
 }
 
-export function sparkline(values: number[], width = 120, height = 32): SVGElement {
+export function sparkline(values: number[], width = 96, height = 32): SVGElement {
   const svg = s("svg", { class: "spark", viewBox: `0 0 ${width} ${height}`, width, height, "aria-hidden": "true" });
   if (values.length < 2) return svg;
   const lo = Math.min(...values);

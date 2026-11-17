@@ -183,6 +183,14 @@ a.card:focus-visible {
   line-height: 1.2;
   margin-top: 2px;
 }
+.tile .value {
+  white-space: nowrap;
+}
+.tile .unit {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--ink-2);
+}
 .tile .row {
   display: flex;
   justify-content: space-between;

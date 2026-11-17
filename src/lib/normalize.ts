@@ -57,6 +57,20 @@ export function sparkline(data: Point[], maxPoints = 48, years = 5): number[] {
   return out;
 }
 
+/** Kennwerte einer Reihe für den Katalog. `data` muss zeitlich sortiert sein und mindestens einen Punkt haben. */
+export function seriesMeta(name: string, data: Point[], axis = 0): SeriesMeta {
+  const last = data[data.length - 1]!;
+  return {
+    name,
+    axis,
+    count: data.length,
+    first: data[0]!,
+    last,
+    yearAgo: pointNear(data, last[0] - 365.25 * DAY, 20 * DAY),
+    spark: sparkline(data),
+  };
+}
+
 function round(value: number): number {
   return Number(value.toPrecision(9));
 }
@@ -159,16 +173,7 @@ export function normalizeIndicator(rawJson: string): NormalizedIndicator | null 
     const data = cleanPoints(raw.data, scale);
     if (data.length < 2) continue;
     const name = stripHtml(raw.name ?? "").replace(/\s*\((linke|rechte) Achse\)/i, "") || "Wert";
-    const last = data[data.length - 1]!;
-    metas.push({
-      name,
-      axis: raw.yAxis ?? 0,
-      count: data.length,
-      first: data[0]!,
-      last,
-      yearAgo: pointNear(data, last[0] - 365.25 * DAY, 20 * DAY),
-      spark: sparkline(data),
-    });
+    metas.push(seriesMeta(name, data, raw.yAxis ?? 0));
     series.push({ name, data });
   }
   if (metas.length === 0) return null;

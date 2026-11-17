@@ -38,6 +38,9 @@ jobs:
 
       - name: Daten aktualisieren
         # Scheitert der Abruf, wird der im Repository liegende Stand veröffentlicht.
+        env:
+          GENESIS_USER: ${{ secrets.GENESIS_USER }}
+          GENESIS_PASSWORD: ${{ secrets.GENESIS_PASSWORD }}
         run: npm run data || echo "::warning::Datenabruf fehlgeschlagen, veröffentliche den eingecheckten Stand."
 
       - name: Bauen
