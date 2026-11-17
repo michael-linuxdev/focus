@@ -1,7 +1,12 @@
 // Zugriff auf GENESIS-Online. Nur für Skripte (Node), nicht für den Browser.
 import { inflateRawSync } from "node:zlib";
 
-const BASE = "https://genesis.destatis.de/genesisWS/rest/2020";
+/** Beide Datenbanken sprechen dieselbe Schnittstelle: GENESIS-Online des Bundes und die Regionaldatenbank der Länder. */
+export const SOURCES = {
+  destatis: "https://genesis.destatis.de/genesisWS/rest/2020",
+  regional: "https://www.regionalstatistik.de/genesisws/rest/2020",
+} as const;
+export type Source = keyof typeof SOURCES;
 
 export interface GenesisAuth {
   /** Benutzername oder API-Token. */
@@ -15,8 +20,8 @@ export function authFromEnv(): GenesisAuth | null {
   return username ? { username, password: process.env.GENESIS_PASSWORD ?? "" } : null;
 }
 
-export async function genesisPost(auth: GenesisAuth, path: string, params: Record<string, string>): Promise<Response> {
-  return fetch(`${BASE}/${path}`, {
+export async function genesisPost(auth: GenesisAuth, path: string, params: Record<string, string>, source: Source = "destatis"): Promise<Response> {
+  return fetch(`${SOURCES[source]}/${path}`, {
     method: "POST",
     headers: { username: auth.username, password: auth.password, "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ language: "de", ...params }),
@@ -41,8 +46,8 @@ export function unzipFirst(zip: Buffer): string {
 }
 
 /** Lädt eine Tabelle im flachen CSV-Format (eine Zeile je Wert). */
-export async function fetchTableCsv(auth: GenesisAuth, name: string, params: Record<string, string> = {}): Promise<string> {
-  const res = await genesisPost(auth, "data/tablefile", { name, format: "ffcsv", ...params });
+export async function fetchTableCsv(auth: GenesisAuth, name: string, params: Record<string, string> = {}, source: Source = "destatis"): Promise<string> {
+  const res = await genesisPost(auth, "data/tablefile", { name, format: "ffcsv", ...params }, source);
   const body = Buffer.from(await res.arrayBuffer());
   if (!res.ok) throw new Error(`GENESIS ${name}: HTTP ${res.status} ${body.toString("utf8").slice(0, 300)}`);
   if ((res.headers.get("content-type") ?? "").includes("zip")) return unzipFirst(body);

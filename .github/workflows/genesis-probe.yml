@@ -8,6 +8,14 @@ on:
         description: Tabellencodes, durch Leerzeichen getrennt (leer = Standardauswahl)
         required: false
         default: ""
+      source:
+        description: destatis (GENESIS-Online) oder regional (Regionaldatenbank)
+        required: false
+        default: destatis
+      guest:
+        description: Mit dem Gastzugang statt mit dem Token prüfen
+        type: boolean
+        default: false
       refresh:
         description: Stattdessen alle Daten neu holen und auf diesen Branch committen (nicht auf main)
         type: boolean
@@ -30,6 +38,8 @@ jobs:
           GENESIS_USER: ${{ secrets.GENESIS_USER }}
           GENESIS_PASSWORD: ${{ secrets.GENESIS_PASSWORD }}
           TABLES: ${{ inputs.tables }}
+          PROBE_SOURCE: ${{ inputs.source }}
+          PROBE_GUEST: ${{ inputs.guest }}
         run: node scripts/genesis-probe.ts $TABLES
       - name: Daten neu holen und committen
         if: ${{ inputs.refresh && github.ref != 'refs/heads/main' }}

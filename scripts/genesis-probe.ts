@@ -2,13 +2,17 @@
 // Zugangsdaten aus GENESIS_USER (Benutzername oder API-Token) und bei Bedarf GENESIS_PASSWORD;
 // ohne sie läuft der Gastzugang (nur zum Vergleich). Aufruf: node scripts/genesis-probe.ts [Tabellencode[:startyear] …]
 import { parseFlatCsv, rowTime } from "../src/lib/genesis-table.ts";
-import { authFromEnv, fetchTableCsv, genesisPost } from "./lib/genesis.ts";
+import { authFromEnv, fetchTableCsv, genesisPost, SOURCES, type Source } from "./lib/genesis.ts";
 
-const auth = authFromEnv() ?? { username: "GAST", password: "GAST" };
+// PROBE_SOURCE=regional prüft die Regionaldatenbank, PROBE_GUEST=true erzwingt den Gastzugang.
+// Ein Eintrag „find=Begriff“ sucht Tabellen, statt eine abzurufen.
+const source: Source = process.env.PROBE_SOURCE === "regional" ? "regional" : "destatis";
+const auth = (process.env.PROBE_GUEST === "true" ? null : authFromEnv()) ?? { username: "GAST", password: "GAST" };
+console.log(`Datenbank: ${SOURCES[source]}`);
 const tables = process.argv.slice(2).length ? process.argv.slice(2) : ["12411-0001", "61111-0002", "62361-0001", "12411-0010"];
 
 console.log(`Konto: ${auth.username === "GAST" ? "Gastzugang" : auth.password ? "eigenes Konto mit Passwort" : "API-Token ohne Passwort"}`);
-const login = await genesisPost(auth, "helloworld/logincheck", {});
+const login = await genesisPost(auth, "helloworld/logincheck", {}, source);
 console.log(`Anmeldung: HTTP ${login.status} ${(await login.text()).slice(0, 200).replace(/\s+/g, " ")}`);
 
 let failed = 0;
@@ -18,8 +22,15 @@ for (const spec of tables) {
   const params: Record<string, string> = Object.fromEntries(new URLSearchParams(extra));
   if (startyear) params.startyear = startyear;
   const started = Date.now();
+  if (spec.startsWith("find=")) {
+    const res = await genesisPost(auth, "find/find", { term: spec.slice(5).replace(/_/g, " "), category: "tables", pagelength: "40" }, source);
+    const found = res.ok ? ((await res.json()) as { Tables?: { Code: string; Content: string }[] | null }).Tables ?? [] : [];
+    console.log(`\n== ${spec}: HTTP ${res.status}, ${found.length} Tabellen`);
+    for (const table of found) console.log(`${table.Code}  ${table.Content.replace(/\s+/g, " ").slice(0, 110)}`);
+    continue;
+  }
   try {
-    const csv = await fetchTableCsv(auth, name, params);
+    const csv = await fetchTableCsv(auth, name, params, source);
     const lines = csv.split(/\r?\n/).filter(Boolean);
     const rows = parseFlatCsv(csv);
     console.log(`\n== ${spec}: ${csv.length} Zeichen, ${rows.length} Zeilen, ${Date.now() - started} ms`);
