@@ -93,7 +93,7 @@ export function viewJahrgang(params: URLSearchParams): HTMLElement {
             fact(
               "Ältere je 100 Menschen im Erwerbsalter",
               `${formatNumber(ratioThen, 0)} → ${formatNumber(ratioNow, 0)}`,
-              `${birthYear >= firstYear ? `In deinem Geburtsjahr` : `${firstYear} (frühere Werte liegen nicht vor)`} kamen ${formatNumber(ratioThen, 1)} Menschen ab 65 auf 100 Menschen von 20 bis 64, Ende ${lastYear} sind es ${formatNumber(ratioNow, 1)}.`,
+              `${birthYear >= firstYear ? `In deinem Geburtsjahr` : `${firstYear} (für das vereinte Deutschland der früheste Wert)`} kamen ${formatNumber(ratioThen, 1)} Menschen ab 65 auf 100 Menschen von 20 bis 64, Ende ${lastYear} sind es ${formatNumber(ratioNow, 1)}.`,
             ),
           );
         }
@@ -110,7 +110,7 @@ export function viewJahrgang(params: URLSearchParams): HTMLElement {
                   "div",
                   { class: "panel" },
                   h("h3", {}, `Jahrgang ${birthYear} über die Zeit`),
-                  h("p", { class: "muted small" }, `Menschen dieses Jahrgangs in Deutschland, in Tausend, jeweils am 31. Dezember${birthYear < firstYear ? `. Altersjahre liegen erst ab ${firstYear} vor` : ""}. Anstiege kommen von Zuwanderung, Rückgänge von Fortzügen und Sterbefällen.`),
+                  h("p", { class: "muted small" }, `Menschen dieses Jahrgangs in Deutschland, in Tausend, jeweils am 31. Dezember${birthYear < firstYear ? `. Für das vereinte Deutschland liegen Altersjahre ab ${firstYear} vor` : ""}. Anstiege kommen von Zuwanderung, Rückgänge von Fortzügen und Sterbefällen.`),
                   lineChart({ series: [{ name: `Jahrgang ${birthYear}`, slot: 1, data: path.map(([t, v]) => [t, v / 1000]) }], frequency: "jährlich", decimals: 0, unit: "Tsd.", height: 240, label: `Größe des Jahrgangs ${birthYear} je Jahr` }),
                 )
               : null,

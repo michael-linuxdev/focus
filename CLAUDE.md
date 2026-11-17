@@ -36,6 +36,10 @@ Ansichten im Browser ansehen (Desktop und 390 px Breite, ohne waagerechtes Scrol
 - `src/views/geld.ts` Bereich „Mein Geld“ (Rechenwege in `src/lib/money.ts`): persönliche Teuerung mit eigenem Warenkorb,
   Verdienste gegen Preise, Arbeitszeit je Ausgabengruppe, Erschwinglichkeit von Wohneigentum.
   Braucht `public/data/facts.json` (Wägungsschema, Verdienste im Stichmonat).
+- `src/views/preise.ts` „Preise im Detail“: alle 441 Positionen des Verbraucherpreisindex nach Preisänderung, mit Suche
+  (`public/data/prices.json`).
+- `src/views/jahrgang.ts` „Mein Jahrgang“ (Rechenwege in `src/lib/cohort.ts`): Geburtenzahl, heutige Größe des Jahrgangs,
+  fernere Lebenserwartung, Altenquotient (`public/data/cohorts.json`).
 - `src/views/laender.ts` Ländervergleich (Rechenwege in `src/lib/regions.ts`): Rangliste, Veränderung, Schere; die
   Kennzahlen samt abgeleiteter Größen stehen in der Liste `METRICS`.
 - Auffällige Werte: `findExtreme` in `src/lib/stats.ts` vermerkt beim Datenabruf je Reihe, ob der jüngste Wert seit
@@ -49,6 +53,8 @@ Ansichten im Browser ansehen (Desktop und 390 px Breite, ohne waagerechtes Scrol
   Farbplätze gehören fest zur Reihe; höchstens acht gleichzeitig. Jede Zahl ist auch über die Tabelle erreichbar.
 - Indizes (Preise, Mieten, Verdienste) zeigen nur Entwicklungen. Nie als Rangliste von Ständen ausgeben und nie zwischen
   Ländern als Niveau vergleichen.
+- Auf Brüche in den Quellen achten: Der Bevölkerungsstand vor 1990 gilt nur für das frühere Bundesgebiet und wird
+  nicht verwendet. Bei neuen langen Reihen den Gebietsstand prüfen, bevor sie als „Deutschland“ erscheinen.
 - Abgeleitete Zahlen nennen ihre Annahmen direkt an der Zahl (z. B. Zinsnäherung, brutto statt netto).
 - Keine Zugangsdaten im Repository. Ein GENESIS-Konto käme als Geheimnis in GitHub Actions.
 - Bezeichner englisch, Oberflächentexte und Dokumente deutsch.

@@ -20,13 +20,14 @@ export const NEW_THEMES: Record<string, { name: string; description: string }> =
 const MIO_PERSONS = { scale: 1e-6, intro: "in Mio. Personen, Stichtag 31. Dezember", decimals: 2 } as const;
 
 export const TABLES: TableSpec[] = [
-  // Bevölkerung
-  { code: "12411-0001", title: "Bevölkerung in Deutschland", themes: ["bevoelkerung"], ...MIO_PERSONS },
+  // Bevölkerung. Der Bevölkerungsstand vor 1990 gilt in GENESIS nur für das frühere Bundesgebiet (Sprung von
+  // 62 auf 80 Mio.), deshalb beginnen diese Reihen 1990. Geburten und Sterbefälle sind durchgehend gesamtdeutsch.
+  { code: "12411-0001", title: "Bevölkerung in Deutschland", themes: ["bevoelkerung"], startyear: 1990, ...MIO_PERSONS },
   {
     code: "12411-0005",
     title: "Bevölkerung nach Altersgruppen",
     themes: ["bevoelkerung"],
-    startyear: 1970,
+    startyear: 1990,
     intro: "Anteil an der Bevölkerung in Prozent, Stichtag 31. Dezember",
     decimals: 1,
     aggregate: {
@@ -89,7 +90,7 @@ export const EXTRA_TABLES = {
   weights: { code: "61111-0007", params: {} },
   earnings: { code: "62361-0031", params: {} },
   priceItems: { code: "61111-0003", params: { startyear: "2000" } },
-  ages: { code: "12411-0005", params: { startyear: "1970" } },
+  ages: { code: "12411-0005", params: { startyear: "1990" } },
   births: { code: "12612-0001", params: {} },
   lifeTables: { code: "12621-0002", params: {} },
 } as const;

@@ -32,6 +32,10 @@ Geprüft am 17. November 2026 mit echten Abrufen.
 - Die Verdienstindizes nach Branchen (62361-0026) beginnen 2007, die Gesamtwirtschaft „A-S“ aber erst 2022;
   „B-S“ (Produzierendes Gewerbe und Dienstleistungsbereich) reicht bis 2007 zurück.
 - Die Rendite zehnjähriger Bundesanleihen liegt nur im Dashboard vor und dort erst ab 2020.
+- Gebietsstand: Der Bevölkerungsstand (12411-0001, 12411-0005) gilt vor 1990 nur für das frühere Bundesgebiet,
+  obwohl die Zeilen „Deutschland“ heißen; 1990 springt die Reihe von rund 62 auf 80 Millionen. Geburten und
+  Sterbefälle sind dagegen durchgehend gesamtdeutsch. Die App nutzt den Bevölkerungsstand deshalb erst ab 1990.
+- Sterbetafeln (12621-0002): 33 Zeiträume von 1991/93 bis 2023/25, je Geschlecht 101 Altersjahre.
 - Antwortzeiten: zwei bis elf Sekunden je Tabelle.
 - Kein Zugriff aus dem Browser: Die Vorabanfrage (`OPTIONS`) wird mit 403 abgelehnt. GENESIS lässt sich nur von einem Skript
   oder Server aus abfragen, nicht direkt von einer Webseite.
