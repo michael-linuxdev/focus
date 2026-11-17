@@ -1,0 +1,28 @@
+name: GENESIS-Zugang prüfen
+
+# Nur von Hand auszulösen. Zeigt im Protokoll, was das Konto liefert; verändert nichts.
+on:
+  workflow_dispatch:
+    inputs:
+      tables:
+        description: Tabellencodes, durch Leerzeichen getrennt (leer = Standardauswahl)
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Abrufe testen
+        env:
+          GENESIS_USER: ${{ secrets.GENESIS_USER }}
+          GENESIS_PASSWORD: ${{ secrets.GENESIS_PASSWORD }}
+          TABLES: ${{ inputs.tables }}
+        run: node scripts/genesis-probe.ts $TABLES
