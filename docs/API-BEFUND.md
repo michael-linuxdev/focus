@@ -9,11 +9,23 @@ Geprüft am 17. November 2026 mit echten Abrufen.
   endet in einer Umleitung auf eine Hinweisseite.
 - Gastzugang (`GAST`/`GAST`): `helloworld/logincheck` und `find/find` (Suche) funktionieren.
 - Mit dem Gastzugang abgelehnt (HTTP 401, Code 15 „nicht berechtigt“): `data/table`, `data/tablefile`, `data/timeseries`,
-  `metadata/table`, `catalogue/tables`. Für Tabellendaten braucht es also ein eigenes, kostenloses Konto.
+  `metadata/table`, `catalogue/tables`. Für Tabellendaten braucht es ein eigenes, kostenloses Konto.
+- Mit Konto genügt ein API-Token: Token in die Kopfzeile `username`, `password` leer. Geprüft mit `helloworld/logincheck`
+  und `data/tablefile` für 12411-0001, 12411-0010, 61111-0002 und 62361-0001.
+- `data/tablefile` mit `format=ffcsv` antwortet immer mit einem ZIP-Archiv, das genau eine CSV-Datei enthält
+  (auch mit `compress=false`). Inhalt: UTF-8 mit BOM, Semikolon als Trenner, Dezimalkomma, eine Zeile je Wert,
+  Zeilen ungeordnet. Spalten: `time` (Stichtag oder Jahr), je Gliederung vier Spalten `n_variable_…`
+  (Monate stehen dort als `MONAT01` … `MONAT12`), dann `value`, `value_unit`, `value_variable_code`, `value_variable_label`.
+- Veränderungsraten stehen als eigene Zeilen mit Einheit `%` in derselben Tabelle; ihr `value_variable_label` ist
+  verstümmelt („in“). Die App übernimmt nur die Niveauwerte und rechnet Veränderungen selbst.
+- Ohne `startyear` liefern manche Tabellen nur die jüngsten Jahre (61111-0002: zwei Jahre). Der Reallohnindex
+  beginnt in der Quelle erst 2022.
+- Antwortzeiten: zwei bis elf Sekunden je Tabelle.
 - Kein Zugriff aus dem Browser: Die Vorabanfrage (`OPTIONS`) wird mit 403 abgelehnt. GENESIS lässt sich nur von einem Skript
   oder Server aus abfragen, nicht direkt von einer Webseite.
 - Laut Anmeldemeldung: höchstens drei gleichzeitige Anfragen.
-- Nicht geprüft, weil kein Konto vorlag: Format und Umfang der Tabellenabrufe.
+- Die GENESIS-Reihen sind aktueller als das Dashboard: am Prüftag Verbraucherpreisindex bis Oktober 2026,
+  Lohnindizes bis September 2026.
 
 ## Dashboard Deutschland
 
@@ -32,5 +44,5 @@ Geprüft am 17. November 2026 mit echten Abrufen.
 ## Folgerung für die App
 
 Beide Schnittstellen sind nur von einem Skript aus erreichbar. Die App ist deshalb eine statische Seite: `npm run data`
-holt die Daten beim Bauen und legt sie aufbereitet unter `public/data/` ab. GENESIS-Tabellen lassen sich auf demselben Weg
-ergänzen, sobald ein Konto vorliegt (Zugangsdaten dann als Geheimnis in GitHub Actions, nie im Repository).
+holt die Daten beim Bauen und legt sie aufbereitet unter `public/data/` ab. Der Token liegt als Geheimnis `GENESIS_USER`
+in GitHub Actions und nirgends sonst; welche Tabellen übernommen werden, steht in `scripts/genesis-tables.ts`.

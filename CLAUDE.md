@@ -1,7 +1,7 @@
 # Lagebild Deutschland
 
 Statische Web-App auf Basis der Schnittstellen des Statistischen Bundesamts. Sie führt die Indikatoren von
-Dashboard Deutschland zusammen und macht Reihen über Themengrenzen hinweg vergleichbar.
+Dashboard Deutschland und Tabellen aus GENESIS-Online zusammen und macht Reihen über Themengrenzen hinweg vergleichbar.
 Befund zu den Schnittstellen (GENESIS-Online, Dashboard Deutschland): `docs/API-BEFUND.md`.
 
 ## Befehle
@@ -28,6 +28,8 @@ Ansichten im Browser ansehen.
   (Themen, Indikatoren, Kennwerte) und `public/data/series/<id>.json` (Zeitreihen). Der Stand ist eingecheckt, damit die
   Seite auch baut, wenn der Abruf scheitert.
 - `src/lib/` reine Funktionen ohne DOM (Aufbereitung, Formate, Vergleichsrechnung), mit Tests in `tests/`.
+- `scripts/lib/genesis.ts` Abruf bei GENESIS-Online, `src/lib/genesis-table.ts` Aufbereitung der Tabellen,
+  `scripts/genesis-tables.ts` Auswahl der Tabellen. GENESIS-Indikatoren heißen `genesis_<Tabellencode>`.
 - `src/lib/curated.ts` redaktionelle Auswahl: Kacheln im Überblick und vorbereitete Vergleiche.
 - `src/ui/` Diagramm und DOM-Hilfen, `src/main.ts` Ansichten und Navigation über den Adress-Anker.
 
@@ -41,8 +43,12 @@ Ansichten im Browser ansehen.
 - Bezeichner englisch, Oberflächentexte und Dokumente deutsch.
 - Veröffentlichung: Push auf `main` baut und veröffentlicht nach `focus.micana.de` (GitHub Pages), dazu täglich per Zeitplan.
 
-## Offen
+## GENESIS-Online
 
-- GENESIS-Konto: Der Auftraggeber legt ein kostenloses Konto bei GENESIS-Online an (`genesis.destatis.de`). Solange hier
-  keines vermerkt ist, zu Beginn einer Sitzung daran erinnern. Danach: Zugangsdaten als Geheimnis in GitHub Actions,
-  Tabellenabruf in `scripts/` ergänzen (Bevölkerung, Reallohnindex, Regionaldaten) und `docs/API-BEFUND.md` nachziehen.
+- Der API-Token des Auftraggebers liegt als Geheimnis `GENESIS_USER` in GitHub Actions, nicht in der Cloud-Umgebung.
+  Abrufe mit Konto laufen deshalb nur dort; lokal holt `npm run data` nur das Dashboard und behält die gespeicherten
+  GENESIS-Reihen.
+- Neue Tabelle: Code mit `npm run genesis:find -- Begriff` suchen, in `scripts/genesis-tables.ts` eintragen, pushen.
+  Dann den Workflow „GENESIS-Zugang prüfen“ (`genesis-probe.yml`) auf dem Arbeitsbranch auslösen: mit Eingabe `tables`
+  zeigt er Aufbau und Zeitraum einer Tabelle im Protokoll, mit `refresh: true` holt er alle Daten und committet sie auf
+  den Branch (danach `git pull`). Auf `main` verweigert er das Committen.

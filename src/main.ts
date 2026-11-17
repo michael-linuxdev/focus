@@ -86,7 +86,12 @@ function headlineTile(label: string, found: Resolved): HTMLElement {
     "a",
     { class: "card tile", href: `#/i/${indicator.id}` },
     h("div", { class: "label" }, label),
-    h("div", { class: "row" }, h("div", { class: "value" }, formatValue(series.last[1], indicator.decimals, indicator.unit)), sparkline(series.spark)),
+    h(
+      "div",
+      { class: "row" },
+      h("div", { class: "value" }, formatNumber(series.last[1], indicator.decimals), indicator.unit ? h("span", { class: "unit" }, `\u00a0${indicator.unit}`) : null),
+      sparkline(series.spark),
+    ),
     h("div", { class: "delta" }, changeText(found)),
     h("div", { class: "meta" }, [indicator.intro, `Stand ${formatDate(series.last[0], indicator.frequency)}`].filter(Boolean).join(" · ")),
   );
@@ -199,7 +204,7 @@ function viewHome(): HTMLElement {
     h(
       "p",
       { class: "lead" },
-      `${catalog.indicators.length} amtliche und ergänzende Indikatoren aus dem Dashboard Deutschland des Statistischen Bundesamts – an einem Ort, mit Vorjahresvergleich und frei kombinierbar.`,
+      `${catalog.indicators.length} Indikatoren des Statistischen Bundesamts aus Dashboard Deutschland und GENESIS-Online – an einem Ort, mit Vorjahresvergleich und frei kombinierbar.`,
     ),
     h("h2", {}, "Auf einen Blick"),
     h("div", { class: "grid" }, ...tiles),
@@ -371,7 +376,7 @@ function viewCompare(params: URLSearchParams): HTMLElement {
   // Reihennamen wie „Insgesamt“ sind nur innerhalb ihres Indikators eindeutig.
   const label = (r: (typeof resolved)[number]): string => {
     if (oneIndicator) return r.series.name;
-    return r.series.name === r.indicator.title ? r.series.name : `${r.series.name} (${r.indicator.title})`;
+    return r.indicator.title.includes(r.series.name) ? r.series.name : `${r.series.name} (${r.indicator.title})`;
   };
 
   // Auswahl
@@ -659,6 +664,8 @@ function render(): void {
       {},
       "Daten: ",
       h("a", { href: "https://www.dashboard-deutschland.de/", rel: "noopener", target: "_blank" }, "Dashboard Deutschland"),
+      " und ",
+      h("a", { href: "https://genesis.destatis.de/", rel: "noopener", target: "_blank" }, "GENESIS-Online"),
       `, Statistisches Bundesamt (Destatis); die Quelle jedes Indikators steht auf seiner Seite. Abgerufen am ${formatShortDate(catalog.fetchedAt)}. Kein amtliches Angebot.`,
     ),
   );
