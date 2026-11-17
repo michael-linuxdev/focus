@@ -20,6 +20,18 @@ Geprüft am 17. November 2026 mit echten Abrufen.
   verstümmelt („in“). Die App übernimmt nur die Niveauwerte und rechnet Veränderungen selbst.
 - Ohne `startyear` liefern manche Tabellen nur die jüngsten Jahre (61111-0002: zwei Jahre). Der Reallohnindex
   beginnt in der Quelle erst 2022.
+- Filter über `classifyingvariable1`/`classifyingkey1` wirken bei `data/tablefile` nicht wie erhofft: Bei 61111-0007
+  kam trotzdem die ganze Tabelle, bei 61111-0004 mit `startyear` eine leere Antwort. Die App filtert deshalb selbst
+  (`where` in `scripts/genesis-tables.ts`).
+- Gegliederte Tabellen führen alle Ebenen in denselben Spalten: Bei den Verbraucherpreisen nach Verwendungszweck
+  steht die Ebene im Gliederungscode (`CC13A2` Zweisteller bis `CC13A5` Fünfsteller, zusammen 441 Positionen).
+  „Insgesamt“ hat einen leeren Ausprägungsschlüssel.
+- Weitere Zeitformen: Stichmonat `2025-04P1M`, Zeitraum `2018-P2Y` (2018 bis 2020).
+- Tabellen ohne Zeitreihe: 61111-0007 (Wägungsschema, nur Basisjahr 2020) und 62361-0031 (Verdienste, nur der
+  jüngste Stichmonat). Sie landen in `public/data/facts.json`.
+- Die Verdienstindizes nach Branchen (62361-0026) beginnen 2007, die Gesamtwirtschaft „A-S“ aber erst 2022;
+  „B-S“ (Produzierendes Gewerbe und Dienstleistungsbereich) reicht bis 2007 zurück.
+- Die Rendite zehnjähriger Bundesanleihen liegt nur im Dashboard vor und dort erst ab 2020.
 - Antwortzeiten: zwei bis elf Sekunden je Tabelle.
 - Kein Zugriff aus dem Browser: Die Vorabanfrage (`OPTIONS`) wird mit 403 abgelehnt. GENESIS lässt sich nur von einem Skript
   oder Server aus abfragen, nicht direkt von einer Webseite.
