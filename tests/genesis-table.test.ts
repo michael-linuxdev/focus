@@ -19,8 +19,8 @@ const wages = [
 const HEAD1 = "statistics_code;statistics_label;time_code;time_label;time;1_variable_code;1_variable_label;1_variable_attribute_code;1_variable_attribute_label;value;value_unit;value_variable_code;value_variable_label";
 const states = [
   HEAD1,
-  "12411;Fortschreibung des Bevölkerungsstandes;STAG;Stichtag;2019-12-31;DLAND;Bundesländer;12;Brandenburg;2521893;Anzahl;BEVSTD;Bevölkerungsstand",
   "12411;Fortschreibung des Bevölkerungsstandes;STAG;Stichtag;2022-12-31;DLAND;Bundesländer;02;Hamburg;1832675;Anzahl;BEVSTD;Bevölkerungsstand",
+  "12411;Fortschreibung des Bevölkerungsstandes;STAG;Stichtag;2019-12-31;DLAND;Bundesländer;12;Brandenburg;2521893;Anzahl;BEVSTD;Bevölkerungsstand",
   "12411;Fortschreibung des Bevölkerungsstandes;STAG;Stichtag;2020-12-31;DLAND;Bundesländer;12;Brandenburg;2531071;Anzahl;BEVSTD;Bevölkerungsstand",
   "12411;Fortschreibung des Bevölkerungsstandes;STAG;Stichtag;2023-12-31;DLAND;Bundesländer;02;Hamburg;1851596;Anzahl;BEVSTD;Bevölkerungsstand",
 ].join("\n");

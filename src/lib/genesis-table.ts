@@ -137,6 +137,8 @@ export function tableToIndicator(rows: Row[], spec: TableSpec): NormalizedIndica
     .map((entry) => ({ name: entry.name, data: [...entry.points.entries()].sort((a, b) => a[0] - b[0]) as Point[] }))
     .filter((entry) => entry.data.length >= 2);
   if (series.length === 0) return null;
+  // GENESIS liefert die Zeilen ungeordnet; gegliederte Reihen (z. B. Bundesländer) stehen alphabetisch.
+  if ([...variety.values()].some((attributes) => attributes.size > 1)) series.sort((a, b) => a.name.localeCompare(b.name, "de"));
 
   const frequency = inferFrequency(series[0]!.data.map((p) => p[0]));
   const newest = Math.max(...series.map((sr) => sr.data[sr.data.length - 1]![0]));

@@ -9,12 +9,15 @@ export interface SeriesRef {
 
 export interface Headline extends SeriesRef {
   label: string;
+  /** Ersatz, falls die bevorzugte Reihe fehlt (z. B. GENESIS-Tabellen ohne Zugang). */
+  fallback?: SeriesRef;
 }
 
 export const HEADLINES: Headline[] = [
   { label: "Wirtschaftsleistung (BIP)", indicator: "tile_1667811574092", series: "BIP kalender- und saisonbereinigt" },
-  { label: "Verbraucherpreise", indicator: "tile_1684314533676", series: "Verbraucherpreisindex" },
-  { label: "Nominallöhne", indicator: "tile_1684314533676", series: "Insgesamt" },
+  { label: "Verbraucherpreise", indicator: "genesis_61111-0002", series: "", fallback: { indicator: "tile_1684314533676", series: "Verbraucherpreisindex" } },
+  { label: "Reallöhne", indicator: "genesis_62361-0001", series: "Reallohnindex", fallback: { indicator: "tile_1684314533676", series: "Insgesamt" } },
+  { label: "Bevölkerung", indicator: "genesis_12411-0001", series: "" },
   { label: "Erwerbstätige", indicator: "tile_1667822587333", series: "saisonbereinigt" },
   { label: "Arbeitslose", indicator: "tile_1666958835081", series: "Arbeitslose" },
   { label: "Exporte", indicator: "tile_1667830902757", series: "Exporte" },
@@ -37,8 +40,9 @@ export const PRESETS: Preset[] = [
     question: "Steigen die Löhne schneller als die Verbraucherpreise?",
     years: 5,
     series: [
-      { indicator: "tile_1684314533676", series: "Insgesamt" },
-      { indicator: "tile_1684314533676", series: "Verbraucherpreisindex" },
+      { indicator: "genesis_62361-0001", series: "Nominallohnindex" },
+      { indicator: "genesis_61111-0002", series: "" },
+      { indicator: "genesis_62361-0001", series: "Reallohnindex" },
     ],
   },
   {

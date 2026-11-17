@@ -179,7 +179,7 @@ function sourcesLine(indicator: IndicatorMeta): HTMLElement {
 
 function viewHome(): HTMLElement {
   const tiles = HEADLINES.map((hl) => {
-    const found = resolve(catalog, hl);
+    const found = resolve(catalog, hl) ?? (hl.fallback ? resolve(catalog, hl.fallback) : null);
     return found ? headlineTile(hl.label, found) : null;
   });
   const presets = PRESETS.map((preset) => {
