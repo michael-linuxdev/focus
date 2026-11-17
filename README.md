@@ -7,6 +7,7 @@ Statische Web-App, die die Indikatoren des [Dashboard Deutschland](https://www.d
 - **Mein Geld**: persönliche Teuerung mit eigenem Warenkorb, Verdienste gegen Preise, Arbeitszeit statt Euro, Erschwinglichkeit von Wohneigentum
 - **Preise im Detail**: alle Positionen des amtlichen Warenkorbs nach Preisänderung, durchsuchbar
 - **Mein Jahrgang**: Geburtenzahl, heutige Größe, Lebenserwartung und Alterung für das eigene Geburtsjahr
+- **Mein Landkreis**: Steckbrief für 400 Landkreise und kreisfreie Städte mit Platz unter allen Kreisen und Ranglisten
 - **Länder**: Rangliste, Veränderung und Schere zwischen den Bundesländern, auch für abgeleitete Größen wie Kaufkraft
 - **Vergleichen**: beliebige Reihen nebeneinander, indexiert, preisbereinigt oder je Einwohner, mit Gleichlauf und Vorlauf
 - Themenseiten und Detailansicht je Indikator

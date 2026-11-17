@@ -43,6 +43,31 @@ Geprüft am 17. November 2026 mit echten Abrufen.
 - Die GENESIS-Reihen sind aktueller als das Dashboard: am Prüftag Verbraucherpreisindex bis Oktober 2026,
   Lohnindizes bis September 2026.
 
+## Regionaldatenbank Deutschland
+
+Geprüft am 17. November 2026.
+
+- Adresse: `https://www.regionalstatistik.de/genesisws/rest/2020/…`, dieselbe Schnittstelle wie GENESIS-Online.
+- Gastzugang (`GAST`/`GAST`): nur `helloworld/logincheck`. Anders als bei GENESIS-Online sind auch die Suche
+  (`find/find`) und der Tabellenabruf gesperrt (HTTP 401).
+- Der API-Token von GENESIS-Online gilt dort nicht: Die Anmeldung antwortet „Bitte geben Sie Ihr Passwort ein“,
+  Abrufe enden mit HTTP 404 und derselben Meldung. Es braucht ein eigenes Konto bei der Regionaldatenbank.
+- Vorbereitet: `scripts/lib/genesis.ts` kennt die Quelle `regional` und liest dafür `REGIONAL_USER` und
+  `REGIONAL_PASSWORD`; der Prüf-Workflow reicht beide Geheimnisse durch (Eingabe `source: regional`).
+- Laut Anmeldemeldung: höchstens zehn gleichzeitige Anfragen.
+
+## Kreistabellen in GENESIS-Online
+
+- GENESIS-Online führt selbst Tabellen auf Kreisebene, abrufbar mit dem vorhandenen Token: Bevölkerung (12411-0015),
+  Altersgruppen (12411-0017), Fläche (11111-0002), Ausländer (12521-0040), Wohnungen und Wohnfläche (31231-0020),
+  Kraftfahrzeuge (46251-0020, 46251-0021), Elterngeld (22922-0042 und weitere), Grundsicherung, Schutzsuchende.
+- Gliederung `KREISE` mit fünfstelligem Kreisschlüssel; die ersten zwei Stellen sind das Bundesland.
+- Die Tabellen führen 477 Kreise, davon 400 bestehende. Aufgelöste Kreise („bis 30.06.2007“) haben keinen Wert
+  und werden weggelassen.
+- Ohne `startyear` kommen nur die jüngsten Jahre (Bevölkerung: fünf). Die Pkw-Tabelle nach Kraftstoffarten
+  hat je Jahr rund zehn Megabyte.
+- Nicht in GENESIS-Online auf Kreisebene gefunden: Einkommen, Arbeitslosigkeit, Wirtschaftsleistung, Mieten.
+
 ## Dashboard Deutschland
 
 - Betrieben vom Statistischen Bundesamt, ohne Anmeldung, `GET`, JSON.

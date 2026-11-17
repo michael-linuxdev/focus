@@ -40,6 +40,9 @@ Ansichten im Browser ansehen (Desktop und 390 px Breite, ohne waagerechtes Scrol
   (`public/data/prices.json`).
 - `src/views/jahrgang.ts` „Mein Jahrgang“ (Rechenwege in `src/lib/cohort.ts`): Geburtenzahl, heutige Größe des Jahrgangs,
   fernere Lebenserwartung, Altenquotient (`public/data/cohorts.json`).
+- `src/views/kreis.ts` „Mein Landkreis“ (Aufbereitung und Kennzahlen in `src/lib/kreise.ts`, Liste `KREIS_METRICS`):
+  Steckbrief eines Kreises mit Platz unter allen 400 Kreisen und Ranglisten (`public/data/kreise.json`, Tabellen in
+  `KREIS_TABLES`).
 - `src/views/laender.ts` Ländervergleich (Rechenwege in `src/lib/regions.ts`): Rangliste, Veränderung, Schere; die
   Kennzahlen samt abgeleiteter Größen stehen in der Liste `METRICS`.
 - Auffällige Werte: `findExtreme` in `src/lib/stats.ts` vermerkt beim Datenabruf je Reihe, ob der jüngste Wert seit
@@ -65,6 +68,10 @@ Ansichten im Browser ansehen (Desktop und 390 px Breite, ohne waagerechtes Scrol
 - Der API-Token des Auftraggebers liegt als Geheimnis `GENESIS_USER` in GitHub Actions, nicht in der Cloud-Umgebung.
   Abrufe mit Konto laufen deshalb nur dort; lokal holt `npm run data` nur das Dashboard und behält die gespeicherten
   GENESIS-Reihen.
+- Regionaldatenbank (`www.regionalstatistik.de`): gleiche Schnittstelle, aber eigenes Konto nötig; der Token von
+  GENESIS-Online gilt dort nicht und der Gastzugang darf nichts abrufen. Solange die Geheimnisse `REGIONAL_USER` und
+  `REGIONAL_PASSWORD` fehlen, fehlen Einkommen, Arbeitslosigkeit und Wirtschaftsleistung je Kreis. Zu Beginn einer
+  Sitzung daran erinnern, solange hier kein Konto vermerkt ist.
 - Neue Tabelle: Code mit `npm run genesis:find -- Begriff` suchen, in `scripts/genesis-tables.ts` eintragen, pushen.
   Dann den Workflow „GENESIS-Zugang prüfen“ (`genesis-probe.yml`) auf dem Arbeitsbranch auslösen: mit Eingabe `tables`
   zeigt er Aufbau und Zeitraum einer Tabelle im Protokoll, mit `refresh: true` holt er alle Daten und committet sie auf
