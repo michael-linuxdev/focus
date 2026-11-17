@@ -1,5 +1,5 @@
 // Rechenwege für den Vergleich von Zeitreihen. Reine Funktionen.
-import type { Point } from "./types.ts";
+import type { Extreme, Point } from "./types.ts";
 
 export function clip(data: Point[], from: number, to = Infinity): Point[] {
   return data.filter((p) => p[0] >= from && p[0] <= to);
@@ -204,16 +204,6 @@ export function perCapita(data: Point[], population: Point[], factor = 1): Point
 }
 
 // ---------- Auffällige Werte ----------
-
-export interface Extreme {
-  dir: "high" | "low";
-  /** Der auffällige Wert: bei Raten der Stand selbst, sonst die Veränderung zum Vorjahr in Prozent. */
-  value: number;
-  /** Zeitpunkt, zu dem der Wert zuletzt mindestens so extrem war; null, wenn nie im gesamten Zeitraum. */
-  since: number | null;
-  /** Länge des Zeitraums ohne vergleichbaren Wert, in Jahren. */
-  years: number;
-}
 
 const YEAR_MS = 365.25 * 86_400_000;
 
