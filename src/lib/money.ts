@@ -1,6 +1,6 @@
 // Rechenwege für „Mein Geld“: persönliche Teuerung, Arbeitszeit, Erschwinglichkeit. Reine Funktionen.
 import { valueAt } from "./stats.ts";
-import type { Point } from "./types.ts";
+import type { Point, PriceItems } from "./types.ts";
 
 export interface PriceGroup {
   code: string;
@@ -100,6 +100,39 @@ export function financingCost(priceIndex: Point[], yields: Point[], repayment = 
   for (const [time, price] of priceIndex) {
     const rate = at(yields, time);
     if (rate !== null) out.push([time, (price * (Math.max(rate, 0) + repayment)) / 100]);
+  }
+  return out;
+}
+
+export interface ItemChange {
+  item: PriceItems["items"][number];
+  /** Preisänderung zwischen den beiden Jahren in Prozent. */
+  change: number;
+}
+
+/** Preisänderung jeder Position zwischen zwei Jahren, absteigend. Positionen ohne Wert in einem der Jahre entfallen. */
+export function itemChanges(prices: PriceItems, fromYear: number, toYear: number): ItemChange[] {
+  const a = prices.years.indexOf(fromYear);
+  const b = prices.years.indexOf(toYear);
+  if (a < 0 || b < 0) return [];
+  const out: ItemChange[] = [];
+  for (const item of prices.items) {
+    const before = item.values[a];
+    const after = item.values[b];
+    if (before && after !== null && after !== undefined) out.push({ item, change: (after / before - 1) * 100 });
+  }
+  return out.sort((x, y) => y.change - x.change);
+}
+
+/** Reihe einer Position ab `fromYear`, auf 100 im Startjahr gesetzt. */
+export function itemSeries(prices: PriceItems, item: PriceItems["items"][number], fromYear: number): Point[] {
+  const start = prices.years.indexOf(fromYear);
+  const base = start >= 0 ? item.values[start] : null;
+  if (!base) return [];
+  const out: Point[] = [];
+  for (let i = start; i < prices.years.length; i++) {
+    const value = item.values[i];
+    if (value !== null && value !== undefined) out.push([Date.UTC(prices.years[i]!, 0, 1), (value / base) * 100]);
   }
   return out;
 }

@@ -8,7 +8,9 @@ import { loadData, loadSeries, store } from "./state.ts";
 import { h, set } from "./ui/dom.ts";
 import { YEAR, dataTable, rangeControl, sourcesLine } from "./ui/parts.ts";
 import { viewGeld } from "./views/geld.ts";
+import { viewJahrgang } from "./views/jahrgang.ts";
 import { viewLaender } from "./views/laender.ts";
+import { viewPreise } from "./views/preise.ts";
 
 const MAX_COMPARE = 6;
 const FREQUENCY_ORDER: Frequency[] = ["täglich", "wöchentlich", "monatlich", "vierteljährlich", "jährlich"];
@@ -145,6 +147,12 @@ function viewHome(): HTMLElement {
       { class: "grid wide" },
       catalog.indicators.some((i) => i.id === "genesis_61111-0003")
         ? h("a", { class: "card", href: "#/geld" }, h("h3", {}, "Mein Geld"), h("div", { class: "desc" }, "Deine persönliche Teuerung mit eigenem Warenkorb, Lohn gegen Preise in deiner Branche, Arbeitszeit statt Euro und die Erschwinglichkeit von Wohneigentum."))
+        : null,
+      catalog.indicators.some((i) => i.id === "genesis_61111-0003")
+        ? h("a", { class: "card", href: "#/preise" }, h("h3", {}, "Preise im Detail"), h("div", { class: "desc" }, "Was ist am stärksten teurer geworden, was billiger? Alle Positionen des amtlichen Warenkorbs durchsuchen, von Butter bis Bahnfahrt."))
+        : null,
+      catalog.indicators.some((i) => i.id === "genesis_12612-0001")
+        ? h("a", { class: "card", href: "#/jahrgang" }, h("h3", {}, "Mein Jahrgang"), h("div", { class: "desc" }, "Wie groß war dein Geburtsjahrgang, wie groß ist er heute, und welche Lebenserwartung nennt die Statistik für dein Alter?"))
         : null,
       catalog.indicators.some((i) => i.region)
         ? h("a", { class: "card", href: "#/laender" }, h("h3", {}, "Bundesländer im Vergleich"), h("div", { class: "desc" }, "Einkommen, Kaufkraft, Mieten, Arbeitslosigkeit und Lebenserwartung: Wo steht dein Land, und geht die Schere auf oder zu?"))
@@ -653,6 +661,8 @@ function render(): void {
   else if (parts[0] === "i" && parts[1]) view = viewIndicator(parts[1]);
   else if (parts[0] === "vergleich") view = viewCompare(params);
   else if (parts[0] === "geld") view = viewGeld();
+  else if (parts[0] === "preise") view = viewPreise();
+  else if (parts[0] === "jahrgang") view = viewJahrgang(params);
   else if (parts[0] === "laender") view = viewLaender(params);
   else if (parts[0] === "suche") view = viewSearch(params.get("q") ?? "");
   else view = viewMissing();
@@ -685,7 +695,7 @@ function render(): void {
         "div",
         { class: "bar" },
         h("a", { class: "brand", href: "#/" }, "Lagebild Deutschland"),
-        h("nav", {}, navLink("#/", "Überblick", parts.length === 0), navLink("#/geld", "Mein Geld", parts[0] === "geld"), navLink("#/laender", "Länder", parts[0] === "laender"), navLink("#/vergleich", "Vergleichen", parts[0] === "vergleich")),
+        h("nav", {}, navLink("#/", "Überblick", parts.length === 0), navLink("#/geld", "Mein Geld", parts[0] === "geld" || parts[0] === "preise"), navLink("#/jahrgang", "Mein Jahrgang", parts[0] === "jahrgang"), navLink("#/laender", "Länder", parts[0] === "laender"), navLink("#/vergleich", "Vergleichen", parts[0] === "vergleich")),
         form,
       ),
     ),

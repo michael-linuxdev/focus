@@ -80,3 +80,32 @@ export interface Facts {
   earnings: { sex: string; age: string; hourlyMean?: number; monthlyMean?: number; hourlyMedian?: number; monthlyMedian?: number }[];
   earningsStand: string;
 }
+
+/** Alle Positionen des Verbraucherpreisindex mit Jahreswerten, für „Preise im Detail“. */
+export interface PriceItems {
+  years: number[];
+  items: {
+    code: string;
+    label: string;
+    /** Gliederungstiefe: 2 = Hauptgruppe bis 5 = einzelne Ware oder Dienstleistung. */
+    level: number;
+    /** Anteil am amtlichen Warenkorb in Promille, falls bekannt. */
+    weight?: number;
+    /** Indexwert je Jahr aus `years`; null, wo die Quelle keinen Wert hat. */
+    values: (number | null)[];
+  }[];
+}
+
+/** Daten für „Mein Jahrgang“. */
+export interface CohortData {
+  /** Stichtagsjahre (31. Dezember) der Bevölkerung nach Altersjahren. */
+  years: number[];
+  /** Je Jahr die Bevölkerung nach Alter 0 bis 84; der letzte Eintrag ist „85 und älter“. */
+  ages: number[][];
+  /** Lebendgeborene je Jahr. */
+  births: [number, number][];
+  /** Fernere Lebenserwartung nach vollendetem Alter aus der jüngsten Sterbetafel. */
+  remaining: { period: string; male: number[]; female: number[] };
+  /** Lebenserwartung bei Geburt über die Zeit: [Endjahr der Sterbetafel, Jahre]. */
+  atBirth: { male: [number, number][]; female: [number, number][] };
+}

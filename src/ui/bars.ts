@@ -8,6 +8,9 @@ export interface BarItem {
   highlight?: boolean;
   /** Zusatz hinter der Beschriftung, z. B. „dein Land“. */
   note?: string;
+  /** Macht die Beschriftung zur Schaltfläche. `pressed` zeigt den Zustand einer Auswahl. */
+  onClick?: () => void;
+  pressed?: boolean;
 }
 
 export function barList(items: BarItem[], format: (value: number) => string, label: string): HTMLElement {
@@ -25,7 +28,9 @@ export function barList(items: BarItem[], format: (value: number) => string, lab
       return h(
         "li",
         { class: item.highlight ? "bar-row highlight" : "bar-row", title: `${item.label}: ${format(item.value)}` },
-        h("span", { class: "bar-label" }, item.label, item.note ? h("span", { class: "muted" }, ` · ${item.note}`) : null),
+        item.onClick
+          ? h("button", { type: "button", class: "bar-label bar-button", "aria-pressed": item.pressed === undefined ? undefined : String(item.pressed), onclick: item.onClick }, item.label)
+          : h("span", { class: "bar-label" }, item.label, item.note ? h("span", { class: "muted" }, ` · ${item.note}`) : null),
         h(
           "span",
           { class: "bar-track" },

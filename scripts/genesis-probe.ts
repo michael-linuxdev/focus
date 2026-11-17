@@ -30,7 +30,9 @@ for (const spec of tables) {
     const count = (key: (row: Record<string, string>) => string): string => {
       const seen = new Map<string, number>();
       for (const row of rows) seen.set(key(row), (seen.get(key(row)) ?? 0) + 1);
-      return [...seen.entries()].slice(0, 130).map(([k, n]) => `${k} (${n})`).join(" · ") + (seen.size > 130 ? ` · … insgesamt ${seen.size}` : "");
+      // Kurz halten: Die Ausgabe wird im Protokoll gelesen. PROBE_LIST erhöht die Zahl der gezeigten Ausprägungen.
+      const cap = Number(process.env.PROBE_LIST ?? 8);
+      return [...seen.entries()].slice(0, cap).map(([k, n]) => `${k} (${n})`).join(" · ") + (seen.size > cap ? ` · … insgesamt ${seen.size}` : "");
     };
     console.log(`Merkmale: ${count((row) => `${row.value_variable_code} „${row.value_variable_label}“ [${row.value_unit}]`)}`);
     for (let n = 1; rows[0]?.[`${n}_variable_code`] !== undefined; n++) {
