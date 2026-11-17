@@ -96,3 +96,59 @@ describe("Kennzahlen und Formate", () => {
     expect(formatDate(Date.UTC(2026, 3, 7), "täglich")).toBe("7. April 2026");
   });
 });
+
+import { deflate, findExtreme, leadLag, perCapita, valueAt, yearOverYear } from "../src/lib/stats.ts";
+
+describe("Vorlauf, Umrechnung, Auffälligkeit", () => {
+  const m = (i: number): number => Date.UTC(2015, i, 1);
+  // Unregelmäßiges, aber festes Muster ohne Zufall.
+  const wave = (i: number): number => Math.sin(i * 0.9) * 5 + Math.sin(i * 0.37) * 3 + ((i * 7) % 5);
+
+  it("erkennt, welche Reihe vorausläuft", () => {
+    const a: Point[] = Array.from({ length: 80 }, (_, i) => [m(i), wave(i)]);
+    const b: Point[] = Array.from({ length: 80 }, (_, i) => [m(i), wave(i - 3)]);
+    const found = leadLag(a, b)!;
+    expect(found.lead).toBe(3);
+    expect(found.r).toBeGreaterThan(0.99);
+    expect(leadLag(b, a)!.lead).toBe(-3);
+    expect(leadLag(a, a)).toBeNull();
+    expect(leadLag(a.slice(0, 10), b)).toBeNull();
+  });
+
+  it("liest Zwischenwerte linear und hält am Rand den Randwert", () => {
+    const data: Point[] = [[0, 10], [10, 20]];
+    expect(valueAt(data, 5)).toBe(15);
+    expect(valueAt(data, -3)).toBe(10);
+    expect(valueAt(data, 99)).toBe(20);
+    expect(valueAt([], 1)).toBeNull();
+  });
+
+  it("rechnet in heutige Preise und je Kopf um", () => {
+    const cpi: Point[] = [[m(0), 100], [m(12), 110], [m(24), 121]];
+    expect(deflate([[m(0), 50], [m(24), 50], [m(400), 1]], cpi)).toEqual([[m(0), 60.5], [m(24), 50]]);
+    expect(perCapita([[m(0), 4000]], [[m(0), 80]], 1000)).toEqual([[m(0), 50000]]);
+  });
+
+  it("bildet Vorjahresveränderungen", () => {
+    const data: Point[] = Array.from({ length: 25 }, (_, i) => [m(i), 100 * 1.02 ** (i / 12)]);
+    const yoy = yearOverYear(data);
+    expect(yoy).toHaveLength(13);
+    expect(yoy[0]![1]).toBeCloseTo(2, 5);
+  });
+
+  it("meldet einen Wert, der lange nicht erreicht wurde", () => {
+    // Zehn Jahre flach mit kleinem Muster, dann ein Sprung: stärkster Anstieg im gesamten Zeitraum.
+    const data: Point[] = Array.from({ length: 121 }, (_, i) => [m(i), 100 + (i % 6) + (i === 120 ? 30 : 0)]);
+    const extreme = findExtreme(data, false)!;
+    expect(extreme.dir).toBe("high");
+    expect(extreme.since).toBeNull();
+    expect(extreme.value).toBeGreaterThan(25);
+    // Raten: der Stand selbst zählt; der Tiefstand von vor sieben Jahren wird als Bezug genannt.
+    const rate: Point[] = Array.from({ length: 121 }, (_, i) => [m(i), i === 36 ? 1 : i === 120 ? 1.5 : 5 + (i % 4)]);
+    const low = findExtreme(rate, true)!;
+    expect(low.dir).toBe("low");
+    expect(low.since).toBe(m(36));
+    expect(low.years).toBeCloseTo(7, 1);
+    expect(findExtreme(rate.slice(0, 60), true)).toBeNull();
+  });
+});

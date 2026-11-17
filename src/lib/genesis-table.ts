@@ -86,6 +86,11 @@ export function rowTime(row: Row): number | null {
   const time = (row.time ?? "").trim();
   const date = /^(\d{4})-(\d{2})-(\d{2})$/.exec(time);
   if (date) return Date.UTC(Number(date[1]), Number(date[2]) - 1, Number(date[3]));
+  // Stichmonat „2025-04P1M“ und Zeitraum „2018-P2Y“ (2018 bis 2020, gezählt wird das Endjahr).
+  const month = /^(\d{4})-(\d{2})P1M$/.exec(time);
+  if (month) return Date.UTC(Number(month[1]), Number(month[2]) - 1, 1);
+  const period = /^(\d{4})-P(\d+)Y$/.exec(time);
+  if (period) return Date.UTC(Number(period[1]) + Number(period[2]), 0, 1);
   if (!/^\d{4}$/.test(time)) return null;
   const year = Number(time);
   for (const dim of dimensions(row)) {
