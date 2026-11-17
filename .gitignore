@@ -1,8 +1,4 @@
 node_modules
 dist
-dev-dist
-coverage
-*.tsbuildinfo
-.DS_Store
 .env*
-test-results
+.DS_Store
